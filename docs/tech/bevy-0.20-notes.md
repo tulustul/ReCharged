@@ -755,10 +755,22 @@ commands.spawn((Node { width: percent(100), height: percent(100), ..default() },
 ### Overlay camera, render to texture, layers
 
 ```rust
-// Full-window 2D/UI camera on top of all player views (pause menu, results, timers):
+// Full-window 2D/UI camera on top of all player views (pause menu, results, timers).
+// WARNING (found by T04 with live UI): with HDR player cameras, `ClearColorConfig::None` here is
+// WRONG — the overlay's LDR texture is never cleared, so UI accumulates across frames (the GPU
+// check below only captured a static first frame). Clear to transparent and blend premultiplied:
 commands.spawn((
     Camera2d,
-    Camera { order: 100, clear_color: ClearColorConfig::None, ..default() },  // don't erase the views
+    Camera {
+        order: 100,
+        clear_color: ClearColorConfig::Custom(Color::NONE),
+        output_mode: bevy::camera::CameraOutputMode::Write {
+            blend_state: Some(bevy::render::render_resource::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+            clear_color: ClearColorConfig::None,
+        },
+        ..default()
+    },
+    Msaa::Off,
     IsDefaultUiCamera,                                                        // un-targeted UI goes here
 ));
 // Rear-view mirror: camera -> Image -> UI ImageNode (or a material texture)

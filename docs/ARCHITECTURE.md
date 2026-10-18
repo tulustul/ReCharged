@@ -482,12 +482,14 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
     hosts the UI (`IsDefaultUiCamera`) — proven by the bevy-react examples; HDR, bloom and
     frosted-glass `backdropFilter` all work.
   - *Split-screen* (2–4 players): player cameras keep HDR/post-processing with viewports; a
-    full-window `OverlayCamera` (`Camera2d`, highest order, `ClearColorConfig::None`,
-    `IsDefaultUiCamera`) hosts the UI. GPU-verified with plain bevy_ui in Bevy 0.20 (mixed-HDR
-    camera stacks alpha-composite; `docs/tech/bevy-0.20-notes.md` §9). React panels use
-    translucent fills in this mode (`backdropFilter` has no 3D frame to sample on the overlay).
-    **Verify the rig with the real bevy-react UI first** (screenshot); fallback if it fails:
-    `ClearColorConfig::Custom(Color::NONE)` + premultiplied-alpha output (`bevy-react-notes.md` §8.3).
+    full-window `OverlayCamera` hosts the UI: `Camera2d`, order 10, `clear_color:
+    ClearColorConfig::Custom(Color::NONE)`, `output_mode: CameraOutputMode::Write { blend_state:
+    Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING), clear_color: ClearColorConfig::None }`,
+    `Msaa::Off`, `IsDefaultUiCamera` + `UiHost` (`rc_camera::overlay_camera()`; verified with the
+    real React UI by T04, see `docs/design/rc_camera.md`). A `ClearColorConfig::None` overlay does
+    **not** work: over HDR players its LDR texture is never cleared, so the UI accumulates frame
+    over frame (translucent panels turn opaque, removed UI stays). React panels use translucent
+    fills in split-screen (`backdropFilter` has no 3D frame to sample on the overlay).
   - Anti-aliasing: **TAA only in single view** (TAA is broken with `Camera::viewport` in 0.20.0);
     split-screen maps TAA → SMAA. SSAO requires `Msaa::Off`, so MSAA is never chosen while SSAO is
     on (Bevy's per-camera default is `Msaa::Sample4` — set it explicitly). rc_render owns this

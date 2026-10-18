@@ -956,12 +956,12 @@ const GRID: Record<number, BevyStyle> = {
 - Keep the Rust viewport math and the React grid in sync (both derived from window size; Rust recomputes on `WindowResized`) — or, as ARCHITECTURE.md plans (`PlayerViewports` → `viewports` event), position each HUD `positionType: "absolute"` at the logical rects Rust sends (one source of truth; UI px must equal window logical px, i.e. no `UiScale`, see §5 scaling). Whole-window overlays (pause, countdown, results) are `<root>`s on top.
 - Alternative (cyberpunk's game view): render each player into a texture (`RenderTargets::create` + `PortalCamera`) and lay out `<portal>`s in React (React owns the split; pause blur via `filter` + `cache: "never"`). Costs: textures capped at **2048 px/side** (a 2560-wide single view gets upscaled), `<anchor>` doesn't work inside portals, `backdropFilter` can't see portal content. Use viewports for races, portals for previews.
 
-> **Orchestrator update (2026-10-18):** the Bevy 0.20 digest GPU-verified that an overlay
-> `Camera2d` with `ClearColorConfig::None` + `IsDefaultUiCamera` composites correctly over two
-> **HDR** viewport cameras (0.20 alpha-composites mixed-HDR stacks; see `bevy-0.20-notes.md` §9 and
-> its verification log). ReCharged therefore uses that rig for split-screen (ARCHITECTURE §5.8),
-> with translucent panels instead of `backdropFilter`; rig B below is the fallback if the real
-> bevy-react UI misbehaves on it. Single-view screens host the UI on the 3D camera.
+> **Orchestrator update (verified by T04 with the real React UI):** **rig B below is the
+> ReCharged split-screen rig.** The `ClearColorConfig::None` overlay (rig A) only *looked* right
+> in a static first-frame GPU check: over HDR viewport players its LDR main texture is never
+> cleared (`LoadOp::Load`), so React UI accumulates — translucent panels turn opaque within a few
+> frames and removed UI stays on screen. See ARCHITECTURE §5.8 and `docs/design/rc_camera.md`.
+> Single-view screens host the UI on the 3D camera.
 
 ### 8.3 Why those clear colors (Bevy 0.20 internals; UNVERIFIED by running — prototype the 4-player rig early)
 - Cameras with the same `(target, texture usages, main texture format [HDR or not], Msaa)` share the window's main textures (`bevy_render/src/view/mod.rs:1380-1392` `main_texture_key`), but **each camera gets its own `ColorAttachment` and clears the whole shared texture on first use if its `clear_color` isn't `None`** (`view/mod.rs:1514-1517`, `texture/texture_attachment.rs:50-52`). Viewport cameras still look right on screen because each one blits only its viewport to the window (`bevy_core_pipeline/src/upscaling/node.rs:92-95`); later cameras blend (`upscaling/mod.rs:63-80`: `sorted_camera_index_for_target > 0` → `BlendState::ALPHA_BLENDING`).
