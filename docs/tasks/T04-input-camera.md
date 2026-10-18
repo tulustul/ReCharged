@@ -9,7 +9,7 @@ digests: bevy §0, §9 (cameras, split screen, overlay), §10 (AA), §11 (input,
 
 ## Owned paths
 `crates/rc_input/**`, `crates/rc_camera/**`, `docs/design/rc_input.md`, `docs/design/rc_camera.md`.
-**rc_core grant:** additive edits in `crates/rc_core/src/input.rs` only.
+**rc_core grant:** additive edits in `crates/rc_core/src/input.rs` and `crates/rc_core/src/camera.rs` only.
 
 ## Deliverables — rc_input
 1. Devices `KeyboardA`, `KeyboardB`, `Gamepad(Entity)`; default bindings (GDD §12.1) in

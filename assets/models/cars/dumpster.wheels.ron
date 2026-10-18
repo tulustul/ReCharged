@@ -1,0 +1,9 @@
+(
+    car: "dumpster",
+    wheels: [ // order: fl, fr, rl, rr; centre in car space (Bevy axes), radius, width
+        (name: "wheel_fl", center: (-0.625, 0.420, -0.675), radius: 0.420, width: 0.320),
+        (name: "wheel_fr", center: (0.625, 0.420, -0.675), radius: 0.420, width: 0.320),
+        (name: "wheel_rl", center: (-0.625, 0.420, 0.675), radius: 0.420, width: 0.320),
+        (name: "wheel_rr", center: (0.625, 0.420, 0.675), radius: 0.420, width: 0.320),
+    ],
+)

@@ -1,0 +1,67 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Bevy's defaults include `audio` (bevy_audio), which clashes with bevy_kira_audio: never enable it.
+# The list is a superset of every Bevy feature our dependencies switch on (bevy-react, rapier), so
+# `cargo check -p <any crate>` compiles the same Bevy as the full game and reuses its artifacts.
+bevy = { version = "0.20", default-features = false, features = [
+    "3d",
+    "ui",
+    "jpeg",
+    "debug",
+    "serialize",
+    "system_clipboard",
+    "keyboard",
+    "mouse",
+    "touch",
+    "gamepad",
+] }
+# No `parallel` (determinism). Debug render only via the binary's `debug-physics` feature.
+bevy_rapier3d = { version = "0.37", default-features = false, features = ["dim3", "async-collider", "to-bevy-mesh"] }
+bevy_kira_audio = { version = "0.27", default-features = false, features = ["ogg", "wav"] }
+bevy-react = "0.8.1"
+serde = { version = "1", features = ["derive"] }
+ron = "0.12"
+serde_json = "1"
+ts-rs = "10"
+
+rc_core = { path = "crates/rc_core" }
+rc_pins = { path = "crates/rc_pins" }
+rc_track = { path = "crates/rc_track" }
+rc_vehicle = { path = "crates/rc_vehicle" }
+rc_input = { path = "crates/rc_input" }
+rc_weather = { path = "crates/rc_weather" }
+rc_race = { path = "crates/rc_race" }
+rc_ai = { path = "crates/rc_ai" }
+rc_items = { path = "crates/rc_items" }
+rc_camera = { path = "crates/rc_camera" }
+rc_render = { path = "crates/rc_render" }
+rc_vfx = { path = "crates/rc_vfx" }
+rc_audio = { path = "crates/rc_audio" }
+rc_game = { path = "crates/rc_game" }
+rc_ui = { path = "crates/rc_ui" }
+rc_testkit = { path = "crates/rc_testkit" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+# PRACTICES §10: every public item is documented (clippy runs with -D warnings).
+missing_docs = "warn"
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 3
+debug = false
+
+[profile.release]
+lto = "thin"

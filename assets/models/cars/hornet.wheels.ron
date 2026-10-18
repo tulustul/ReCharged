@@ -1,0 +1,9 @@
+(
+    car: "hornet",
+    wheels: [ // order: fl, fr, rl, rr; centre in car space (Bevy axes), radius, width
+        (name: "wheel_fl", center: (-0.480, 0.240, -0.600), radius: 0.240, width: 0.180),
+        (name: "wheel_fr", center: (0.480, 0.240, -0.600), radius: 0.240, width: 0.180),
+        (name: "wheel_rl", center: (-0.480, 0.240, 0.600), radius: 0.240, width: 0.180),
+        (name: "wheel_rr", center: (0.480, 0.240, 0.600), radius: 0.240, width: 0.180),
+    ],
+)

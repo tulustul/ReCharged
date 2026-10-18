@@ -7,8 +7,8 @@
 | GDD | GDD + architecture + practices, reviews 1–2 | R1, R2 | **approved** (v2.1) |
 | T01 | foundation / walking skeleton | GDD | in progress |
 | T08 | art bible + 8 car models | GDD | in progress |
-| T09a | SFX synthesis (phase 1 of T09) | GDD | in progress |
-| T10 | music | GDD | in progress |
+| T09a | SFX synthesis (phase 1 of T09) | GDD | done (73 files, `docs/design/sfx.md`) |
+| T10 | music | GDD | done (12 cues, `docs/design/music.md`) |
 | T02 | track system + test_oval + toy_town layout | T01 | brief ready |
 | T03 | vehicle physics | T01 | brief ready |
 | T04 | input + cameras (split-screen rig first) | T01 | brief ready |

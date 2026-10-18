@@ -1,0 +1,20 @@
+[package]
+name = "rc_ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rc_core.workspace = true
+rc_game.workspace = true
+bevy.workspace = true
+bevy-react.workspace = true
+serde.workspace = true
+ts-rs.workspace = true
+
+[dev-dependencies]
+rc_testkit.workspace = true

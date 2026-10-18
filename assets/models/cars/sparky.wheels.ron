@@ -1,0 +1,9 @@
+(
+    car: "sparky",
+    wheels: [ // order: fl, fr, rl, rr; centre in car space (Bevy axes), radius, width
+        (name: "wheel_fl", center: (-0.550, 0.300, -0.650), radius: 0.300, width: 0.220),
+        (name: "wheel_fr", center: (0.550, 0.300, -0.650), radius: 0.300, width: 0.220),
+        (name: "wheel_rl", center: (-0.550, 0.320, 0.650), radius: 0.320, width: 0.250),
+        (name: "wheel_rr", center: (0.550, 0.320, 0.650), radius: 0.320, width: 0.250),
+    ],
+)

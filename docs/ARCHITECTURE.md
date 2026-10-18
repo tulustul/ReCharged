@@ -55,6 +55,7 @@ bevy-volt/
 │  ├─ rc_game/                F1  app flow: boot, lifecycle transitions, modes, loading gate, pause, results, progression, persistence
 │  ├─ rc_ui/                  F2  bevy-react bridge: typed channels per namespace, HUD data push, bindings export
 │  ├─ rc_testkit/             T   headless app builders + helpers for integration tests (used only from `tests/`)
+│  ├─ rc_pins/                —   build hygiene only: pins third-party features so per-crate builds reuse one Bevy build (no code)
 │  └─ recharged/              BIN main.rs: assembles plugins, CLI flags (automation, capture, bench, bindings export)
 ├─ ui/                        React app (npm package; bundles → ui/dist/{vendor,app}.js)
 ├─ assets/                    data/ models/ textures/ audio/ fonts/ ui/   (all runtime content)
@@ -69,7 +70,7 @@ only on those listed:
 
 | Crate | May depend on (workspace) | External |
 |---|---|---|
-| rc_core | — | bevy, serde, ron |
+| rc_core | rc_pins (feature pins only) | bevy, serde, ron |
 | rc_track | rc_core | bevy_rapier3d |
 | rc_vehicle | rc_core | bevy_rapier3d |
 | rc_input | rc_core | — |
@@ -90,7 +91,9 @@ only on those listed:
 - Same-layer crates do not depend on each other; they share data via `rc_core`.
 - `rc_testkit` is a `[dev-dependency]` used only by integration tests in `crates/*/tests/`
   (unit tests inside a crate must not use it — that would compile the crate twice).
-- New external dependencies require orchestrator approval (PRACTICES §9).
+- New external dependencies require orchestrator approval (PRACTICES §9). After any dependency
+  change the orchestrator regenerates `rc_pins` (`python3 crates/rc_pins/update.py`, with no other
+  build running) so `cargo test -p <crate>` keeps reusing the shared build.
 
 ---
 
@@ -329,6 +332,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `UiSound(UiCue)` | ui | audio |
 | `Teleported { entity }` | vehicle (respawn), track (prop reset), race/items (spawns) | core (snapshot snap) |
 | `LoadingDone(&'static str)` | every loader | game (`LoadingTasks`) |
+| `LoadingFailed { key, error }` | any loader | game (→ Unloading → Menu + error dialog) |
 
 ### 4.6 Resources
 | Resource | Writer | Purpose |
