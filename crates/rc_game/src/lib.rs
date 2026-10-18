@@ -224,8 +224,6 @@ enum Step {
     Progress,
     /// `GameCommand`s and lifecycle transitions.
     Transitions,
-    /// The placeholder phase driver.
-    Phases,
     /// Writing saves.
     Saves,
 }
@@ -247,7 +245,6 @@ impl Plugin for GameFlowPlugin {
                     Step::Signals,
                     Step::Progress,
                     Step::Transitions,
-                    Step::Phases,
                     Step::Saves,
                 )
                     .chain()

@@ -4,7 +4,7 @@
 §3.1, the loading gate, pause, `RaceConfig` per mode, cup runs, Versus sessions, results →
 profile, saves and the soak runner. Systems sit in `FlowSet`, ordered by an internal `Step` chain:
 `Signals` (focus, disconnects, soak) → `Progress` (results, batteries, hints, stats) →
-`Transitions` (commands, gate, unloading) → `Phases` (placeholder driver until T06) → `Saves`.
+`Transitions` (commands, gate, unloading) → `Saves`. Race phases are driven by rc_race (T06).
 Progress runs before Transitions, so a restart sent in the frame a result arrives reverts it.
 
 ## Modules
@@ -22,7 +22,6 @@ Progress runs before Transitions, so a restart sent in the frame a result arrive
 | `prefs` | settings edits, rebinding, clamping |
 | `save` | files, envelopes, migrations, atomic writes, throttle, ghosts, session logs |
 | `soak` | `--soak` runner |
-| `phases` | placeholder phase driver (delete when rc_race drives phases) |
 
 ## Commands (`GameCommand`)
 | Command | Valid in | Effect |
@@ -140,7 +139,7 @@ the soak must catch.
 ## Known limitations
 - Grid order puts humans on pole (kept from T01; GDD is silent). Change in `race_setup` if
   playtests want humans at the back.
-- The phase driver is a placeholder until rc_race (T06) drives phases; `RaceResults` must exist
+- Race phases are driven by rc_race (T06); rc_game only sets `RacePhase::Setup` (start/restart). `RaceResults` must exist
   no later than entering `Finished` and be removed in `OnEnter(Setup)`.
 - Distance counts finished races only; play time is wall time of the app.
 - Window settings are applied by rc_render (single writer of the window).

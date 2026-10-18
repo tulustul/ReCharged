@@ -15,7 +15,7 @@
 | T05 | UI framework + menus | T01 | done (all screens; HUD = T05b) |
 | T07 | game flow, progression, persistence | T01 | done (54 tests) |
 | T09b | rc_audio system (phase 2 of T09) | T01, T09a | done (in-race listen pending integration) |
-| T06 | race rules | T02, T03 | in progress |
+| T06 | race rules | T02, T03 | done (27 tests) |
 | T11 | AI drivers | T02, T03 | in progress |
 | T12 | items | T02, T03 | in progress |
 | T13 | graphics (render) | T02, T08 | T13a + T13b in progress |
