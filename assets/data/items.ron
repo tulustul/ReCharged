@@ -1,0 +1,73 @@
+// Item odds and tuning (GDD §6). Read by rc_items when a race loads (dev builds hot-reload it).
+// Units: u, s, u/s, degrees. Rationale and the full table: docs/design/rc_items.md.
+//
+// Impulses are what a 3★-weight reference car (mass 2.6) feels: `up` / `push` / `forward` are
+// its Δv in u/s; rc_vehicle scales every impulse by (2.6 / mass)^0.5, so Zip and Bolt get 1.48×
+// the Δv and Dumpster 0.67×. `spin` is an angular impulse; the reference car's inertia is about
+// 0.96 (pitch), 1.18 (yaw) and 0.33 (roll), so spin / inertia = rad/s.
+(
+    pickups: (
+        radius: 1.5, // car centre to cube centre
+        respawn_secs: 2.0,
+        roulette_secs: 1.0,
+    ),
+    // Your own rockets and hazards ignore you this long after they spawn (GDD §5.5).
+    owner_immunity_secs: 1.0,
+    // GDD §6.3: band from f = (rank − 1) / (N − 1): rank 1 → first; f ≤ 0.4 → top;
+    // f < 0.7 → middle; else last (8 racers: 1 | 2–3 | 4–5 | 6–8). Every row sums to 100.
+    odds: (
+        first: {TurboCell: 10, SparkRocket: 15, OilSlick: 30, SpringPad: 20, ShieldBubble: 25},
+        top: {
+            TurboCell: 10, SparkRocket: 20, LeechCoil: 10, ShockOrb: 10, EmpPulse: 5,
+            GooBomb: 10, OilSlick: 10, SpringPad: 10, ShieldBubble: 15,
+        },
+        middle: {
+            TurboCell: 15, SparkRocket: 20, LeechCoil: 15, ShockOrb: 15, EmpPulse: 10,
+            GooBomb: 10, OilSlick: 5, SpringPad: 5, ShieldBubble: 5,
+        },
+        last: {TurboCell: 25, SparkRocket: 15, LeechCoil: 20, ShockOrb: 15, EmpPulse: 15, StormStrike: 10},
+    ),
+    turbo_cell: (top_speed: 1.45, force: 1.80, secs: 2.5),
+    spark_rocket: (
+        speed: 55.0,
+        lock_cone_deg: 35.0, // half-angle around the firing direction; leaving it breaks the lock
+        lock_range: 80.0, // fired forward
+        lock_range_back: 60.0, // fired backward (Look back held)
+        turn_rate_deg: 120.0, // per second
+        radius: 0.3, // body against walls and slopes
+        hit_radius: 1.3, // car centre to the rocket's path: detonates
+        blast_radius: 1.8, // every car this close to the detonation tumbles
+        life_secs: 4.0,
+        tumble: (up: 8.0, push: 6.0, spin: 1.5), // ≈ 1.5 s lost
+    ),
+    leech_coil: (
+        ahead_range: 40.0, // nearest car ahead in the race…
+        near_range: 20.0, // …else the nearest car in any direction
+        wait_secs: 3.0, // searching for a target
+        secs: 3.0, // tethered
+        share: 0.30, // of the target's charge, moved evenly over `secs` (10 %/s)
+        tow: 1.08, // top-speed multiplier while tethered
+        break_range: 45.0, // also breaks without line of sight
+    ),
+    shock_orb: (
+        speed: 24.0,
+        radius: 3.0, // knocks any car whose centre comes this close
+        life_secs: 10.0,
+        hits: 3,
+        height: 0.7, // above the track surface
+        edge_margin: 0.8, // bounces this far inside the racing width
+        max_angle_deg: 30.0, // launch angle to the track direction, at most
+        knock: (up: 6.0, push: 7.0, spin: 1.0), // pushed sideways
+    ),
+    emp_pulse: (windup_secs: 0.4, radius: 12.0, power: 0.0, secs: 2.0, drain: 0.5),
+    goo_bomb: (
+        fuse_secs: 6.0,
+        no_pass_back_secs: 0.5,
+        radius: 7.0,
+        tumble: (up: 9.0, push: 6.0, spin: 1.5),
+    ),
+    oil_slick: (radius: 2.5, life_secs: 25.0, grip: 0.2, secs: 1.2, spin: 2.5),
+    spring_pad: (radius: 1.6, life_secs: 25.0, up: 12.0, forward: 4.0, spin: 0.6),
+    shield_bubble: (secs: 10.0, push: 6.0), // push: Δv given to a car it bumps
+    storm_strike: (interval_secs: 0.25, power: 0.0, secs: 1.5, hop: 4.0),
+)

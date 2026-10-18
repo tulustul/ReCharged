@@ -197,7 +197,8 @@ pub struct ItemSlot {
     pub roulette: f32,
 }
 
-/// A Volt Cube pickup (attempt-scoped, spawned by rc_items).
+/// A Volt Cube pickup (attempt-scoped, spawned by rc_items). Available when its [`ItemTimer`]
+/// is 0; a taken cube's timer counts down its respawn.
 #[derive(Component, Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Pickup {
     /// Item row index along the lap.
@@ -206,7 +207,9 @@ pub struct Pickup {
     pub slot: u8,
 }
 
-/// A flying item (attempt-scoped, also `Interpolated`).
+/// An item in flight or about to go off (attempt-scoped, also `Interpolated`): a Spark Rocket, a
+/// Shock Orb, a Leech Coil tether (at its owner; [`ItemTarget`] = the tethered car) or an EMP
+/// Pulse winding up (at its owner; [`ItemTimer`] = wind-up left).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Projectile {
     /// What it is.
@@ -215,14 +218,32 @@ pub struct Projectile {
     pub owner: Entity,
 }
 
-/// A hazard left behind or attached (attempt-scoped).
+/// A hazard left behind or attached (attempt-scoped, also `Interpolated`; dropped hazards lie on
+/// the ground, rotated to its normal).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Hazard {
     /// What it is.
     pub kind: HazardKind,
-    /// The racer who dropped it.
+    /// The racer who dropped it (Goo Bomb: who last passed it on; its user at first).
     pub owner: Entity,
 }
+
+/// The car an item entity is bound to (rc_items): a Spark Rocket's lock, a Leech Coil's tether
+/// target, the Goo Bomb's carrier. `None` = unbound (no lock, tether still searching).
+#[derive(Component, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ItemTarget(pub Option<Entity>);
+
+/// Seconds until an item entity goes off or expires (rc_items): a Volt Cube's respawn (0 =
+/// available), a rocket's or orb's life, the EMP wind-up, the Leech Coil's search or tether,
+/// the Goo Bomb's fuse, a dropped hazard's life.
+#[derive(Component, Debug, Clone, Copy, Default, PartialEq)]
+pub struct ItemTimer(pub f32);
+
+/// How far an item entity reaches, in u (rc_items; draw it at this size): a dropped hazard's
+/// trigger disc, the Shock Orb's knock radius, the EMP's pulse, the Goo Bomb's and a rocket's
+/// blast.
+#[derive(Component, Debug, Clone, Copy, Default, PartialEq)]
+pub struct ItemRadius(pub f32);
 
 /// Request to apply a status effect (producers items, race; consumer the rc_items effects system).
 #[derive(Message, Debug, Clone, Copy, PartialEq)]
