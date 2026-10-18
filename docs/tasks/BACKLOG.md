@@ -23,3 +23,4 @@ QA/polish phase (T18) or when the owning area is touched next.
 | B16 | AI never takes shortcuts; rockets/leech fired without line-of-sight; one steering geometry for all cars | rc_ai | T11 |
 | B17 | Item races are rough (0.14–0.33 respawns per racer-lap, mostly hits/Spring Pad launches over walls) — tune impulses, add wall checks | rc_items balance | T11 |
 | B18 | Re-run `every_layout` AI test once all environments are final (incl. aisle_rush) | QA | T11 |
+| B19 | Maple Street: leaf piles look 0.9 u but collide at 0.5 u; decor beyond bounds sits 0.6 u below edge lawns; reverse curb-hop turn very slow (widen TURN_R) | env street | T16 street |
