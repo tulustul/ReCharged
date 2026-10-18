@@ -3,3 +3,4 @@
 /ui/dist
 *.blend1
 /screenshots/tmp
+__pycache__/
