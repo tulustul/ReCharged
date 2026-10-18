@@ -67,34 +67,10 @@ playback rate is the only pitch control. Rate 1.0 = mid revs (buggy f0 185 Hz, t
 sports 245 Hz). Content ≤ 9 kHz → alias-free up to rate ≈ 2.4 (kira resamples without an
 anti-alias filter). Verified with a simulated 0.55 → 2.0 → 0.7 rate ramp across loop wraps.
 
-## Playback notes for rc_audio (phase 2)
-- **Engine timbre per car** (catalog `CarInfo.engine`, orchestrator's file) — suggestion:
-  buggy whine: Sparky, Zip, Hornet · truck growl: Dumpster, Torque · sports scream: Phantom,
-  Volt GT, Bolt. A per-car base-rate multiplier (≈ 0.9–1.15, e.g. Zip high, Torque low) keeps
-  cars that share a timbre distinguishable.
-- **Engine rate/volume**: rate ≈ 0.55 + 1.3·rpm (0..1) + 0.1·load, clamp 0.5–2.2; volume from
-  throttle (≈ −10 dB coasting → 0 dB); optional per-instance low-pass for load (≈ 2.5 kHz coasting
-  → open at full load). Boost: `boost_whoosh` once + `boost_crackle_loop` while boosting. Drift:
-  `drift_sizzle_loop`, rate 0.8–1.6 and volume by charge gain rate.
-- **Surfaces** (slip loop by surface, volume by slip): skid_loop for Asphalt, Stone, ToyTrack,
-  Wood, Tile, Cardboard; scrub_loop for Carpet, Grass, Dirt, Water, Ice (smooth slide); Oil:
-  `oil_slip` on entry. Rolling layer by speed (rate ≈ 0.6–1.6): Grass `rumble_grass_loop`,
-  Dirt/mud `rumble_dirt_loop`, Water `rumble_water_loop`.
-- **Variants**: `impact_soft_1..3`, `impact_hard_1..3`, `landing_thump_1..2` — pick at random,
-  ±5 % rate, volume from `strength`.
-- **Repeated cues** scheduled by rc_audio: `roulette_tick` 12–15× over the 1 s roulette, then
-  `roulette_lock`; `lockon_beep` while locked (faster as the rocket closes in); `goo_beep` from
-  ~1 s down to ~0.12 s intervals over the 6 s fuse; `countdown_beep` ×3 then `countdown_go`.
-- **Entity loops**: `rocket_flight_loop` / `orb_hum_loop` on projectiles, `leech_hum_loop` while
-  tethered.
-- **Ambience**: indoor bed per environment — `room_tone` (house, toy store), `supermarket_hum`,
-  `workshop_hum` + `workshop_tools`; outdoor — `birds` (Clear, day), `crickets` (Clear, night),
-  `wind` (Cloudy; Snow: lower + low-passed ≈ 2 kHz for the hush), `rain_light` (Rain),
-  `rain_heavy` (Storm); indoor tracks use `rain_*_indoor`. Thunder `thunder_1/2/3` (close /
-  medium / distant by `Lightning { intensity }`), delayed after the flash, low-passed ≈ 700 Hz
-  indoors (no separate files). Fog: low-pass the ambience bus.
-- **Memory**: kira decodes whole files to f32 stereo frames (≈ 0.38 MB per second at 48 kHz) — load
-  only the current environment's/weather's ambience during Loading.
+## Playback
+How each file is triggered, mixed, spatialised and loaded is documented with the code in
+`docs/design/rc_audio.md` (engine rate mapping, car layers, message → cue table, ambience mix,
+music director, memory). Engine timbre per car comes from `catalog.ron` (`CarInfo.engine`).
 
 ## Cue table
 Output of `build.py` (decoded files). RMS: whole file for loops, loudest 100 ms for one-shots.
