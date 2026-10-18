@@ -38,11 +38,11 @@ cached for the app's lifetime, so restarts and next races reuse them.
   |---|---|---|
   | `toy_store` | 2 u, 0.06 gaps | `plastic_red/yellow/blue/green` (foam/toy blocks) |
   | `test` | 1.5 u, no gaps | `plastic_red`, `plastic_white` (kart barrier) |
-  | `street` | 4 u, 0.05 gaps | role `barrier` (kerb stones) |
+  | `street` | 2.4 u, 0.06 gaps | `garden_wall`, `garden_wall_b` (low sandstone garden wall) |
   | `garden` | 1.2 u, 0.06 gaps | role `barrier` (brick edging) |
   | `workshop` | 2 u, 0.04 gaps | roles `trim`, `barrier` (hazard-yellow kerbs, black rubber) |
   | `house` | 0.6 u, 0.02 gaps | `book_red/cream/green/blue/mustard/cream` (book rows; env materials) |
-  | `supermarket` | 2.4 u, 0.05 gaps | `barrier`, `crate_blue`, `barrier`, `crate_green` (kick plates, crates) |
+  | `supermarket` | 6 u, no gaps | role `barrier` (one painted-steel kick plate, #8E959C) |
   | others | the collider sweep | role `barrier` |
 - **Room shell** (`shell.rs`): wall inner faces stand exactly on `Track::bounds()` (the collider
   shell), 1 u thick; ceiling at `ActiveEnvironment.def.room.height`. Window openings from
@@ -63,7 +63,8 @@ cached for the app's lifetime, so restarts and next races reuse them.
   uses its drivable `surface` material, else the toy palette (`plastic_*`): knockables cycle
   colours per instance, static kinds keep one colour per kind.
 - **Lamps** (environment artists; the street artist's format): rc_render reads `lights` from
-  `props/*.ron` (rc_track ignores it) and spawns real lights at Night only:
+  `props/*.ron` (rc_track ignores it) and spawns real lights at the environment's `practicals`
+  level (time look field; default 1 at Night, 0 otherwise; street sunset 0.2):
   ```ron
   "street_lamp": (model: "...", colliders: [...],
       lights: [(offset: (0, 29, -6),         // prop space, u
@@ -74,9 +75,11 @@ cached for the app's lifetime, so restarts and next races reuse them.
                 dir: (0, -1, -0.15),         // spot direction in prop space (default straight down)
                 shadows: false)]),           // ≤ 1–2 shadowed hero lamps per track
   ```
-  Bulb materials of a prop glb named `lamp*` glow at their authored strength at Night and 0.05×
-  by day. Unknown lamp fields are load errors naming the file and kind; a test loads every
-  shipped `props/*.ron`.
+  Bulb materials of a prop or decor glb named `lamp*` glow at the `practicals` level (0.05× when
+  off); materials listed in the environment's `fixture_materials` (decor fixtures of the room
+  lamps, e.g. the supermarket's `tube_on`) glow at the room lamps' `lamps` level. Dimmed copies
+  are shared by all instances. Unknown lamp fields are load errors naming the file and kind; a
+  test loads every shipped `props/*.ron`.
 - **Decor** (`decor.rs`): decorative-only models without colliders (backdrops, furniture beyond
   the barriers) from the optional `assets/data/decor/<track>.ron`:
   `(decor: [(model: "models/...glb", pos: (x, y, z), yaw: 90, scale: 1.0, dir: Both)])` —
@@ -115,7 +118,8 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
       target/agent-data/T13b --unlock-all --quick-race $t --time noon --weather clear \
       --capture-previews --exit-after 60; done
   ```
-- `--track-tour <track>`: a shot every 25 u along the racing line, eye 1.6 u above it, looking
+- `--track-tour <track>`: a shot every 25 u along the racing line (moved forward past jump gaps
+  and ≥ 3 u away from item rows, so the eye is never inside the Volt Cubes), eye 1.6 u above it, looking
   8 u ahead along it (shots in a jump gap move past it) →
   `<user data>/captures/tour_<track>_<variant>/NNN.png`. Pass the same track to `--quick-race`.
 

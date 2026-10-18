@@ -659,10 +659,13 @@ file is loaded and validated by a test of its owning crate.
 | `--screenshot <path> [--screenshot-at <s>] [--screenshot-every <s>]` | captures |
 | `--headless-race` | no window/render/audio: run the race sim as fast as possible, print result JSON |
 | `--soak <minutes>` | chain random races through `Unloading`; assert entity/resource counts return to baseline |
-| `--bench <scenario>` | p50/p95 frame times as JSON |
+| `--bench <track>_<n>p` | p50/p95/p99 frame times as JSON (1920×1080 physical, vsync off) |
 | `--calibrate-medals` | Elite AI in a Phantom, items & catch-up off, on every layout → `medals.ron` |
 | `--capture-previews`, `--track-tour <track>` | preview images; screenshots along the racing line |
 | `--export-bindings <path>` | write the TS bindings and exit (also `cargo run -p rc_ui --example export_bindings`) |
+
+Every automated run uses vsync off (`AutoNoVsync`) and continuous winit updates, so captures don't
+depend on the monitor or window focus. Tool details: `docs/design/automation.md`.
 
 `rc_testkit`: headless app builders (MinimalPlugins, states, rapier, sim plugins, manual time,
 ambiguity detection), race helpers (enter race, step seconds, restart, next race), lifecycle

@@ -65,13 +65,17 @@ indirect light ≈ 15 % of the key. Screenshots are sRGB: 0.18 linear shows as 1
   skybox at night (the atmosphere composites over it, so stars fade by themselves), cloud dome.
   IBL comes from a generated sky cubemap (`sky::sky_radiance`, regenerated when the cloud cover
   changes) scaled by `env_light` (cd/m²) — **not** `AtmosphereEnvironmentMapLight`, whose probe
-  bind-group preparation panics every frame in Bevy 0.20 here.
+  bind-group preparation panics every frame in Bevy 0.20 here. Bevy re-filters a
+  `GeneratedEnvironmentMapLight` every frame, so it lives on one probe entity and every camera
+  shares the filtered maps (`EnvironmentMapLight` copies; split screen used to filter per view).
 - **Indoor:** key = sun through windows/skylights (the room shell's ceiling casts no shadows, walls
   do), fill = soft sky bounce, a generated room cubemap (walls/floor/ceiling, window band toward the
   key, lamp spots at night) for IBL, ceiling lamp grid over `Track::bounds()` at the env's
   `room.height`, window glass panes on the wall centre plane (`door: true` openings: no mullions,
   no rain on the pane; frames/openings in `track_visuals/shell.rs`). Extra env `lights` (point or
-  spot, `times` filter, real-world lumens) for display spots and practicals.
+  spot, `times` filter, real-world lumens) for display spots and practicals. Per time of day:
+  `lamps` = room lamp level 0–1 (supermarket night 0.12), `practicals` = props' lamp level
+  (default on at Night only); `fixture_materials` names decor fixtures that follow `lamps`.
 - **Emissives** are not scaled by exposure (`emissive_exposure_weight = 0`), so art-bible values
   read the same in every environment. Clear-coated paints reflect the environment map: keep
   `env_light` consistent with the actual room brightness.
@@ -99,7 +103,9 @@ G = 255 so `metallic` passes through), full mip chains (linear-light albedo mips
 widening) written as KTX2 + Zstandard by our own writer (stdlib `compression.zstd`; validated with
 `ktx validate`). 32 MB total, 1024² for hero ground, 512² for walls/props. Loaded with repeat
 addressing and 16× anisotropy; missing sets fall back to flat colours instead of invisible meshes.
-UVs are world units; `tile_u` per set/material. Environment files override the built-in names
+UVs are world units; `tile_u` per set/material; `hue_variation` drifts macro patches toward a
+drier tint (lawns). Water: light muddy base under a clear coat (puddles mirror the sky instead of
+reading as holes). Environment files override the built-in names
 (`floor`, `wall`, `ceiling`, `trim`, `barrier`, `ribbon_side`, generic sets, toy palette) and map
 surfaces to them. Car paint: clear coat 1.0 (0.04 solid / 0.06 metallic coat roughness, none on
 chrome).

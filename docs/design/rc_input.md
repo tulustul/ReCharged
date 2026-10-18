@@ -86,5 +86,5 @@ conflicts; pad disconnect and takeover.
 ## Known limitations
 - Mouse use does not set `LastUsed` (pointer input is React's), and there is no `DeviceKind::Mouse`
   glyph switching.
-- `--input-script` (AutomationConfig) is not implemented. It was not in T04's brief.
+- `--input-script` is implemented in `src/script.rs`: a scripted virtual device feeding `ButtonInput`/`Gamepad` before `InputSet::Collect` (see `docs/design/automation.md`).
 - A finished human's car still receives driving input (rc_race may hand it to the AI, Re-Volt style).

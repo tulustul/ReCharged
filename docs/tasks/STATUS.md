@@ -23,7 +23,7 @@
 | T15 | weather | T01 | done (12 tests) |
 | T05b | race HUD | T05, T06 | done |
 | T16 | environments & tracks (2 waves) | T02, art bible | all six done (toy, house, workshop, street, supermarket, garden) |
-| T17 | automation tools (input script, headless race, determinism, medals, bench) | T06, T11 | in progress |
+| T17 | automation tools (input script, headless race, determinism, medals, bench) | T06, T11 | done |
 | T18 | QA playtests & bug triage | all | todo |
 | QA | playtests, soak, bench, DoD checks | all | todo |
 

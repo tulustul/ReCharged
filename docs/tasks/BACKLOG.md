@@ -27,3 +27,8 @@ QA/polish phase (T18) or when the owning area is touched next.
 | B20 | ~~DONE~~ Intro fly-by camera passes through walls (Aisle Rush lobby grid is 10 u from the glazing) — clamp the intro orbit inside `Track::bounds()` and under the ceiling | rc_camera | T16 supermarket |
 | B21 | Prop glbs embed their own copies of texture sheets (~4 MB VRAM each in the supermarket) — share external textures | env art pipeline | T16 supermarket |
 | B22 | Decor has no time-of-day switch (supermarket ceiling light rows glow by day) — a "day-only"/"night-only" material prefix | rc_render | T16 supermarket |
+| B23 | Look-back camera mostly black when stopped against a ramp (Backyard Bash deck) — obstruction pull-in for look-back | rc_camera | T17 |
+| B24 | One Confirm on Car select once sent `race.start` twice (harmless: ignored in Loading) — debounce in the UI | ui | T17 |
+| B25 | ~1 in 8 Elite autopilot TT runs loses ~10 s (outliers absorbed by median-of-3 calibration) | rc_ai | T17 |
+| B26 | `rc_render::quality::bench` overlaps the binary's `--bench` (logs from app start) — remove or keep log-only | rc_render | T17 |
+| B27 | `RECHARGED_UI_SCRIPT` `nav`/`pause` verbs superseded by `--input-script` (keep go/demo/tab) | rc_ui | T17 |
