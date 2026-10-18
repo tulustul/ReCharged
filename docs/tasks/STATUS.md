@@ -21,7 +21,7 @@
 | T13 | graphics (render) | T02, T08 | T13a + T13b in progress |
 | T14 | VFX | T03 | in progress |
 | T15 | weather | T01 | done (12 tests) |
-| T05b | race HUD | T05, T06 | todo |
+| T05b | race HUD | T05, T06 | in progress |
 | T16 | environments & tracks (2 waves) | T02, art bible | wave 1 in progress (toy, house, street) |
 | QA | playtests, soak, bench, DoD checks | all | todo |
 
