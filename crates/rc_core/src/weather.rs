@@ -82,19 +82,22 @@ pub struct WeatherSetup {
 }
 
 /// The current weather, blended. Written only by rc_weather; reset in `OnEnter(RacePhase::Setup)`.
+///
+/// Outside races it holds the default (Clear, Noon); it is absent only during the one
+/// `AppState::Unloading` frame, so readers outside `FixedUpdate` take `Option<Res<_>>`.
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct WeatherState {
     /// Current (or target, while blending) preset.
     pub kind: WeatherKind,
     /// Time of day.
     pub time: TimeOfDay,
-    /// Precipitation intensity 0–1 (rain or snow by `kind`).
+    /// Precipitation intensity 0–1: snow when `snowing`, rain otherwise.
     pub precipitation: f32,
     /// Ground wetness 0–1 (always 0 on indoor tracks).
     pub wetness: f32,
     /// Snow cover 0–1 (always 0 on indoor tracks).
     pub snow_cover: f32,
-    /// Wind velocity in u/s (gusts included).
+    /// Wind velocity in u/s (gusts included; zero on indoor tracks).
     pub wind: Vec3,
     /// Fog density 0–1.
     pub fog: f32,
@@ -104,6 +107,9 @@ pub struct WeatherState {
     pub lightning: f32,
     /// Indoor track: weather is only visible/audible outside (no grip effect).
     pub outside_only: bool,
+    /// Precipitation falls as snow: `Snow`, or a change to or from it (where `kind` alone cannot
+    /// tell, e.g. snow still fading out after `kind` became `Cloudy`).
+    pub snowing: bool,
 }
 
 impl Default for WeatherState {
@@ -119,6 +125,7 @@ impl Default for WeatherState {
             cloudiness: 0.0,
             lightning: 0.0,
             outside_only: false,
+            snowing: false,
         }
     }
 }
