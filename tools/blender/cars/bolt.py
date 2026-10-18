@@ -77,7 +77,7 @@ parts.wing(bm, V((0, 0.95, 0.163)), 2 * HW - 0.10, 0.08, thick=0.08, angle=-14, 
 for s in (-1, 1):
     parts.bar(bm, V((s * 0.06, 0.92, 0.18)), V((s * 0.08, 0.98, 0.135)), 0.02, 0.012, plastic,
               up=V((1, 0, 0)))  # front wing pylons
-parts.wing(bm, V((0, -0.93, 0.368)), 0.86, 0.20, thick=0.11, angle=-10, mat='paint_accent',
+parts.wing(bm, V((0, -0.93, 0.36)), 0.86, 0.20, thick=0.11, angle=-16, mat='paint_accent',
            plate=(0.18, 0.28), plate_mat='paint')  # rear wing with tall fins
 parts.wing(bm, V((0, -1.03, 0.392)), 0.86, 0.07, thick=0.10, angle=-24, mat='paint_accent')
 geo.extrude_x(bm, [(-0.14, 0.40), (-0.30, 0.41), (-0.90, 0.405), (-0.94, 0.37), (-0.86, 0.30),

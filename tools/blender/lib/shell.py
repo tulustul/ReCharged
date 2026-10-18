@@ -164,7 +164,7 @@ def shell(bm, prof, y0, y1, arches=(), seg=3, step=0.05, ends=(0.08, 0.08), end_
     return geo._finish(bm, fs)
 
 
-def glass(bm, surf, prof, windshield=None, side=None, rear=None, m=0.018, r=0.02, z_off=0.0):
+def glass(bm, surf, prof, windshield=None, side=None, rear=None, m=0.018, r=0.02):
     """Window decals that follow the shell: windshield/rear (projected from above, between the
     roof-edge lines) and side windows (projected from the sides, between belt and roof edge).
     Each range is (y_low, y_high); margins `m` leave paint pillars and frames."""
@@ -183,7 +183,7 @@ def glass(bm, surf, prof, windshield=None, side=None, rear=None, m=0.018, r=0.02
     if side:
         ys = [side[0] + (side[1] - side[0]) * i / 16 for i in range(17)]
         bot = [V((y, prof.at(y)['zg'] + m * 0.7)) for y in ys]
-        top = [V((y, prof.at(y)['zt'] - prof.at(y)['rr'] * 0.6 - m * 0.5 + z_off)) for y in ys]
+        top = [V((y, prof.at(y)['zt'] - prof.at(y)['rr'] * 0.6 - m * 0.5)) for y in ys]
         ok = [t.y - b.y >= 0.012 for t, b in zip(top, bot)]  # keep where the greenhouse is tall
         i0 = ok.index(True)
         i1 = len(ok) - ok[::-1].index(True)

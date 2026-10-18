@@ -134,8 +134,8 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
   origins at the wheel centres with identity rotation (spin axis = local X); left wheels are
   mirrored copies so the rim face always points outward.
 - Origin at the ground-contact centre, front toward Blender +Y, exported "+Y Up" (front = Bevy −Z).
-- **≤ 25 k triangles** per car (target 15–22 k; the four wheels take roughly half). Positions and
-  normals only — no UVs or textures on cars.
+- **≤ 25 k triangles** per car (the shipped cars use 19–24.6 k; the four wheels take 40–47 %).
+  Positions and normals only — no UVs or textures on cars.
 - Generators: `tools/blender/cars/<id>.py`; shared helpers in `tools/blender/lib/`.
 
 ---
@@ -180,6 +180,7 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
   straight / curve / ramp / banked piece, plush bear, toy boxes, crayon pack, ball pit balls,
   train wagon, toy robot, stacking cups, puzzle mat tiles, rubber duck, marble.
 - **Barriers:** orange toy-track walls; foam block borders.
+- **References:** wooden train sets and orange plastic race-track toys, foam play mats with printed roads, toy-store shelving, nursery lighting (warm, soft, big windows).
 
 ### 3.3 Sofa Circuit — family house ground floor (indoor ★)
 - **Mood:** cosy lived-in home; warm afternoon window light, cool shadows; lamps at night.
@@ -193,6 +194,7 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
 - **Kit:** books (3 sizes), magazines, mug, remote control, cushion, slipper, plant pot, floor
   lamp, dining chair, rug edge, toy left on the floor, shoe, laundry basket, bowl, cable.
 - **Barriers:** book rows, skirting boards, cushions.
+- **References:** Scandinavian family living rooms, oak floors with afternoon sun streaks, low coffee tables, dining chairs from a toy's eye height (macro photography at 5–10 cm).
 
 ### 3.4 Backyard Bash — back garden (outdoor ★★)
 - **Mood:** sunny suburban garden, saturated greens, warm terracotta, long sunset shadows;
@@ -207,6 +209,7 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
 - **Kit:** flower pots (3), watering can, trowel, garden gnome, stepping stones, pebbles, leaves,
   fence panel, hose segment, bucket, football, plant clumps, toy spade, brick, tennis ball.
 - **Barriers:** brick edging, pots, low fence boards.
+- **References:** suburban back gardens in summer, macro photos of lawns and patio slabs, terracotta pot clusters, garden hose reels, golden-hour shadows.
 
 ### 3.5 Aisle Rush — supermarket after closing (indoor ★★)
 - **Mood:** cold fluorescent light with half the tubes off, glowing freezer cases, deep shadows
@@ -221,6 +224,7 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
 - **Kit:** cans (3), cereal box, bottle, milk carton, crate, price sign, basket, pallet, wet-floor
   sign, mop bucket, cardboard box (2), fruit, bag, shelf divider.
 - **Barriers:** shelf kick-plates, crates, wet-floor signs.
+- **References:** supermarkets after closing (half-lit fluorescent rows, glowing freezer aisles), polished vinyl reflections, stacked cardboard pallets; no real brands on packaging.
 
 ### 3.6 Wrench Works — auto-repair workshop (indoor ★★★)
 - **Mood:** gritty, warm sodium work lights against blue daylight from the roll-up door; oil
@@ -235,6 +239,7 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
 - **Kit:** tyres (2 sizes), wrench, socket set, oil can, jerry can, jack, creeper board, traffic
   cone, bucket, spare wheel, rag, toolbox, battery, hose, pallet.
 - **Barriers:** tyre walls, hazard-striped kerbs, rubber mats.
+- **References:** independent auto-repair garages, two-post lifts, red tool chests, oil-stained concrete, roll-up doors with blue daylight, paint-booth haze.
 
 ### 3.7 Maple Street — suburban street & front lawns (outdoor ★★★)
 - **Mood:** wide open suburban morning, maple reds and oranges, clean asphalt; sodium street
@@ -249,3 +254,4 @@ so emissive values read directly as "times brighter than a sunlit white wall". g
 - **Kit:** kerb pieces, leaves pile, trash can, recycling bin, sign post, hydrant, mailbox,
   hedge block, lawn sprinkler, newspaper, bike, cone, manhole cover, garden light, maple tree.
 - **Barriers:** kerbs, hedges, parked-car wheels.
+- **References:** North-American suburban streets in autumn, maple leaves on asphalt, storm drains and kerbs photographed from ground level, sodium street lamps at night.

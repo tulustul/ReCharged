@@ -76,16 +76,16 @@ geo.slab(bm, [(0.78, 0.43, CLR, CLR + 0.022, 0.008), (0.945, 0.40, CLR, CLR + 0.
 geo.slab(bm, [(-0.945, 0.38, 0.095, 0.135, 0.01), (-0.80, 0.40, 0.095, 0.135, 0.01)],
          mi('plastic'))
 for x in (-0.24, -0.08, 0.08, 0.24):  # diffuser fins
-    geo.box(bm, V((x, -0.90, 0.115)), (0.012, 0.14, 0.05), mi('plastic'))
+    geo.box(bm, V((x, -0.875, 0.115)), (0.012, 0.13, 0.05), mi('plastic'))
 for s in (-1, 1):
     geo.box(bm, V((s * 0.475, 0.0, CLR + 0.022)), (0.05, 0.70, 0.045), mi('plastic'))
     geo.box(bm, V((s * 0.468, 0.30, 0.40)), (0.05, 0.034, 0.03), mi('paint'))  # mirror
     parts.bar(bm, V((s * 0.42, 0.30, 0.38)), V((s * 0.45, 0.30, 0.395)), 0.016, 0.01,
               mi('plastic'))  # stalk
-    parts.bar(bm, V((s * 0.22, -0.83, 0.40)), V((s * 0.22, -0.875, 0.475)), 0.04, 0.014,
+    parts.bar(bm, V((s * 0.22, -0.82, 0.40)), V((s * 0.22, -0.865, 0.475)), 0.04, 0.014,
               mi('plastic'), up=V((1, 0, 0)))  # wing stands
-parts.wing(bm, V((0, -0.88, 0.478)), 0.86, 0.12, thick=0.11, angle=-5, mat='paint_accent',
-           plate=(0.055, 0.14), plate_mat='paint_accent')
+parts.wing(bm, V((0, -0.87, 0.474)), 0.86, 0.12, thick=0.11, angle=-14, mat='paint_accent',
+           plate=(0.055, 0.12), plate_mat='paint_accent')
 hard = core.obj_from_bm('hard', bm, bevel=0.004, angle=40)
 
 # --- round parts: exhaust, suspension in the arches --------------------------------------------

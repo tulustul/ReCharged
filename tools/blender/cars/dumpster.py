@@ -39,12 +39,13 @@ prof = shell.Profile([
     (0.40, dict(zt=ROOF - 0.01)),
     (0.58, dict(hw=0.705, zb=0.90, hg=0.66, zg=0.905, hr=0.58, zt=0.925)),
     (yF, dict(hw=HW, zb=0.92, hg=0.67, zg=0.925, hr=0.58, zt=0.92)),
-    (0.98, dict(hw=0.70, zb=0.88, hg=0.66, zg=0.88, hr=0.58, zt=0.885)),
-    (HL, dict(hw=0.66, z0=Z0 + 0.03, zb=0.80, hg=0.62, zg=0.805, hr=0.56, zt=0.815, rs=0.03)),
+    (0.93, dict(hw=0.70, zb=0.88, hg=0.66, zg=0.88, hr=0.58, zt=0.885)),
+    (HL - 0.06, dict(hw=0.66, z0=Z0 + 0.03, zb=0.80, hg=0.62, zg=0.805, hr=0.56, zt=0.815,
+                     rs=0.03)),
     (0.0, dict(z0=Z0, rb=0.035)),
 ])
 bm = core.new_bm()
-shell.shell(bm, prof, -HL, HL, arches=shell.arches(D, clear=0.035), ends=(0.05, 0.06),
+shell.shell(bm, prof, -HL, HL - 0.06, arches=shell.arches(D, clear=0.035), ends=(0.05, 0.06),
             end_scale=0.75, step=0.075)
 body_shell = core.obj_from_bm('shell', bm, weighted=False, angle=48)
 surf = geo.Surface([body_shell])
@@ -56,11 +57,11 @@ front = (V((-1, 0, 0)), V((0, 0, 1)))
 rear = (V((1, 0, 0)), V((0, 0, 1)))
 side_planes = [(V((s * 2.0, 0, 0)), V((0, s, 0)), V((0, 0, 1))) for s in (-1, 1)]
 acc, plastic = mi('paint_accent'), mi('plastic')
-geo.decal(bm, surf, geo.rrect(0.62, 0.11, 0.03, 3), V((0, 3, 0.735)), *front, plastic)  # grille
+geo.decal(bm, surf, geo.rrect(0.62, 0.10, 0.03, 3), V((0, 3, 0.72)), *front, plastic)  # grille
 for x in (-0.22, -0.11, 0.0, 0.11, 0.22):  # grille bars
-    geo.decal(bm, surf, geo.rrect(0.025, 0.09, 0.01, 2, x, 0.735), V((0, 3, 0)), *front,
+    geo.decal(bm, surf, geo.rrect(0.025, 0.08, 0.01, 2, x, 0.72), V((0, 3, 0)), *front,
               mi('chrome'), offset=0.005)
-parts.lamps(bm, surf, geo.circle2(0.055, 20), 0.48, 0.74, True, 'light_head', bezel='chrome',
+parts.lamps(bm, surf, geo.circle2(0.045, 20), 0.47, 0.715, True, 'light_head', bezel='chrome',
             bezel_w=0.01)
 parts.lamps(bm, surf, geo.rrect(0.08, 0.10, 0.02, 3), 0.60, 0.80, False, 'light_tail')
 parts.lamps(bm, surf, geo.rrect(0.08, 0.06, 0.02, 3), 0.60, 0.69, False, 'light_brake')
@@ -75,7 +76,7 @@ for (org, u, v), s in zip(side_planes, (-1, 1)):
         geo.decal(bm, surf, [(s * (y - 0.03), 0.855), (s * (y + 0.03), 0.855),
                              (s * (y + 0.07), 0.915), (s * (y + 0.01), 0.915)], org, u, v,
                   plastic, offset=0.0055)
-    parts.number(bm, surf, '13', org + V((0, 0.22, 0.79)), u, v, 0.10, roundel=0.085)
+    parts.number(bm, surf, '13', org + V((0, 0.22, 0.765)), u, v, 0.095, roundel=0.08)
 decals = core.obj_from_bm('decals', bm, weighted=False, angle=60)
 
 # --- hard parts: bin lid, roof light bar, frame plates, bumpers, mirrors ----------------------

@@ -13,20 +13,19 @@ V = Vector
 # ---------------------------------------------------------------------------------------------
 # helpers
 
-def _bridge(bm, rings, mat, closed=True, cap0=True, cap1=True):
+def _bridge(bm, rings, mat, cap0=True, cap1=True):
     """Bridge equal-length vertex rings (lists of Vector) into quads; optional n-gon end caps."""
     vr = [[bm.verts.new(p) for p in r] for r in rings]
     n = len(rings[0])
     out = []
     for a, b in zip(vr, vr[1:]):
-        for j in range(n if closed else n - 1):
+        for j in range(n):
             k = (j + 1) % n
             out.append(bm.faces.new((a[j], a[k], b[k], b[j])))
-    if closed:
-        if cap0:
-            out.append(bm.faces.new(vr[0]))
-        if cap1:
-            out.append(bm.faces.new(vr[-1]))
+    if cap0:
+        out.append(bm.faces.new(vr[0]))
+    if cap1:
+        out.append(bm.faces.new(vr[-1]))
     for f in out:
         f.material_index = mat
     return out
@@ -108,25 +107,9 @@ def rrect(w, h, r, seg=4, cx=0.0, cy=0.0):
     return [p + V((cx, cy)) for p in rounded_poly([(x, -y), (x, y), (-x, y), (-x, -y)], r, seg)]
 
 
-def circle2(r, n=24, cx=0.0, cy=0.0, rx=None):
-    rx = r if rx is None else rx
-    return [V((cx + rx * math.cos(2 * math.pi * i / n), cy + r * math.sin(2 * math.pi * i / n)))
+def circle2(r, n=24, cx=0.0, cy=0.0):
+    return [V((cx + r * math.cos(2 * math.pi * i / n), cy + r * math.sin(2 * math.pi * i / n)))
             for i in range(n)]
-
-
-def resample(poly, n):
-    """Resample a closed 2D polygon to n points evenly spaced by arc length."""
-    pts = [V(p) for p in poly] + [V(poly[0])]
-    seg = [(b - a).length for a, b in zip(pts, pts[1:])]
-    total = sum(seg)
-    out, acc, i = [], 0.0, 0
-    for k in range(n):
-        t = total * k / n
-        while i < len(seg) - 1 and acc + seg[i] < t:
-            acc += seg[i]
-            i += 1
-        out.append(pts[i].lerp(pts[i + 1], (t - acc) / seg[i] if seg[i] > 0 else 0.0))
-    return out
 
 
 def inset2(poly, d):
@@ -194,10 +177,10 @@ class Curve:
 # ---------------------------------------------------------------------------------------------
 # solids
 
-def box(bm, center, size, mat, rot=None):
-    """Box centred at `center`; `rot` is an optional 3x3 rotation matrix."""
+def box(bm, center, size, mat):
+    """Axis-aligned box centred at `center`."""
     sx, sy, sz = (s / 2 for s in size)
-    m = Matrix.Translation(center) @ (rot.to_4x4() if rot is not None else Matrix.Identity(4))
+    m = Matrix.Translation(center)
     vs = [bm.verts.new(m @ V((x, y, z))) for z in (-sz, sz) for y in (-sy, sy) for x in (-sx, sx)]
     idx = [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
     return _finish(bm, set_mat([bm.faces.new([vs[i] for i in q]) for q in idx], mat))
@@ -223,12 +206,6 @@ def extrude_x(bm, poly_yz, x0, x1, mat):
     return _finish(bm, _bridge(bm, rings, mat))
 
 
-def extrude_z(bm, poly_xy, z0, z1, mat):
-    """Extrude a polygon in the (x, y) plane along Z (plates, chassis)."""
-    rings = [[V((p[0], p[1], z0)) for p in poly_xy], [V((p[0], p[1], z1)) for p in poly_xy]]
-    return _finish(bm, _bridge(bm, rings, mat))
-
-
 def extrude_y(bm, poly_xz, y0, y1, mat):
     """Extrude a polygon in the (x, z) plane along Y (bumpers, light bars)."""
     rings = [[V((p[0], y0, p[1])) for p in poly_xz], [V((p[0], y1, p[1])) for p in poly_xz]]
@@ -251,17 +228,13 @@ def sphere(bm, c, r, mat, n=16, rings=8, scale=(1, 1, 1)):
     return set_mat(list({f for v in out['verts'] for f in v.link_faces}), mat)
 
 
-def tube(bm, path, r, mat, n=8, corner=0.0, cseg=4, closed=False, r_end=None):
+def tube(bm, path, r, mat, n=8, corner=0.0, cseg=4, r_end=None):
     """Sweep a circle along a polyline with filleted corners (parallel transport, no twist).
     `r_end` tapers the radius linearly along the path."""
     pts = [V(p) for p in path]
     if corner > 0 and len(pts) > 2:
-        pts = _fillet3d(pts, corner, cseg, closed)
-    if closed:
-        pts = pts + [pts[0]]
+        pts = _fillet3d(pts, corner, cseg)
     tan = [(pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized() for i in range(len(pts))]
-    if closed:
-        tan[0] = tan[-1] = (pts[1] - pts[-2]).normalized()
     x, _, _ = frame(tan[0])
     rings = []
     for i, p in enumerate(pts):
@@ -271,28 +244,18 @@ def tube(bm, path, r, mat, n=8, corner=0.0, cseg=4, closed=False, r_end=None):
         rr = r if r_end is None else r + (r_end - r) * i / (len(pts) - 1)
         rings.append([p + (x * math.cos(a) + y * math.sin(a)) * rr
                       for a in (2 * math.pi * k / n for k in range(n))])
-    if closed:
-        rings[-1] = rings[0]
-        vr = [[bm.verts.new(q) for q in ring] for ring in rings[:-1]]
-        vr.append(vr[0])
-        fs = []
-        for a, b in zip(vr, vr[1:]):
-            for j in range(n):
-                k = (j + 1) % n
-                fs.append(bm.faces.new((a[j], a[k], b[k], b[j])))
-        return _finish(bm, set_mat(fs, mat))
     return _finish(bm, _bridge(bm, rings, mat))
 
 
-def _fillet3d(pts, r, seg, closed):
-    out = [] if closed else [pts[0]]
-    for i in (range(len(pts)) if closed else range(1, len(pts) - 1)):
+def _fillet3d(pts, r, seg):
+    out = [pts[0]]
+    for i in range(1, len(pts) - 1):
         p0, p1, p2 = pts[i - 1], pts[i], pts[(i + 1) % len(pts)]
         a, b = p0 - p1, p2 - p1
         la, lb = a.length, b.length
         a.normalize()
         b.normalize()
-        if a.dot(b) < -0.99995:  # straight: keep the point
+        if abs(a.dot(b)) > 0.99995:  # straight or spike: keep the point
             out.append(p1)
             continue
         ang = math.acos(min(1.0, a.dot(b)))
@@ -301,12 +264,11 @@ def _fillet3d(pts, r, seg, closed):
         for s in range(seg + 1):  # quadratic Bezier ~ arc
             t = s / seg
             out.append(t0 * (1 - t) ** 2 + p1 * 2 * t * (1 - t) + t1 * t * t)
-    if not closed:
-        out.append(pts[-1])
+    out.append(pts[-1])
     return out
 
 
-def revolve_x(bm, profile, mat, n=32, a0=0.0):
+def revolve_x(bm, profile, mat, n=32):
     """Revolve an open (x, radius) polyline around the X axis.
 
     Winding: walking along the profile, the surface faces to the side given by
@@ -315,7 +277,7 @@ def revolve_x(bm, profile, mat, n=32, a0=0.0):
     (radius 0) are welded. Returns the faces (normals already final, no recalculation)."""
     vr = []
     for k in range(n):
-        a = a0 + 2 * math.pi * k / n
+        a = 2 * math.pi * k / n
         c, s = math.cos(a), math.sin(a)
         vr.append([bm.verts.new(V((p[0], p[1] * c, p[1] * s))) for p in profile])
     fs = []
@@ -355,17 +317,6 @@ def slab(bm, keys, mat, seg=3, cx=0.0):
         rr = rrect(2 * hw, z1 - z0, min(r, hw * 0.99, (z1 - z0) / 2 * 0.99), seg, cx, (z0 + z1) / 2)
         rings.append([V((q.x, y, q.y)) for q in rr])
     return loft(bm, rings, mat)
-
-
-def mirror_x(bm, faces):
-    """Duplicate faces mirrored across X = 0 (with correct winding)."""
-    geom = bmesh.ops.duplicate(bm, geom=list(faces))['geom']
-    verts = [g for g in geom if isinstance(g, bmesh.types.BMVert)]
-    nf = [g for g in geom if isinstance(g, bmesh.types.BMFace)]
-    for v in verts:
-        v.co.x = -v.co.x
-    bmesh.ops.reverse_faces(bm, faces=nf)
-    return nf
 
 
 # ---------------------------------------------------------------------------------------------
@@ -469,7 +420,7 @@ def decal(bm, surf, poly2d, origin, u, v, mat, offset=0.0035, back=0.25, h=None)
             misses.append(p)
         verts.append(bm.verts.new(hit if hit is not None else w))
     fs = []
-    for t in tris:
+    for t in sorted(tris, key=lambda t: sorted(t)):  # CDT face order varies between runs
         f = bm.faces.new([verts[i] for i in t])
         f.material_index = mat
         f.normal_update()
@@ -513,9 +464,9 @@ def solid_decal(bm, surf, poly2d, origin, u, v, mat, height=0.004, side_mat=None
 
 
 def strip(bm, surf, path2d, width, origin, u, v, mat, offset=0.0035, step=0.02, across=2,
-          back=0.25, w_end=None):
-    """Band of `width` (tapering to `w_end`) along a 2D polyline in the plane origin + x*u + y*v,
-    projected onto `surf` along -(u x v). For stripes, glow strips and trims."""
+          back=0.25):
+    """Band of `width` along a 2D polyline in the plane origin + x*u + y*v, projected onto
+    `surf` along -(u x v). For stripes, glow strips and trims."""
     origin, u, v = V(origin), V(u), V(v)
     nrm = u.cross(v).normalized()
     path = [V(p) for p in path2d]
@@ -529,10 +480,9 @@ def strip(bm, surf, path2d, width, origin, u, v, mat, offset=0.0035, step=0.02, 
     for i, p in enumerate(pts):
         t = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
         side = V((-t.y, t.x))
-        w = width if w_end is None else width + (w_end - width) * i / (len(pts) - 1)
         row = []
         for k in range(across + 1):
-            q = p + side * (w * (k / across - 0.5))
+            q = p + side * (width * (k / across - 0.5))
             wp = origin + u * q.x + v * q.y
             hit, _ = surf.project(wp, -nrm, offset, back)
             misses += hit is None

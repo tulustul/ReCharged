@@ -56,9 +56,9 @@ acc = mi('paint_accent')
 geo.decal(bm, surf, geo.rrect(0.42, 0.075, 0.02, 3), V((0, 3, 0.355)), *front, mi('plastic'))
 parts.lamps(bm, surf, geo.rrect(0.14, 0.07, 0.018, 3), 0.33, 0.36, True, 'light_head',
             bezel='chrome')
-parts.lamps(bm, surf, geo.rrect(0.07, 0.11, 0.015, 3), 0.43, 0.43, False, 'light_tail')
-parts.lamps(bm, surf, geo.rrect(0.07, 0.05, 0.015, 3), 0.43, 0.335, False, 'light_brake')
-geo.decal(bm, surf, geo.rrect(0.62, 0.06, 0.02, 3), V((0, -3, 0.39)), *rear, acc)  # hatch band
+parts.lamps(bm, surf, geo.rrect(0.09, 0.12, 0.018, 3), 0.42, 0.44, False, 'light_tail')
+parts.lamps(bm, surf, geo.rrect(0.09, 0.05, 0.015, 3), 0.42, 0.345, False, 'light_brake')
+geo.decal(bm, surf, geo.rrect(0.64, 0.07, 0.02, 3), V((0, -3, 0.40)), *rear, acc)  # hatch band
 top = (V((0, 0, 2.0)), V((1, 0, 0)), V((0, 1, 0)))
 geo.strip(bm, surf, [(0, 0.92), (0, 0.43)], 0.26, *top, acc, across=4)  # bonnet stripe
 for x in (-0.21, 0.21):  # bonnet vents
@@ -75,7 +75,7 @@ bm = core.new_bm()
 geo.slab(bm, [(-0.22, 0.10, ROOF - 0.01, ROOF + 0.025, 0.02), (-0.01, 0.11, ROOF - 0.01,
                                                                  HH - 0.003, 0.025)], acc)
 geo.box(bm, V((0, -0.005, HH - 0.026)), (0.17, 0.008, 0.035), mi('plastic'))  # scoop mouth
-parts.wing(bm, V((0, -0.70, ROOF + 0.015)), 1.0, 0.16, thick=0.09, angle=-6, mat='paint_accent',
+parts.wing(bm, V((0, -0.70, ROOF + 0.012)), 1.0, 0.16, thick=0.09, angle=-14, mat='paint_accent',
            plate=(0.07, 0.17), plate_mat='paint_accent')
 for s in (-1, 1):
     parts.bar(bm, V((s * 0.30, -0.62, ROOF - 0.01)), V((s * 0.30, -0.68, ROOF + 0.008)), 0.04,

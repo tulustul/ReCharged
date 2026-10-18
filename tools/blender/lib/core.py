@@ -78,12 +78,12 @@ def new_bm():
     return bmesh.new()
 
 
-def obj_from_bm(name, bm, bevel=0.0, segments=2, angle=35.0, weighted=True, smooth_angle=None,
+def obj_from_bm(name, bm, bevel=0.0, segments=2, angle=35.0, weighted=True,
                 location=(0.0, 0.0, 0.0), parent=None):
     """Create a mesh object from a bmesh; optional angle-limited bevel + weighted normals.
 
-    Faces are smooth-shaded with sharp edges above `smooth_angle` (default = bevel angle) so
-    flat panels stay flat and fillets stay round.
+    Faces are smooth-shaded with sharp edges above `angle` so flat panels stay flat and fillets
+    stay round.
     """
     me = bpy.data.meshes.new(name)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
@@ -93,7 +93,7 @@ def obj_from_bm(name, bm, bevel=0.0, segments=2, angle=35.0, weighted=True, smoo
     for m in MATS:
         me.materials.append(bpy.data.materials[m])
     me.shade_smooth()
-    me.set_sharp_from_angle(angle=math.radians(smooth_angle or angle))
+    me.set_sharp_from_angle(angle=math.radians(angle))
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
     ob.location = location

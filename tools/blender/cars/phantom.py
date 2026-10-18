@@ -26,9 +26,9 @@ HL, HW, HH = D['length'] / 2, D['width'] / 2, D['height']
 
 # --- shell -------------------------------------------------------------------------------------
 prof = shell.Profile([
-    (-HL, dict(hw=0.53, z0=0.13, zb=0.33, hg=0.46, zg=0.34, hr=0.40, zt=0.36, rs=0.03)),
-    (-0.92, dict(hw=0.55, z0=0.10, zb=0.40, hg=0.49, zg=0.405, hr=0.38, zt=0.405)),
-    (yR, dict(hw=HW, zb=0.492, hg=0.47, zg=0.484, hr=0.28, zt=0.42, bulge=0.006)),
+    (-HL, dict(hw=0.53, z0=0.13, zb=0.33, hg=0.46, zg=0.34, hr=0.40, zt=0.335, rs=0.03)),
+    (-0.92, dict(hw=0.55, z0=0.10, zb=0.40, hg=0.49, zg=0.405, hr=0.30, zt=0.352)),
+    (yR, dict(hw=HW, zb=0.492, hg=0.47, zg=0.484, hr=0.28, zt=0.395, bulge=0.006)),
     (-0.42, dict(zt=0.425)),
     (-0.22, dict(hw=0.54, zb=0.40, hg=0.45, zg=0.405, hr=0.32, zt=0.448, crown=0.01)),
     (0.02, dict(hw=0.535, zb=0.385, hg=0.445, zg=0.39, hr=0.33, zt=0.455, bulge=0.01)),
@@ -70,9 +70,9 @@ decals = core.obj_from_bm('decals', bm, weighted=False, angle=60)
 
 # --- hard parts: wing + stands, splitter, canards, skirts, diffuser, mirrors ---------------------
 bm = core.new_bm()
-parts.wing(bm, V((0, -0.875, 0.458)), 1.07, 0.24, thick=0.11, angle=-6, mat='paint_accent',
+parts.wing(bm, V((0, -0.875, 0.432)), 1.07, 0.24, thick=0.17, angle=-22, mat='paint_accent',
            plate=(0.15, 0.27), plate_mat='paint_accent')
-parts.wing(bm, V((0, -0.965, 0.482)), 1.07, 0.09, thick=0.10, angle=-24, mat='paint_accent')
+parts.wing(bm, V((0, -0.975, 0.474)), 1.07, 0.08, thick=0.14, angle=-38, mat='paint_accent')
 geo.slab(bm, [(0.86, 0.53, CLR, CLR + 0.022, 0.01), (1.012, 0.50, CLR, CLR + 0.022, 0.01)],
          mi('plastic'))  # splitter
 for s in (-1, 1):
