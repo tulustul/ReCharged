@@ -26,7 +26,6 @@
 mod commands;
 mod flow;
 mod medals;
-mod phases;
 mod prefs;
 mod profile;
 mod race_setup;
@@ -259,6 +258,5 @@ impl Plugin for GameFlowPlugin {
         results::build(app);
         save::build(app);
         soak::build(app);
-        phases::build(app);
     }
 }

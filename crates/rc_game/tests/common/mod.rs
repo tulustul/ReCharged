@@ -1,6 +1,7 @@
 //! Shared headless world for rc_game's integration tests: a private data dir per test, a dummy
 //! loader (session entities, `TrackSummary`), and placeholder racers standing in for rc_race —
-//! spawned in `OnEnter(RaceAttempt)`, finishing after `FinishAfter` race ticks in `FinishOrder`.
+//! spawned in `OnEnter(RaceAttempt)`, finishing after `FinishAfter` race ticks in `FinishOrder` —
+//! plus a stand-in for rc_race's phase driver (Intro and Countdown on 3 s timers).
 
 #![allow(dead_code)] // each test binary uses a subset
 
@@ -57,6 +58,18 @@ pub struct Seen {
 #[derive(Resource, Default)]
 struct RaceClock(u32);
 
+/// Phase stand-in state of the session (inserted on `OnEnter(Loading)`).
+#[derive(Resource, Default)]
+struct PhaseClock {
+    /// Attempts started in this session (Intro only before the first).
+    attempts: u32,
+    /// Fixed ticks spent in the current phase.
+    ticks: u32,
+}
+
+/// Intro and countdown length of the phase stand-in (ticks, 3 s each).
+const PHASE_TICKS: u32 = 180;
+
 /// A fresh, private user-data directory for one test.
 pub fn data_dir(name: &str) -> PathBuf {
     static N: AtomicU32 = AtomicU32::new(0);
@@ -90,7 +103,15 @@ fn dummy_world(app: &mut App) {
         .init_resource::<RaceClock>()
         .insert_resource(Geometry(HASH))
         .add_systems(OnEnter(AppState::Loading), dummy_loader)
+        .add_systems(OnEnter(AppState::Loading), |mut c: Commands| {
+            c.insert_resource(PhaseClock::default());
+        })
         .add_systems(OnEnter(RaceAttempt), spawn_grid)
+        .add_systems(OnEnter(RaceAttempt), |clock: Option<ResMut<PhaseClock>>| {
+            if let Some(mut clock) = clock {
+                clock.attempts += 1;
+            }
+        })
         .add_systems(
             OnEnter(RacePhase::Setup),
             |mut c: Commands, mut clock: ResMut<RaceClock>| {
@@ -101,10 +122,15 @@ fn dummy_world(app: &mut App) {
         .add_systems(OnEnter(AppState::Unloading), |mut c: Commands| {
             c.remove_resource::<RaceResults>();
             c.remove_resource::<TrackSummary>();
+            c.remove_resource::<PhaseClock>();
         })
         .add_systems(
             FixedUpdate,
-            (|mut c: ResMut<Counters>| c.sim_ticks += 1, placeholder_race)
+            (
+                |mut c: ResMut<Counters>| c.sim_ticks += 1,
+                placeholder_phases,
+                placeholder_race,
+            )
                 .chain()
                 .in_set(SimSet::Race),
         )
@@ -155,8 +181,36 @@ fn spawn_grid(mut commands: Commands, config: Res<RaceConfig>, mut counters: Res
     }
 }
 
+/// rc_race stand-in for the phase driver: Setup → Intro (first attempt of a session) → Countdown
+/// → Racing, counted in fixed ticks (so pausing freezes it).
+fn placeholder_phases(
+    phase: Option<Res<State<RacePhase>>>,
+    clock: Option<ResMut<PhaseClock>>,
+    mut next: ResMut<NextState<RacePhase>>,
+) {
+    let (Some(phase), Some(mut clock)) = (phase, clock) else {
+        return;
+    };
+    clock.ticks = if phase.is_changed() {
+        1
+    } else {
+        clock.ticks + 1
+    };
+    let done = clock.ticks >= PHASE_TICKS;
+    let to = match phase.get() {
+        RacePhase::Setup if clock.attempts == 0 => Some(RacePhase::Intro),
+        RacePhase::Setup => Some(RacePhase::Countdown),
+        RacePhase::Intro if done => Some(RacePhase::Countdown),
+        RacePhase::Countdown if done => Some(RacePhase::Racing),
+        _ => None,
+    };
+    if let Some(to) = to {
+        next.set_if_different(to);
+    }
+}
+
 /// rc_race stand-in: everyone finishes at once in `FinishOrder`; results and phase as rc_race
-/// will write them.
+/// writes them.
 fn placeholder_race(
     phase: Option<Res<State<RacePhase>>>,
     (mut clock, finish, order, geometry): (

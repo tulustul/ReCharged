@@ -12,6 +12,18 @@ use crate::weather::WeatherSetup;
 /// Ghost recording rate in Hz (Time Trial).
 pub const GHOST_HZ: u32 = 20;
 
+/// Length of the 3-2-1 countdown in fixed ticks (3 s, GDD §3.2), counted by rc_race in
+/// `SimSet::Race` (a pause freezes it). Countdown tick `k` (1-based, from entering
+/// `RacePhase::Countdown`) shows 3, 2, 1 from ticks 1, 61, 121; the cars are held for all
+/// `COUNTDOWN_TICKS` of them. After tick `COUNTDOWN_TICKS` rc_race requests `RacePhase::Racing`;
+/// GO (`RaceEvent::Go`, perfect starts / stalls) is applied before the next tick, so the first
+/// racing tick (race tick 1) is tick `COUNTDOWN_TICKS + 1` after entering Countdown. Bevy applies
+/// state transitions once per frame: when a frame runs several fixed ticks, its ticks after
+/// `COUNTDOWN_TICKS` stay in Countdown (cars still held) and GO moves accordingly. Perfect start =
+/// throttle pressed in the last 0.3 s (18 ticks) before GO; held since more than 1 s before GO =
+/// stall.
+pub const COUNTDOWN_TICKS: u32 = 180;
+
 /// Game mode of a session.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GameMode {
