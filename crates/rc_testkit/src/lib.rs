@@ -7,6 +7,8 @@
 //! - [`headless_app`]: `MinimalPlugins` + transforms + states + rapier (fixed schedule, no debug
 //!   render) + `CorePlugin` + the plugins under test; `FixedUpdate` ambiguity detection = warn;
 //!   starts in `AppState::Menu`, with `UserPaths` on the workspace `assets/` and a temp data dir.
+//! - [`SimPlugins`]: every headless sim plugin (track, vehicle, weather, race, items, AI); the sim
+//!   crates are re-exported for tests that add individual plugins.
 //! - Stepping: [`step`], [`step_seconds`], [`step_until`]; queries: [`app_state`],
 //!   [`race_phase`], [`count_entities`] (resource entities excluded).
 //! - Lifecycle helpers [`load_race`], [`start_race`], [`restart`], [`next_race`],
@@ -26,6 +28,27 @@ use bevy::state::app::StatesPlugin;
 use bevy::state::state::FreelyMutableState;
 use bevy::time::TimeUpdateStrategy;
 use rc_core::prelude::*;
+
+/// The sim crates, re-exported so integration tests of any crate can add their plugins without
+/// extra dev-dependencies (e.g. `rc_testkit::rc_vehicle::VehiclePlugin`).
+pub use {rc_ai, rc_input, rc_items, rc_race, rc_track, rc_vehicle, rc_weather};
+
+/// Every headless-capable simulation plugin of a race: track, vehicle, weather, race, items, AI.
+/// (Not `GameInputPlugin`, which needs Bevy's input plugin; physics setup is already part of
+/// [`headless_app`].) Use `headless_app(SimPlugins)` for full AI races.
+pub struct SimPlugins;
+
+impl PluginGroup for SimPlugins {
+    fn build(self) -> bevy::app::PluginGroupBuilder {
+        bevy::app::PluginGroupBuilder::start::<Self>()
+            .add(rc_track::TrackPlugin)
+            .add(rc_vehicle::VehiclePlugin)
+            .add(rc_weather::WeatherPlugin)
+            .add(rc_race::RacePlugin)
+            .add(rc_items::ItemsPlugin)
+            .add(rc_ai::AiPlugin)
+    }
+}
 
 /// Longest a helper waits for something to happen, in simulated seconds.
 pub const TIMEOUT_SECS: f32 = 10.0;
