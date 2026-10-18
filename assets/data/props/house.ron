@@ -1,0 +1,294 @@
+// Prop catalog — family house (Sofa Circuit, art bible §3.3). Kinds are prefixed `house_`.
+// Units: u (1 u = 22.5 cm, real size x 4.44); origin = ground-contact centre, front -Z.
+// Models: tools/blender/props/house/*.py -> models/props/house/*.glb
+// (tools/blender/props/house/build.sh rebuilds them and validates them against this file).
+// Colliders stay inside the visual meshes; drivable tops carry a `surface`.
+// `lights` (rc_render): offset (prop space, u), linear colour, lumens, range (u), spot_deg
+// (0 = point light) — the same format as street.ron.
+// Format: docs/design/rc_track.md §Props. Decorative, out-of-reach dressing lives in
+// data/decor/sofa_circuit.ron instead.
+(
+    props: {
+        // ---- hero props ------------------------------------------------------------------
+        // Sage three-seater on tall oak legs, 10.66 x 4.22 x 4.2 u; 1.75 u clear underneath:
+        // the track tunnels under it front to back.
+        "house_sofa": (
+            model: "models/props/house/sofa.glb",
+            surface: Carpet,
+            colliders: [
+                Box(half: (5.33, 0.4, 2.11), offset: (0, 2.15, 0)),
+                Box(half: (5.33, 0.83, 0.55), offset: (0, 3.38, 1.56)),
+                Box(half: (0.45, 0.33, 2.11), offset: (4.88, 2.88, 0)),
+                Box(half: (0.45, 0.33, 2.11), offset: (-4.88, 2.88, 0)),
+                Cylinder(radius: 0.13, half_height: 0.875, offset: (4.95, 0.875, 1.75)),
+                Cylinder(radius: 0.13, half_height: 0.875, offset: (-4.95, 0.875, 1.75)),
+                Cylinder(radius: 0.13, half_height: 0.875, offset: (4.95, 0.875, -1.75)),
+                Cylinder(radius: 0.13, half_height: 0.875, offset: (-4.95, 0.875, -1.75)),
+            ],
+        ),
+        // Square oak coffee table, 5.55 x 1.55 u (35 cm); the bare top is the jump deck between
+        // the two book ramps. Solid below the top (legs + shelf would trap a car's nose).
+        "house_coffee_table": (
+            model: "models/props/house/coffee_table.glb",
+            surface: Wood,
+            colliders: [
+                Box(half: (2.775, 0.09, 2.775), offset: (0, 1.46, 0)),
+                Box(half: (2.5, 0.685, 2.5), offset: (0, 0.685, 0)),
+            ],
+        ),
+        // Book-stack ramp: 5.5 u wide, rises 1.55 u over 8.0 u (11 deg) towards -Z; the slanted
+        // book covers lie exactly on the wedge.
+        "house_book_ramp": (
+            model: "models/props/house/book_ramp.glb",
+            surface: Cardboard,
+            colliders: [Wedge(half: (2.75, 0.775, 4.0), offset: (0, 0.775, 0))],
+        ),
+        // Oak dining table 11.5 x 4.0 x 3.33 u (2.8 u clear under the apron), laid for two.
+        "house_dining_table": (
+            model: "models/props/house/dining_table.glb",
+            surface: Wood,
+            colliders: [
+                Box(half: (5.75, 0.09, 2.0), offset: (0, 3.24, 0)),
+                Box(half: (5.45, 0.18, 1.7), offset: (0, 2.97, 0)),
+                Box(half: (0.155, 1.4, 0.155), offset: (5.35, 1.4, 1.65)),
+                Box(half: (0.155, 1.4, 0.155), offset: (-5.35, 1.4, 1.65)),
+                Box(half: (0.155, 1.4, 0.155), offset: (5.35, 1.4, -1.65)),
+                Box(half: (0.155, 1.4, 0.155), offset: (-5.35, 1.4, -1.65)),
+            ],
+        ),
+        // Hall staircase, 4.8 x 20.6 u, front (-Z) = the way up: two steps to a 5 u landing at
+        // 2.3 u (both sides open), then the flight to the ceiling over a closed cupboard.
+        "house_staircase": (
+            model: "models/props/house/staircase.glb",
+            surface: Wood,
+            colliders: [
+                Box(half: (2.4, 0.383, 0.6), offset: (0, 0.383, 9.7)),
+                Box(half: (2.4, 0.767, 0.6), offset: (0, 0.767, 8.5)),
+                Box(half: (2.4, 1.15, 2.5), offset: (0, 1.15, 5.4)),
+                Box(half: (2.4, 1.15, 6.6), offset: (0, 1.15, -3.7)),
+                Wedge(half: (2.4, 4.6, 6.6), offset: (0, 6.9, -3.7)),
+            ],
+        ),
+        // Walnut sideboard / TV unit, 8.9 x 2.0 x 2.44 u (solid to the floor).
+        "house_sideboard": (
+            model: "models/props/house/sideboard.glb",
+            surface: Wood,
+            colliders: [Box(half: (4.45, 1.22, 1.0), offset: (0, 1.22, 0))],
+        ),
+        // ---- furniture & architecture kit ----------------------------------------------------
+        // 55" TV on its foot (stands on the sideboard at y 2.44).
+        "house_tv": (
+            model: "models/props/house/tv.glb",
+            colliders: [
+                Box(half: (2.75, 1.6, 0.06), offset: (0, 1.9, 0)),
+                Box(half: (1.0, 0.04, 0.5), offset: (0, 0.04, 0.05)),
+            ],
+        ),
+        // Mustard armchair, 3.8 x 3.6 x 3.6 u (solid base to the floor).
+        "house_armchair": (
+            model: "models/props/house/armchair.glb",
+            surface: Carpet,
+            colliders: [
+                Box(half: (1.9, 0.975, 1.78), offset: (0, 0.975, 0)),
+                Box(half: (1.25, 0.85, 0.35), offset: (0, 2.8, 1.42)),
+                Box(half: (0.36, 0.3, 1.75), offset: (1.54, 2.25, -0.05)),
+                Box(half: (0.36, 0.3, 1.75), offset: (-1.54, 2.25, -0.05)),
+            ],
+        ),
+        // Low white bookcases full of books, 7.1 x 1.55 x 4.0 u (two arrangements).
+        "house_bookcase": (
+            model: "models/props/house/bookcase.glb",
+            colliders: [Box(half: (3.55, 2.0, 0.775), offset: (0, 2.0, 0))],
+        ),
+        "house_bookcase_b": (
+            model: "models/props/house/bookcase_b.glb",
+            colliders: [Box(half: (3.55, 2.0, 0.775), offset: (0, 2.0, 0))],
+        ),
+        // Oak dining chair, 2.0 x 2.2 x 3.8 u, seat at 2.04 u: the slalom gates.
+        "house_dining_chair": (
+            model: "models/props/house/dining_chair.glb",
+            colliders: [
+                Box(half: (1.0, 0.1, 1.05), offset: (0, 1.98, -0.05)),
+                Box(half: (0.9, 0.55, 0.08), offset: (0, 3.2, 1.08)),
+                Box(half: (0.08, 0.95, 0.08), offset: (0.85, 0.95, 0.95)),
+                Box(half: (0.08, 0.95, 0.08), offset: (-0.85, 0.95, 0.95)),
+                Box(half: (0.08, 0.95, 0.08), offset: (0.85, 0.95, -0.95)),
+                Box(half: (0.08, 0.95, 0.08), offset: (-0.85, 0.95, -0.95)),
+            ],
+        ),
+        // White storage bench with cushions, 10 x 1.6 x 2.0 u (solid: seals under the table).
+        "house_bench": (
+            model: "models/props/house/bench.glb",
+            surface: Carpet,
+            colliders: [Box(half: (5.0, 1.0, 0.8), offset: (0, 1.0, 0))],
+        ),
+        // Plywood plank onto the stair landing: 3.6 u wide, rises 2.3 u over 10.53 u towards -Z.
+        "house_plank": (
+            model: "models/props/house/plank.glb",
+            surface: Wood,
+            colliders: [Wedge(half: (1.8, 1.15, 5.265), offset: (0, 1.15, 0))],
+        ),
+        // Navy kitchen island, 11.5 x 4.4 x 4.0 u; the quartz top overhangs the front with two
+        // stools tucked under it.
+        "house_kitchen_island": (
+            model: "models/props/house/kitchen_island.glb",
+            colliders: [
+                Box(half: (5.75, 1.9, 1.6), offset: (0, 1.9, 0.6)),
+                Box(half: (5.75, 0.1, 2.2), offset: (0, 3.9, 0)),
+                Cylinder(radius: 0.6, half_height: 1.5, offset: (3.5, 1.5, -1.6)),
+                Cylinder(radius: 0.6, half_height: 1.5, offset: (-3.5, 1.5, -1.6)),
+            ],
+        ),
+        // Kitchen counter runs, 10.7 x 2.7 x 4.0 u + wall cabinets / extractor hood (back to
+        // the wall).
+        "house_counter": (
+            model: "models/props/house/counter.glb",
+            colliders: [
+                Box(half: (5.35, 2.0, 1.35), offset: (0, 2.0, 0)),
+                Box(half: (5.35, 1.8, 0.775), offset: (0, 8.4, 0.575)),
+            ],
+        ),
+        "house_counter_hob": (
+            model: "models/props/house/counter_hob.glb",
+            colliders: [
+                Box(half: (5.35, 2.0, 1.35), offset: (0, 2.0, 0)),
+                Box(half: (1.7, 0.25, 0.85), offset: (-1.34, 7.5, 0.45)),
+            ],
+        ),
+        // Steel fridge-freezer with the kids' drawings, 4.0 x 2.9 x 8.4 u.
+        "house_fridge": (
+            model: "models/props/house/fridge.glb",
+            colliders: [Box(half: (2.0, 4.2, 1.4), offset: (0, 4.2, 0.05))],
+        ),
+        // Spine wall between the front and back halves: 78 u long (x -39..39), 11.5 u high.
+        "house_wall_spine": (
+            model: "models/props/house/wall_spine.glb",
+            colliders: [Box(half: (39, 5.75, 0.3), offset: (0, 5.75, 0))],
+        ),
+        // Hall wall, 32 u long (x -16..16) with two 9 x 9.3 u openings (x -12.5..-3.5, 1.5..10.5).
+        "house_wall_hall": (
+            model: "models/props/house/wall_hall.glb",
+            colliders: [
+                Box(half: (1.75, 5.75, 0.3), offset: (-14.25, 5.75, 0)),
+                Box(half: (2.5, 5.75, 0.3), offset: (-1, 5.75, 0)),
+                Box(half: (2.75, 5.75, 0.3), offset: (13.25, 5.75, 0)),
+                Box(half: (4.5, 1.1, 0.3), offset: (-8, 10.4, 0)),
+                Box(half: (4.5, 1.1, 0.3), offset: (6, 10.4, 0)),
+            ],
+        ),
+        // Potted fiddle-leaf fig, pot 1.6 u, tree to 5.6 u (collider: the pot).
+        "house_plant_pot": (
+            model: "models/props/house/plant_pot.glb",
+            colliders: [Cylinder(radius: 0.78, half_height: 0.8, offset: (0, 0.8, 0))],
+        ),
+        // Floor lamp, 7.1 u, warm bulb inside the drum shade.
+        "house_floor_lamp": (
+            model: "models/props/house/floor_lamp.glb",
+            colliders: [
+                Cylinder(radius: 0.66, half_height: 0.06, offset: (0, 0.06, 0)),
+                Cylinder(radius: 0.07, half_height: 2.95, offset: (0, 3.0, 0)),
+            ],
+            lights: [(offset: (0, 6.25, 0), color: (1, 0.8, 0.55), lumens: 800, range: 24, spot_deg: 0)],
+        ),
+        // Pendant lamp hanging from the ceiling (shade rim at 7.0 u); origin on the floor below.
+        "house_pendant": (
+            model: "models/props/house/pendant.glb",
+            colliders: [Ball(radius: 0.6, offset: (0, 7.5, 0))],
+            lights: [(offset: (0, 7.3, 0), color: (1, 0.82, 0.6), lumens: 600, range: 26, spot_deg: 0)],
+        ),
+        // Narrow oak hall console with a table lamp, 5.3 x 1.3 x 3.55 u.
+        "house_console": (
+            model: "models/props/house/console.glb",
+            colliders: [Box(half: (2.65, 1.775, 0.65), offset: (0, 1.775, 0))],
+            lights: [(offset: (-1.6, 5.3, 0), color: (1, 0.8, 0.55), lumens: 300, range: 14, spot_deg: 0)],
+        ),
+        // Built-in white coat closet, 3.0 x 4.8 x 9.0 u: fills the gap behind the top of the stairs.
+        "house_cupboard": (
+            model: "models/props/house/cupboard.glb",
+            colliders: [Box(half: (1.5, 4.5, 2.4), offset: (0, 4.5, 0))],
+        ),
+        // Low oak shoe bench with shoes, 4.0 x 1.4 x 2.1 u.
+        "house_shoe_rack": (
+            model: "models/props/house/shoe_rack.glb",
+            colliders: [Box(half: (2.0, 1.05, 0.7), offset: (0, 1.05, 0))],
+        ),
+        // Extension cable lying across the floor (a 0.06 u bump), 7.1 u long.
+        "house_cable": (
+            model: "models/props/house/cable.glb",
+            colliders: [Box(half: (3.4, 0.03, 0.36), offset: (0, 0.03, 0))],
+        ),
+        // ---- knockable clutter (dynamic and light: cars barely notice) -----------------------
+        "house_book_small": (
+            model: "models/props/house/book_small.glb",
+            dynamic: true,
+            mass: 0.08,
+            colliders: [Box(half: (0.25, 0.055, 0.4), offset: (0, 0.055, 0))],
+        ),
+        "house_book_medium": (
+            model: "models/props/house/book_medium.glb",
+            dynamic: true,
+            mass: 0.12,
+            colliders: [Box(half: (0.355, 0.08, 0.535), offset: (0, 0.08, 0))],
+        ),
+        "house_book_large": (
+            model: "models/props/house/book_large.glb",
+            dynamic: true,
+            mass: 0.15,
+            colliders: [Box(half: (0.535, 0.065, 0.69), offset: (0, 0.065, 0))],
+        ),
+        "house_magazines": (
+            model: "models/props/house/magazines.glb",
+            dynamic: true,
+            mass: 0.06,
+            colliders: [Box(half: (0.6, 0.06, 0.66), offset: (0.04, 0.06, -0.07))],
+        ),
+        "house_mug": (
+            model: "models/props/house/mug.glb",
+            dynamic: true,
+            mass: 0.05,
+            colliders: [Cylinder(radius: 0.19, half_height: 0.21, offset: (0, 0.21, 0))],
+        ),
+        "house_remote": (
+            model: "models/props/house/remote.glb",
+            dynamic: true,
+            mass: 0.04,
+            colliders: [Box(half: (0.11, 0.05, 0.4), offset: (0, 0.05, 0))],
+        ),
+        "house_cushion": (
+            model: "models/props/house/cushion.glb",
+            dynamic: true,
+            mass: 0.12,
+            colliders: [Box(half: (0.95, 0.26, 0.95), offset: (0, 0.29, 0))],
+        ),
+        "house_slipper": (
+            model: "models/props/house/slipper.glb",
+            dynamic: true,
+            mass: 0.05,
+            colliders: [Box(half: (0.22, 0.14, 0.6), offset: (0, 0.14, 0))],
+        ),
+        "house_shoe": (
+            model: "models/props/house/shoe.glb",
+            dynamic: true,
+            mass: 0.08,
+            colliders: [Box(half: (0.24, 0.26, 0.65), offset: (0, 0.26, 0))],
+        ),
+        "house_laundry_basket": (
+            model: "models/props/house/laundry_basket.glb",
+            dynamic: true,
+            mass: 0.3,
+            colliders: [Box(half: (1.2, 0.66, 0.83), offset: (0, 0.66, 0))],
+        ),
+        "house_bowl": (
+            model: "models/props/house/bowl.glb",
+            dynamic: true,
+            mass: 0.08,
+            colliders: [Cylinder(radius: 0.44, half_height: 0.15, offset: (0, 0.15, 0))],
+        ),
+        "house_toy_truck": (
+            model: "models/props/house/toy_truck.glb",
+            dynamic: true,
+            mass: 0.15,
+            colliders: [Box(half: (0.42, 0.34, 0.63), offset: (0, 0.34, 0.03))],
+        ),
+    },
+)
