@@ -50,11 +50,15 @@ and track files load (`cargo test -p rc_track` covers every track file); lint-fr
 variants; report with preview/plot paths.
 
 ## Environments (one agent each)
+Props directory ids below are independent of the catalog's `TrackInfo.environment` ids (which key
+the lighting files `assets/data/environments/<id>.ron`): toy_town → `toy_store`, sofa_circuit →
+`house`, maple_street → `street`, backyard_bash → `garden`, aisle_rush → `supermarket`,
+wrench_works → `workshop`.
 | Wave | Env id | Track id | Notes |
 |---|---|---|---|
 | 1 | `toy` | `toy_town` | layout exists (T02) — dress it, replace placeholder props, refine the layout if needed |
 | 1 | `house` | `sofa_circuit` | ~400 u, 5 laps; furniture verticality (book-stack ramp onto the coffee table, under the sofa, chair-leg slalom, stair ramp) |
 | 1 | `street` | `maple_street` | ~900 u, 3 laps, outdoor; drive under parked giant cars, curbs, lawn shortcut, storm drain |
 | 2 | `garden` | `backyard_bash` | ~450 u, 5 laps, outdoor |
-| 2 | `market` | `aisle_rush` | ~800 u, 3 laps; icy freezer aisle |
+| 2 | `supermarket` | `aisle_rush` | ~800 u, 3 laps; icy freezer aisle |
 | 2 | `workshop` | `wrench_works` | ~700 u, 3 laps; lifts, oil stains, wash bay |
