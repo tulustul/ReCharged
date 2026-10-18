@@ -91,10 +91,13 @@ Read this **before** writing code.
   Use required components for defaults. Construct `rc_core` structs with `..Default::default()`
   when they have many fields so additive changes don't break you.
 - Use run conditions (`in_state`, `resource_exists`, `resource_changed`) and change filters.
-- Lifetimes follow the session lifecycle (ARCHITECTURE §3.1): attempt entities
-  `DespawnOnExit(RaceAttempt)`, session entities `DespawnOnExit(RaceSession)`, menu entities
-  `DespawnOnExit(AppState::Menu)`. Reset attempt resources in `OnEnter(RacePhase::Setup)`, remove
-  session resources in `OnEnter(AppState::Unloading)`. Never leak across races.
+- Lifetimes follow the session lifecycle (ARCHITECTURE §3.1): attempt entities are **spawned in
+  `OnEnter(RaceAttempt)`** (never in `OnEnter(Setup)`) with `DespawnOnExit(RaceAttempt)`; session
+  entities `DespawnOnExit(RaceSession)`; menu entities `DespawnOnExit(AppState::Menu)`. Reset attempt
+  resources in `OnEnter(RacePhase::Setup)`, remove session resources in
+  `OnEnter(AppState::Unloading)`. Never leak across races.
+- Loaders report completion with a `LoadingDone(key)` message; only rc_game writes `LoadingTasks`.
+- Teleporting an `Interpolated` entity (spawn, respawn, reset) → send `Teleported { entity }`.
 
 **Time & determinism**
 - Gameplay clocks count fixed ticks; never use `Time<Virtual>` pausing, `Time<Fixed>::elapsed()`
@@ -106,8 +109,11 @@ Read this **before** writing code.
 - Only rc_vehicle (and rapier) write a rapier body's `Transform`; presentation uses visual proxies.
 
 **Bevy 0.20 traps** (details in `bevy-0.20-notes.md` §0)
-- No bundles; spawn tuples of ≤ 15 items (nest for more); the same component twice in one spawn
-  panics — `.insert()` overrides.
+- No built-in `*Bundle` types (`impl Bundle` / `#[derive(Bundle)]` still exist); spawn tuples of
+  ≤ 15 items (nest for more); the same component twice in one spawn panics — `.insert()` overrides.
+- `ComputedStates` has no derive: hand-write the impl, and set
+  `const ALLOW_SAME_STATE_TRANSITIONS: bool = false` for scope states (default `true` re-fires
+  exit/enter when the computed value doesn't change).
 - Buffered events are `Message`s (`MessageWriter/Reader`, `add_message`); `Event` is for observers;
   lifecycle observers are `On<Add<T>>`, `On<Remove<T>>`, `On<Discard<T>>`.
 - Scenes: `WorldAssetRoot` / `WorldInstanceReady` (not `SceneRoot`). Custom shaders are **WESL**.

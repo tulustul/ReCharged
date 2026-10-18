@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | **v2** — revised after `docs/reviews/gdd-review-1.md` (pending delta review 2) |
+| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`) |
 | Owner | Game designer / orchestrator |
 | Engine | Bevy 0.20, bevy-react 0.8.1 (UI), bevy_rapier3d 0.37 (physics), bevy_kira_audio 0.27 (audio) |
 | Companion docs | `docs/ARCHITECTURE.md` (technical design), `docs/PRACTICES.md` (engineering rules) |

@@ -38,6 +38,12 @@ How this was checked (2026-10-18):
 18. **Turn on `bevy/debug` in development.** Without it, system names in error messages print as `<Enable the debug feature to see the name>`. [T]
 19. **`Tonemapping::None` is now a raw passthrough.** It skips grading and dither too. Use `Tonemapping::Linear` for "no curve". [C]
 20. **`ScreenSpaceTransmission` is opt-in (0.20).** Glass and liquid transmission needs that component on the camera. [C]
+21. **Computed states re-fire on unchanged values.** `ComputedStates::ALLOW_SAME_STATE_TRANSITIONS`
+    defaults to `true`: when a source state changes but the computed value stays the same (e.g.
+    `Loading → InRace` both mapping to `Some(RaceSession)`), an exit/enter pair fires and
+    `DespawnOnExit(RaceSession)` entities are despawned. Scope states must hand-write the impl
+    (there is **no `ComputedStates` derive**) with `const ALLOW_SAME_STATE_TRANSITIONS: bool = false;`
+    (`bevy_state-0.20.0/src/state/computed_states.rs:79`; verified by the design review probe).
 
 ---
 

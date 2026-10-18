@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **v2** — revised after `docs/reviews/gdd-review-1.md` (pending delta review 2) |
+| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`; N1–N10 of review 2 applied) |
 | Stack | Rust 2024 · Bevy 0.20 · bevy_rapier3d 0.37 · bevy_kira_audio 0.27 · bevy-react 0.8.1 (crate + npm) · React/TSX |
 | Read with | `docs/GDD.md` (what), `docs/PRACTICES.md` (how we write code), `docs/tech/*.md` (verified API digests) |
 
@@ -101,18 +101,29 @@ only on those listed:
 #[derive(States, Default)] enum AppState { #[default] Boot, Menu, Loading, InRace, Unloading }
 
 // Present while AppState ∈ {Loading, InRace}. Scope for session entities (track, colliders,
-// static visuals). ALLOW_SAME_STATE_TRANSITIONS = false — otherwise Loading → InRace
-// recomputes the same value, fires an exit/enter pair and despawns the whole session
-// (measured in review 1, B1).
-#[derive(ComputedStates)] struct RaceSession;
+// static visuals, game cameras). ALLOW_SAME_STATE_TRANSITIONS = false — otherwise
+// Loading → InRace recomputes the same value, fires an exit/enter pair and despawns the whole
+// session (measured in review 1, B1). Bevy 0.20 has no ComputedStates derive: hand-write it.
+#[derive(States, Clone, Copy, PartialEq, Eq, Hash, Debug)] struct RaceSession;
+impl ComputedStates for RaceSession {
+    type SourceStates = AppState;
+    const ALLOW_SAME_STATE_TRANSITIONS: bool = false;
+    fn compute(s: AppState) -> Option<Self> { matches!(s, AppState::Loading | AppState::InRace).then_some(Self) }
+}
 
 // Sub-state of AppState::InRace.
 #[derive(SubStates, Default)] enum RacePhase { #[default] Setup, Intro, Countdown, Racing, Finished }
 
-// Present while InRace and RacePhase != Setup. Scope for attempt entities (racers, cameras of
-// local players, pickups, projectiles, hazards, ghost car, golden battery).
-// ALLOW_SAME_STATE_TRANSITIONS = false (same reason as RaceSession).
-#[derive(ComputedStates)] struct RaceAttempt;
+// Present while InRace and RacePhase != Setup. Scope for attempt entities (racers, pickups,
+// projectiles, hazards, ghost car, golden battery). Attempt entities are SPAWNED in
+// OnEnter(RaceAttempt) — never in OnEnter(Setup), where the scope is absent and a session that
+// ends during Setup would leak them (review 2, N1).
+#[derive(States, Clone, Copy, PartialEq, Eq, Hash, Debug)] struct RaceAttempt;
+impl ComputedStates for RaceAttempt {
+    type SourceStates = RacePhase;
+    const ALLOW_SAME_STATE_TRANSITIONS: bool = false;
+    fn compute(p: RacePhase) -> Option<Self> { (p != RacePhase::Setup).then_some(Self) }
+}
 
 // Sub-state of AppState::InRace.
 #[derive(SubStates, Default)] enum PauseState { #[default] Running, Paused }
@@ -121,12 +132,16 @@ only on those listed:
   menu entities: `DespawnOnExit(AppState::Menu)` (or the exact 0.20 names from the digest).
 - **Every exit from a session passes through `Unloading`** (one frame, outside `RaceSession`), so
   a following `Loading` always starts from a clean world.
-- **Restart** = `RacePhase::Setup` without reloading: attempt entities despawn; every sim crate
-  resets its attempt resources in `OnEnter(RacePhase::Setup)`; rc_track resets dynamic props to
-  their spawn poses; rc_race respawns the grid; the phase goes to `Countdown` (Intro only on the
-  first attempt of a session). Target < 0.5 s. `PauseState` is set back to `Running`.
+- **Restart** = `RacePhase::Setup` without reloading: attempt entities despawn (`RaceAttempt`
+  exits); every sim crate resets its attempt resources in `OnEnter(RacePhase::Setup)`; rc_track
+  resets dynamic props to their spawn poses; then the phase leaves Setup, `RaceAttempt` enters and
+  rc_race (and rc_items, …) **spawn attempt entities in `OnEnter(RaceAttempt)`**; the phase goes to
+  `Countdown` (Intro only on the first attempt of a session). Target < 0.5 s. `PauseState` is set
+  back to `Running`.
 - **Resource cleanup**: each crate resets its attempt resources in `OnEnter(RacePhase::Setup)`
   and removes its session resources in `OnEnter(AppState::Unloading)`.
+- **Game cameras are session-scoped** and re-bound to the new racers by slot in
+  `OnEnter(RaceAttempt)`, so a restart never despawns the UI host camera (review 2, N4).
 
 | From | Trigger | To |
 |---|---|---|
@@ -139,10 +154,11 @@ only on those listed:
 | InRace | Quit; Results → Menu; cup finished | Unloading → Menu (React opens the right screen) |
 
 **Loading gate** (`rc_core::LoadingTasks`): plugins that load something call
-`LoadingTasks::register(app, "track")` in `build()`. On `OnEnter(Loading)` every registered key
-is pending; each plugin marks its key done. `rc_game` opens the gate when all registered keys are
-done and the minimum display time has passed (1 s; 0 with automation flags or headless). A
-plugin that is not added never blocks.
+`LoadingTasks::register(app, "track")` in `build()` (build-time registration). On
+`OnEnter(Loading)` every registered key is pending; a plugin reports completion with a
+`LoadingDone("track")` message; **rc_game is the only runtime writer** of `LoadingTasks` and opens
+the gate when all registered keys are done and the minimum display time has passed (1 s; 0 with
+automation flags or headless). A plugin that is not added never blocks.
 
 **Pause** (owned by rc_game; never pauses `Time<Virtual>` — bevy-react animates the UI with it):
 - every `SimSet` is gated on `in_state(PauseState::Running)` (configured once in `CorePlugin`);
@@ -158,8 +174,10 @@ plugin that is not added never blocks.
 ### 3.2 Schedules and system sets (`rc_core::schedule`)
 ```
 PreUpdate
-  InputSet::Collect      rc_input: devices → PlayerIntents (edges latched until a fixed tick consumes them),
-                         UiNav messages, pause requests, rebind capture
+  InputSet::Collect      rc_input: devices → PlayerIntents (driving edges latched only while Running and no
+                         menu/dialog is open, until a fixed tick consumes them; cleared on entering Running and
+                         on OnEnter(Setup)), UiNav messages (suppressed while Racing and not paused), pause
+                         requests, rebind capture
 FixedUpdate (60 Hz; every SimSet gated on PauseState::Running, i.e. only in a running race)
   SimSet::Drivers        rc_input → CarControl (LocalPlayer & !AiDriver);  rc_ai → CarControl (AiDriver)
   SimSet::Assist         rc_ai steering assist: may change only `steer` of LocalPlayer racers with assist on
@@ -189,8 +207,11 @@ Update (chained)
 Anything simulated at 60 Hz that is shown on screen (racers, projectiles, hazards, dynamic props,
 the 20 Hz ghost) carries `Interpolated`. `CorePlugin` snapshots `PoseHistory { prev, curr }` in
 `FixedLast`. **rc_render** spawns a *visual proxy* entity per `Interpolated` sim entity, links
-them (`Visual(proxy)` on the sim entity, `VisualOf(sim)` on the proxy) and poses proxies in
-`InterpolateSet` using `Time<Fixed>::overstep_fraction()`. Models, wheels, VFX attachments,
+them with a one-to-one Bevy relationship (`VisualOf(sim)` on the proxy, relationship target
+`Visual` on the sim entity with `linked_spawn`, so the proxy despawns with its sim entity) and
+poses proxies in `InterpolateSet` using `Time<Fixed>::overstep_fraction()`. Teleports (spawn,
+respawn, prop reset) send a `Teleported { entity }` message; the snapshot system then sets
+`prev = curr` so nothing streaks across the screen. Models, wheels, VFX attachments,
 cameras and audio emitters use the proxy. Nobody but rc_vehicle (and rapier) writes a rapier
 body's `Transform`. Headless apps have no proxies.
 
@@ -254,14 +275,14 @@ Written only by rc_game before `Loading` (and replaced for a next race); read-on
 `Human { autopilot: true }` → rc_race also adds `AiDriver` to that racer (camera/HUD stay).
 
 ### 4.3 The racer entity
-Spawned by rc_race in `OnEnter(RacePhase::Setup)`, scoped `DespawnOnExit(RaceAttempt)`.
+Spawned by rc_race in `OnEnter(RaceAttempt)`, scoped `DespawnOnExit(RaceAttempt)`.
 
 | Component | Writer | Readers | Meaning |
 |---|---|---|---|
 | `Racer { index, name, car, paint, color }` | race | all | identity |
 | `LocalPlayer(PlayerSlot)` | race | input, camera, ui, audio, vfx | human (or autopilot) slot |
 | `AiDriver { rival, difficulty }` | race | ai | AI-driven |
-| `CarControl { throttle, brake, steer, drift, boost, use_item, look_back, reset_held }` | input (`LocalPlayer`, `!AiDriver`) / ai (`AiDriver`); assist may adjust `steer` (§3.2) | vehicle, items, race | driving intent; `use_item` is an edge consumed in the tick |
+| `CarControl { throttle, brake, steer, drift, boost, use_item, look_back, reset_held }` | input (`LocalPlayer`, `!AiDriver`) / ai (`AiDriver`); assist may adjust `steer` (§3.2) | vehicle, items, race | driving intent; `use_item` is an edge consumed in the tick; `reset_held` is a level — rc_race times the hold in fixed ticks |
 | `VehicleTelemetry { speed, forward_speed, rpm, throttle_load, grounded_wheels, airborne_time, slip_angle, drifting, surface, wheels: [WheelState;4], boosting, up_dot, clean_landing }` | vehicle | render, vfx, audio, ui, ai, race | physical state |
 | `Charge(f32)` (0–1) | vehicle | ui, ai, vfx, audio | battery meter |
 | `RaceProgress { lap, next_checkpoint, distance, total_distance, rank, finished, lap_times, best_lap, wrong_way, last_valid_checkpoint, off_track_time }` | race | ui, ai, items, game, audio, camera | standing in the race |
@@ -269,7 +290,7 @@ Spawned by rc_race in `OnEnter(RacePhase::Setup)`, scoped `DespawnOnExit(RaceAtt
 | `StatusEffects` (timed effects; getters `power_mul()`, `grip_mul()`, `top_speed_mul()`, `boost()`, `shielded()`, `ghosted()`) | items | vehicle, render, vfx, ui, ai | effect state |
 | `CatchUp(f32)` (±0.06) | ai | vehicle | catch-up top-speed scaling |
 | `Interpolated`, `PoseHistory` | race (marker) / core (snapshot) | render | interpolation |
-| `Visual(Entity)` | render | camera, vfx, audio | the visual proxy |
+| `Visual` (relationship target of the proxy's `VisualOf`) | render | camera, vfx, audio | the visual proxy |
 
 Rapier components on the racer are private to rc_vehicle.
 
@@ -284,7 +305,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `GoldenBattery` | rc_race (attempt) | rc_vfx |
 | `GhostCar { car, paint }` (+ `Interpolated`) | rc_race (attempt) | rc_render |
 | `GameCamera { slot }`, `MenuCamera`, `OverlayCamera`, `UiHost` marker | rc_camera | rc_render (post-processing), rc_audio (listener), rc_vfx (precipitation layer) |
-| `VisualOf(Entity)` | rc_render | — |
+| `VisualOf(Entity)` (relationship, `linked_spawn` target `Visual`) | rc_render | — |
 
 ### 4.5 Messages (`rc_core::messages`)
 | Message | Producer | Consumers |
@@ -306,6 +327,8 @@ Rapier components on the racer are private to rc_vehicle.
 | `DeviceEvent::{ Joined { slot, device }, Left { slot }, Disconnected { slot }, LastUsed { slot, kind } }` | input | game, ui |
 | `PauseRequest { slot: Option<PlayerSlot> }` | input, game (focus loss) | game |
 | `UiSound(UiCue)` | ui | audio |
+| `Teleported { entity }` | vehicle (respawn), track (prop reset), race/items (spawns) | core (snapshot snap) |
+| `LoadingDone(&'static str)` | every loader | game (`LoadingTasks`) |
 
 ### 4.6 Resources
 | Resource | Writer | Purpose |
@@ -322,8 +345,8 @@ Rapier components on the racer are private to rc_vehicle.
 | `LobbyState { open: bool, max_slots }` | game | input |
 | `PlayerViewports(Vec<(PlayerSlot, Rect)>)` (logical px) | camera | ui |
 | `MenuBackdrop { car, paint, focus }` | ui | render, camera |
-| `LoadingTasks` | each loader (its own key) / game (reset, gate) | loading gate |
-| `AutomationConfig` | binary (CLI) | game, ai, camera, render, ui |
+| `LoadingTasks` | game (runtime; loaders register at build and send `LoadingDone`) | loading gate |
+| `AutomationConfig` | binary (CLI) | game, ai, camera, render, ui, input (`--input-script`) |
 | `UserPaths { data_dir, assets_dir }` | binary (CLI/env) | game (saves, logs), track/vehicle/items/ai (data) |
 
 ### 4.7 Shared tables & constants
@@ -344,11 +367,13 @@ Each subsystem owns its crate, its data files and a short note `docs/design/<cra
 
 ### 5.1 `rc_track`
 - **TrackDef** (`assets/data/tracks/<id>.ron`): closed list of control points
-  `{ pos, width, bank_deg, surface, wall_left, wall_right, offroad_margin, dir }`, ribbon `style`
+  `{ pos, width, bank_deg, surface, wall_left, wall_right, offroad_margin }` (the loop's shape is
+  identical in both directions), ribbon `style`
   (`ToyTrack | Asphalt | CarpetRunner | Invisible` — Invisible lies on the environment's floor),
   `gap` spans (jumps, with a takeoff direction), `ground` polygons with surfaces (lawns, floors,
   furniture tops), item rows, props `{ kind, pos, yaw, dir }`, shortcuts, golden battery, kill
-  height. Every feature carries `dir: Both | Fwd | Rev`.
+  height. Every *feature* (gaps, ramps/props, item rows, shortcuts, golden battery, point flags)
+  carries `dir: Both | Fwd | Rev`; a different path in one direction is modelled as a shortcut.
 - **Variants:** reverse = traverse backwards and keep only `Both|Rev` features; mirror = negate X
   of positions and mirror yaw (prop meshes are never mirrored, so text stays readable), fix winding.
 - **Build (pure):** centripetal Catmull-Rom → arc-length samples (0.5 u) → frames (bank; helices OK,
@@ -392,8 +417,12 @@ Each subsystem owns its crate, its data files and a short note `docs/design/<cra
 - Pause: the Pause action → `PauseRequest` (only when not already paused). Disconnects →
   `DeviceEvent::Disconnected`; `LastUsed` for glyphs.
 - Rebinding: `RebindRequest` → capture the next press (Esc/Start cancels) → conflict check across
-  both keyboard schemes → `RebindResult` → `Settings.controls` updated via rc_game? No: rc_input
-  returns the result; **rc_game** writes `Settings` (single writer).
+  both keyboard schemes → `RebindResult`; **rc_game** writes `Settings` (single writer).
+- Driving edges are latched only while `PauseState::Running` and no menu/dialog is open; all
+  latched edges are cleared on entering `Running` and on `OnEnter(RacePhase::Setup)` (so the
+  Confirm that clicks "Resume" never fires an item). `UiNav` is suppressed while
+  `RacePhase::Racing` and not paused.
+- Reset: rc_input forwards the button level as `CarControl.reset_held`; rc_race times the hold.
 - Rumble for local players' pads from `CarImpact`, `HitEvent`, `CarLanded`, boost start.
 
 ### 5.4 `rc_weather`
@@ -404,8 +433,9 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
 `WeatherState` only; resets in `OnEnter(Setup)`.
 
 ### 5.5 `rc_race`
-- `OnEnter(RacePhase::Setup)`: spawn racers on the grid (`Interpolated`, scoped to the attempt),
-  `GoldenBattery` if `RaceConfig.golden_battery`, `GhostCar` in Time Trial; reset race resources.
+- `OnEnter(RacePhase::Setup)`: reset race resources only. `OnEnter(RaceAttempt)`: spawn racers on
+  the grid (`Interpolated`, scoped to the attempt), `GoldenBattery` if `RaceConfig.golden_battery`,
+  `GhostCar` in Time Trial.
 - Phases Intro → Countdown → Racing → Finished; perfect start / stall (`ApplyEffect`); AI
   perfect-start chance is decided by rc_ai's throttle timing.
 - Progress with continuity hints; checkpoint validation; lap timing in ticks; standings (finished
@@ -454,8 +484,11 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
     **Verify the rig with the real bevy-react UI first** (screenshot); fallback if it fails:
     `ClearColorConfig::Custom(Color::NONE)` + premultiplied-alpha output (`bevy-react-notes.md` §8.3).
   - Anti-aliasing: **TAA only in single view** (TAA is broken with `Camera::viewport` in 0.20.0);
-    split-screen uses SMAA/FXAA/MSAA — rc_render maps the setting accordingly.
-- `GameCamera { slot }` per local racer (attempt-scoped) with `Viewport` from the split layout
+    split-screen maps TAA → SMAA. SSAO requires `Msaa::Off`, so MSAA is never chosen while SSAO is
+    on (Bevy's per-camera default is `Msaa::Sample4` — set it explicitly). rc_render owns this
+    mapping.
+- `GameCamera { slot }` per local player (session-scoped, re-bound to the slot's racer in
+  `OnEnter(RaceAttempt)`) with `Viewport` from the split layout
   (pure function, tested); writes `PlayerViewports`. 3P: no 3D camera in the fourth quadrant
   (React shows a minimap/standings panel there).
 - Modes chase/far/hood, look-back, obstruction pull-in (rapier rays, ignoring cars), FOV Hor+ with
@@ -554,8 +587,9 @@ indoors). Pause pauses Engines/Sfx/Ambience. No audio device → muted, no panic
 React race.start(setup) → rc_ui → GameCommand::StartRace → rc_game validates, writes RaceConfig
   → Loading: rc_track builds Track/colliders ("track"); rc_render loads/builds visuals ("visuals");
              rc_audio loads banks ("audio"); … each marks its LoadingTasks key
-  → gate open → InRace/Setup: rc_race spawns racers → decorators attach physics (vehicle), brains
-             (ai), item slots (items), proxies & models (render), cameras (camera), engines (audio)
+  → gate open → InRace/Setup (attempt resources reset) → RaceAttempt enters: rc_race spawns racers →
+             decorators attach physics (vehicle), brains (ai), item slots (items), proxies & models
+             (render), engines (audio); session game cameras re-bind to the new racers
   → Intro → Countdown → Racing … → Finished: rc_race writes RaceResults
   → rc_game: points/records/unlocks → save → rc_ui pushes race.results → React Results screen
 ```
@@ -617,8 +651,9 @@ file is loaded and validated by a test of its owning crate.
 
 `rc_testkit`: headless app builders (MinimalPlugins, states, rapier, sim plugins, manual time,
 ambiguity detection), race helpers (enter race, step seconds, restart, next race), lifecycle
-test (start → restart ×2 → next race → menu: entity count back to baseline, one `Track`, one
-grid), pause test (120 paused frames: no change), determinism test.
+test (start → restart ×2 → next race → menu, **and leaving the session while still in `Setup`
+via quit and via a load error**: entity counts back to baseline, one `Track`, one grid), pause
+test (120 paused frames: no change), determinism test.
 
 ---
 
