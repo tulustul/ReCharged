@@ -20,8 +20,8 @@ blender -b -P tools/blender/props/street/<script>.py -- [--preview DIR] [--only 
 `assets/data/decor/maple_street.ron` come from `plan.py` (street plan, race line, dressing,
 decor) and `catalog.py` (prop dimensions and colliders, shared with the Blender scripts).
 `check.py` checks every kind: glb present and parsing, triangle budget (kit 5 k / hero 15 k),
-colliders inside the mesh bounds, `lamp*` bulb material on lit kinds, no clearcoat, decor
-models present, placed kinds in the catalog, ≤ 40 dynamic.
+colliders inside the mesh bounds, `lamp*` bulb material on lit kinds, decor models present,
+placed kinds in the catalog, ≤ 40 dynamic.
 
 Blender scripts (`tools/blender/props/street/`): `streetkit.py` (palette, material table,
 profile sweeps, full-size decals/glass, road wheel, block lettering), `kerbs.py`,
@@ -48,14 +48,17 @@ Maple keeps barrier kerbs. Corner radii 16.
 
 ## Lap (forward = start eastbound on Maple)
 
-1. Start straight (grid 36–57 u behind the line) → **under a parked SUV lengthwise** (6 u
-   between its wheels: chokepoint 1 of 1, cones mark the entry).
+1. Start straight (line at x 90, grid 66–87) → **under a parked SUV lengthwise** (6 u between
+   its wheels: chokepoint 1 of 1, cones mark the entry). The line sits at x 90 so that the
+   evenly spaced checkpoint gates stay out of the curb-hop S-bend (step 5).
 2. Cul-de-sac: clockwise around the planted island (radius 30), out over the driveway apron.
 3. Lawn → **east plank** (two plywood sheets on cinder blocks, 14.9°, forward only) onto the
    raised yard → kicker → **jump off the west end** (5.7° kicker, 3.2 u drop, 0.62 s air).
 4. Sidewalk west; the corner lot's front yard is walled (rc_render draws the barrier as kerb
    stones) with two gates: the **lawn shortcut** cuts the corner through them (grass, a maple,
-   a bike and a sprinkler on the way); the main line turns on the corner paving.
+   a bike and a sprinkler on the way); the main line turns on the corner paving. The shortcut
+   path continues ~12 u along the sidewalk beyond both gates so the checkpoint keep-out zone
+   puts the neighbouring gates where every car is still on the main line.
 5. Birch east sidewalk → right turn, **curb hop** down the rolled kerb straight **under an SUV
    parked across the line** (between its axles, 9 u wide) → left onto the roadway.
 6. **Storm-drain dip** in the median gutter (24 × 18 u dish, 2 u deep, 11° slopes: compression
@@ -77,8 +80,14 @@ counter-clockwise. Mirror variants mirror positions/yaws (prop meshes are not mi
 | Golden Battery | in the drain inlet (median kerb, dip bottom) | — |
 
 Item rows (5): start straight, cul-de-sac ring, raised yard, Birch east before the dip, Birch
-west. 13 checkpoints, 59–60 respawn points. Reference lap 34.8 s; the autopilot laps in about
-39 s forward and 45 s reverse with 7 AI cars and items.
+west. 13 checkpoints, 59–60 respawn points. Reference lap 34.8 s (reverse 34.9 s).
+
+**AI (DoD-2):** `AI_TRACK=maple_street AI_DIFF=Elite AI_CLASS=Elite AI_N=8 AI_LAPS=3
+AI_SEED=<s> [AI_REV=1] [AI_MIRROR=1] cargo test -p rc_ai --test race -- --ignored --nocapture
+probe` — seeds 21, 7 and 3 × all four variants: every car finishes, worst 1.31× the expected
+time (limit 1.5×), at most 2 respawns per race (limit 6). The corridor stays inside the barrier
+kerbs everywhere (an earlier version let the racing line graze the north kerb after the tunnel
+and the NW fillet: cars spun out in the mirrored reverse).
 
 **Intended lines:** hug the north parking lane into the SUV tunnel; swing wide (north) into
 the bulb and clip the island; cross the apron diagonally; stay straight from the plank to the
@@ -110,9 +119,10 @@ the tight left (R 9); the dip throws the car up on exit — land straight for th
 Decor (`assets/data/decor/maple_street.ron`): 9 houses and 13 maples beyond the bounds.
 Visible-triangle estimate for the whole place: ≈ 0.5 M.
 
-Conventions: materials are plain PBR (no textures yet), **no clearcoat** (washed out on prop
-scenes in game), bulbs named `lamp*` (rc_render dims them by day and adds the catalog
-`lights` at night). Collider rotations use `rot: (0, yaw, 0)` (catalog helpers take `yaw=`).
+Conventions: materials are plain PBR (no textures yet); clearcoat only on the parked cars'
+paint and glass (art bible car paint); bulbs named `lamp*` (rc_render dims them by day and adds
+the catalog `lights` at night). Collider rotations use `rot: (0, yaw, 0)` (catalog helpers take
+`yaw=`).
 
 ## Lighting wishes (for `assets/data/environments/street.ron`)
 
@@ -128,12 +138,17 @@ scenes in game), bulbs named `lamp*` (rc_render dims them by day and adds the ca
 - Ground materials: Asphalt mid-grey with crack decals, Stone light concrete slabs, Grass
   autumn green with leaf litter; wet: darker and glossier, leaves stay matte.
 
+## Verified in game
+
+`cargo run -p recharged -- --user-data-dir target/agent-data/T16-street --unlock-all
+--quick-race maple_street [--reverse] [--mirror] [--time Night] --autopilot --exit-after 80`:
+forward and reverse laps by day and at night (28 lamp lights), the SUV tunnel, the cul-de-sac
+apron, both plank/jump ends, the curb hop under the parked SUV, the storm-drain dip with the
+Golden Battery in its inlet (forward only; rc_render's outdoor inner floor sits under the
+dish).
+
 ## Known issues
 
-- **Storm-drain dip hidden in game:** rc_render's outdoor ground slab (top −0.03 over the
-  bounds) covers the 2 u-deep dish, so the dish and the Golden Battery are invisible and cars
-  dip under the grass plane. Requested an inner floor at the lowest ground polygon (see the
-  report); fallback: raise the street by 2.1 u in `plan.py`.
 - Barriers (the corner lot's wall, `wall_left`) are drawn by rc_render as kerb-stone blocks
   1.2 u tall; a low garden wall/hedge style would suit better.
 - Props are untextured PBR (plywood, siding, bark read as flat colours up close).
@@ -141,3 +156,6 @@ scenes in game), bulbs named `lamp*` (rc_render dims them by day and adds the ca
 - Leaf piles look higher (0.9 u) than their collider (0.5 u cap): cars sink into the leaves.
 - The decor beyond the bounds stands on rc_render's outdoor plane (y ≈ 0), 0.6 u below the
   lawns at the bounds' edge.
+- Reverse: the left turn right after climbing the curb hop (R 9) is slow; the autopilot scrubs
+  to ~7 km/h on the planting strip (within DoD-2). Widen `TURN_R` in `plan.py` if playtests
+  find it frustrating.
