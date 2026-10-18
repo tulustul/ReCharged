@@ -185,10 +185,11 @@ FixedUpdate (60 Hz; every SimSet gated on PauseState::Running, i.e. only in a ru
   SimSet::Drivers        rc_input → CarControl (LocalPlayer & !AiDriver);  rc_ai → CarControl (AiDriver)
   SimSet::Assist         rc_ai steering assist: may change only `steer` of LocalPlayer racers with assist on
   SimSet::Effects        rc_items: ApplyEffect → StatusEffects (stacking rules), timers, shield pops
-  SimSet::Items          rc_items: roulette, item use, projectile motion, hazards, pickups
+  SimSet::Items          rc_items: roulette, item use, projectile motion, hazards, pickups, hit detection
+                         (kept here, not in PostPhysics, to avoid ambiguities with rc_vehicle)
   SimSet::Vehicle        rc_vehicle: suspension, tyres, drive, boost/charge, air control, RespawnCar execution
   ── bevy_rapier: SyncBackend → StepSimulation → Writeback ──
-  SimSet::PostPhysics    rc_vehicle telemetry, impacts/landings; rc_items hit detection
+  SimSet::PostPhysics    rc_vehicle telemetry, impacts/landings
   SimSet::Race           rc_race: progress, checkpoints, laps, standings, wrong-way, reset/respawn decisions, finish
   SimSet::Weather        rc_weather
 FixedLast
@@ -304,9 +305,9 @@ Rapier components on the racer are private to rc_vehicle.
 |---|---|---|
 | `TrackPiece { kind }`, `Surface(SurfaceKind)` | rc_track (session) | — (visuals come from `TrackGeometry`) |
 | `Prop { kind, dynamic }` (+ `Interpolated` if dynamic) | rc_track (session; reset on Setup) | rc_render (glb scene on the proxy) |
-| `Pickup { row, slot }` | rc_items (attempt) | rc_vfx |
-| `Projectile { kind, owner }` (+ `Interpolated`) | rc_items (attempt) | rc_vfx, rc_audio |
-| `Hazard { kind: OilSlick / SpringPad / GooBomb …, owner }` | rc_items (attempt) | rc_vfx, rc_audio |
+| `Pickup { row, slot }` (+ `ItemTimer`: 0 = available, `ItemRadius`) | rc_items (attempt) | rc_vfx |
+| `Projectile { kind, owner }` (+ `Interpolated`, `ItemTarget` lock/target, `ItemTimer`, `ItemRadius`) | rc_items (attempt) | rc_vfx, rc_audio, ui (lock-on) |
+| `Hazard { kind: OilSlick / SpringPad / GooBomb …, owner }` (+ `ItemTarget` = goo carrier, `ItemTimer` = fuse/lifetime, `ItemRadius`) | rc_items (attempt) | rc_vfx, rc_audio, ui |
 | `GoldenBattery` | rc_race (attempt) | rc_vfx |
 | `GhostCar { car, paint }` (+ `Interpolated`) | rc_race (attempt) | rc_render |
 | `GameCamera { slot }`, `MenuCamera`, `OverlayCamera`, `UiHost` marker | rc_camera | rc_render (post-processing), rc_audio (listener), rc_vfx (precipitation layer) |
