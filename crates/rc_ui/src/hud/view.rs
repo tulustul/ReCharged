@@ -108,6 +108,8 @@ pub(super) fn race_event(
         },
         // `race.hud` carries the warning while it lasts.
         (K::WrongWay(_), Some(_)) => return None,
+        // T19b: show "Missed checkpoint — go back" (B15).
+        (K::MissedCheckpoint, Some(_)) => return None,
     })
 }
 

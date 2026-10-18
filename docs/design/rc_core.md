@@ -73,3 +73,4 @@ Lifecycle and pause behaviour: `crates/rc_testkit/tests/`, `crates/rc_game/tests
 | `AutomationConfig::soak_seed` | `flow` | T07 | `--soak-seed <n>` |
 | `ItemTarget(Option<Entity>)`, `ItemTimer(f32)`, `ItemRadius(f32)` components | `items` | T12 | rocket lock / leech target / goo carrier; cube respawn, lifetimes, fuse; drawn size = trigger size |
 | `COUNTDOWN_TICKS` const | `race` | T06 | 180; race tick 1 is the 181st tick after entering Countdown |
+| `RaceEventKind::MissedCheckpoint` | `race` | orchestrator (B15) | rc_race: a gate passed outside it; HUD "go back" notice |

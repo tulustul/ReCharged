@@ -303,6 +303,9 @@ pub enum RaceEventKind {
         /// Total time in ticks.
         time: u32,
     },
+    /// Passed a checkpoint's `s` outside its gate: the racer's distance stays frozen there until
+    /// it drives back through the gate (once per missed pass).
+    MissedCheckpoint,
     /// Wrong-way warning on/off.
     WrongWay(bool),
     /// The Golden Battery was collected.
