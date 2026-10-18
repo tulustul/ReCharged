@@ -16,3 +16,5 @@ QA/polish phase (T18) or when the owning area is touched next.
 | B9 | Barrier styles for house, workshop and supermarket use the plain sweep — themed barrier blocks like toy/street | rc_render track_visuals | T13b |
 | B10 | Finished human keeps car control after crossing the line — hand to the AI (one `AiDriver` insert) | rc_race | T06 |
 | B11 | Rockets never re-acquire a lock; explosions/EMP ignore walls; orb uses racing-width edges not barriers | rc_items | T12 |
+| B12 | World-space wheel contact point/normal on `WheelState` so skid marks, debris and splashes sit exactly on ramps/curbs | rc_core + rc_vehicle → rc_vfx | T14 |
+| B13 | Soft-depth fade for big particle puffs (hard edge where they meet the ground) | rc_vfx | T14 |

@@ -19,7 +19,7 @@
 | T11 | AI drivers | T02, T03 | in progress |
 | T12 | items | T02, T03 | done (40 tests) |
 | T13 | graphics (render) | T02, T08 | T13b done; T13a in progress |
-| T14 | VFX | T03 | in progress |
+| T14 | VFX | T03 | done (37 tests) |
 | T15 | weather | T01 | done (12 tests) |
 | T05b | race HUD | T05, T06 | in progress |
 | T16 | environments & tracks (2 waves) | T02, art bible | toy done; house, street, garden, supermarket, workshop in progress |

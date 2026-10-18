@@ -528,7 +528,9 @@ Pooled particle system (CPU sim, shared meshes/materials for batching; counts by
 emitters from telemetry (drift sparks by charge rate, wheel debris by surface, boost flames,
 landing dust, splashes) and messages (impacts, explosions, EMP ring, lightning, respawn,
 confetti); skid marks; visuals for `Pickup`, `Projectile`, `Hazard`, `GoldenBattery`, leech
-tether; per-`GameCamera` precipitation on its own `RenderLayers`; 3D name tags (slot colours) and
+tether; per-`GameCamera` precipitation on its own `RenderLayers` (**rc_vfx owns every
+`GameCamera`'s `RenderLayers`**: layer 0 + `rc_vfx::player_layer(slot)` = 1 + slot; layer 30 = name
+atlas; other crates needing per-camera layers merge into that set); 3D name tags (slot colours) and
 lock-on markers per camera; reduce-flashing variants.
 
 ### 5.11 `rc_audio`
