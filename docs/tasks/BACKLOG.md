@@ -24,3 +24,6 @@ QA/polish phase (T18) or when the owning area is touched next.
 | B17 | Item races are rough (0.14–0.33 respawns per racer-lap, mostly hits/Spring Pad launches over walls) — tune impulses, add wall checks | rc_items balance | T11 |
 | B18 | Re-run `every_layout` AI test once all environments are final (incl. aisle_rush) | QA | T11 |
 | B19 | Maple Street: leaf piles look 0.9 u but collide at 0.5 u; decor beyond bounds sits 0.6 u below edge lawns; reverse curb-hop turn very slow (widen TURN_R) | env street | T16 street |
+| B20 | Intro fly-by camera passes through walls (Aisle Rush lobby grid is 10 u from the glazing) — clamp the intro orbit inside `Track::bounds()` and under the ceiling | rc_camera | T16 supermarket |
+| B21 | Prop glbs embed their own copies of texture sheets (~4 MB VRAM each in the supermarket) — share external textures | env art pipeline | T16 supermarket |
+| B22 | Decor has no time-of-day switch (supermarket ceiling light rows glow by day) — a "day-only"/"night-only" material prefix | rc_render | T16 supermarket |
