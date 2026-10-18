@@ -1,0 +1,177 @@
+// Prop catalog — back garden (Backyard Bash, art bible §3.4). Kinds are prefixed `garden_`.
+// Units: u (1 u = 22.5 cm), real size × 4.44; origin = ground-contact centre, front faces −Z.
+// Models: models/props/garden/ (generators in tools/blender/props/garden/). Collider `rot` is
+// (pitch about X, yaw about Y, roll about Z) in degrees. Format: docs/design/rc_track.md §A9;
+// `lights` (rc_render): offset (prop space), linear colour, real-world lumens, range (u).
+// Soft dressing cars drive through (grass tufts, leaves, hose, stepping stones) and the
+// out-of-reach backdrop (house wall, fences) live in assets/data/decor/backyard_bash.ron.
+(
+    props: {
+        // --- hero props -------------------------------------------------------------------
+        // Slatted three-seat garden bench, 1.9 m long (8.4 u), seat at 0.45 m (2.0 u); the
+        // track passes under the seat front to back between the end frames (7.4 u clear,
+        // 1.65 u headroom).
+        "garden_bench": (
+            model: "models/props/garden/bench.glb",
+            colliders: [
+                Box(half: (0.25, 1.45, 1.4), offset: (-3.95, 1.45, 0.05)),
+                Box(half: (0.25, 1.45, 1.4), offset: (3.95, 1.45, 0.05)),
+                Box(half: (3.7, 0.2, 1.15), offset: (0, 1.86, -0.05)),
+                Box(half: (3.7, 0.95, 0.14), offset: (0, 2.95, 1.2), rot: (12, 0, 0)),
+            ],
+        ),
+        // Hose-reel cart with the green hose wound on its drum, 2.6 × 2.4 × 4.4 u; it stands on
+        // the island inside the spiral.
+        "garden_hose_reel": (
+            model: "models/props/garden/hose_reel.glb",
+            colliders: [Box(half: (1.3, 1.2, 1.1), offset: (0, 1.2, 0))],
+        ),
+        // Wooden sandbox, 2.4 × 1.4 m (10.7 × 6.2 u), boards with a cap rail at 1.18 u (the
+        // kickers' lip), corner seats at the back corners. The sand is a Dirt ground polygon at
+        // 1.0 inside it (track file).
+        "garden_sandbox": (
+            model: "models/props/garden/sandbox.glb",
+            colliders: [
+                Box(half: (5.35, 0.59, 0.09), offset: (0, 0.59, -3.01)),
+                Box(half: (5.35, 0.59, 0.09), offset: (0, 0.59, 3.01)),
+                Box(half: (0.09, 0.59, 2.92), offset: (-5.26, 0.59, 0)),
+                Box(half: (0.09, 0.59, 2.92), offset: (5.26, 0.59, 0)),
+            ],
+        ),
+        // Three big terracotta pots with geraniums, lavender and a clipped box ball, 5.6 × 4.6 u,
+        // up to 5 u tall: the flower-pot chicane's corner markers.
+        "garden_pot_cluster": (
+            model: "models/props/garden/pot_cluster.glb",
+            colliders: [
+                Cylinder(radius: 1.2, half_height: 1.15, offset: (-1.3, 1.15, 0.6)),
+                Cylinder(radius: 0.78, half_height: 0.72, offset: (1.45, 0.72, 1.05)),
+                Cylinder(radius: 0.95, half_height: 0.9, offset: (0.75, 0.9, -1.25)),
+            ],
+        ),
+        // Timber garden shed, 2.4 × 1.8 m footprint (10.7 × 8 u), 2.3 m (10.2 u) to the ridge;
+        // door and window on the front (−Z).
+        "garden_shed": (
+            model: "models/props/garden/shed.glb",
+            colliders: [Box(half: (5.45, 4.6, 4.1), offset: (0, 4.6, 0))],
+        ),
+        // Kettle barbecue on a three-leg stand, 2.6 u wide, 4.4 u tall (on the deck).
+        "garden_bbq": (
+            model: "models/props/garden/bbq.glb",
+            colliders: [Cylinder(radius: 1.3, half_height: 2.2, offset: (0, 2.2, 0))],
+        ),
+        // --- structures -------------------------------------------------------------------
+        // Raised timber deck, 42 × 36 u, 0.45 m (2.0 u) high: decking boards, fascia, skirting
+        // and a corner post on the open south and west sides. The box is the drivable top (Wood)
+        // and keeps cars from driving under it; the track's Wood ground polygon sits hidden at
+        // 1.8 inside it so the race line knows the surface.
+        "garden_deck": (
+            model: "models/props/garden/deck.glb",
+            surface: Wood,
+            colliders: [
+                Box(half: (21, 1, 18), offset: (0, 1, 0)),
+                Box(half: (2.3, 0.335, 1.3), offset: (-9, 0.335, 19.3)),
+                Box(half: (2.3, 0.665, 0.65), offset: (-9, 0.665, 18.65)),
+            ],
+        ),
+        // Decking ramp up to the deck: 10 u wide, 2.0 u rise over 7.5 u (15°), rising toward −Z.
+        "garden_deck_ramp": (
+            model: "models/props/garden/deck_ramp.glb",
+            surface: Wood,
+            colliders: [Wedge(half: (5, 1, 3.75), offset: (0, 1, 0))],
+        ),
+        // Plywood sheet (2.44 × 1.22 m) leaning on the sandbox rim: 10.8 u wide, 1.18 u rise over
+        // 5.29 u (12.6°), rising toward −Z.
+        "garden_kicker": (
+            model: "models/props/garden/kicker.glb",
+            surface: Wood,
+            colliders: [Wedge(half: (5.4, 0.59, 2.645), offset: (0, 0.59, 0))],
+        ),
+        // Edging block, 1.2 × 1.2 × 0.6 u (the size and brick-red tint of the track's barrier
+        // blocks): closes the open ends of the raised beds.
+        "garden_edging": (
+            model: "models/props/garden/edging.glb",
+            colliders: [Box(half: (0.6, 0.6, 0.3), offset: (0, 0.6, 0))],
+        ),
+        // Round raised bed in the middle of the lawn: stone ring 10 u across, 1.2 u tall, a
+        // small Japanese maple and flowers (the canopy is out of reach).
+        "garden_round_bed": (
+            model: "models/props/garden/round_bed.glb",
+            colliders: [Cylinder(radius: 5, half_height: 0.6, offset: (0, 0.6, 0))],
+        ),
+        // Timber vegetable bed, 11 × 4.4 u, 1.1 u tall, lettuces and a bean-cane wigwam.
+        "garden_veg_bed": (
+            model: "models/props/garden/veg_bed.glb",
+            colliders: [Box(half: (5.5, 0.55, 2.2), offset: (0, 0.55, 0))],
+        ),
+        // --- kit ----------------------------------------------------------------------------
+        // Terracotta pots with plants: large (2.3 u tall, 2.6 u rim), medium (1.4 / 1.6 u).
+        "garden_pot_large": (
+            model: "models/props/garden/pot_large.glb",
+            colliders: [Cylinder(radius: 1.2, half_height: 1.15, offset: (0, 1.15, 0))],
+        ),
+        "garden_pot_medium": (
+            model: "models/props/garden/pot_medium.glb",
+            colliders: [Cylinder(radius: 0.75, half_height: 0.7, offset: (0, 0.7, 0))],
+        ),
+        // Small empty terracotta pot, 0.7 u tall: knockable.
+        "garden_pot_small": (
+            model: "models/props/garden/pot_small.glb",
+            dynamic: true,
+            mass: 0.3,
+            colliders: [Cylinder(radius: 0.38, half_height: 0.35, offset: (0, 0.35, 0))],
+        ),
+        // Plastic watering can, 1.9 × 0.8 × 1.4 u (spout toward −Z): knockable.
+        "garden_watering_can": (
+            model: "models/props/garden/watering_can.glb",
+            dynamic: true,
+            mass: 0.4,
+            colliders: [Box(half: (0.4, 0.6, 0.7), offset: (0, 0.6, 0.15))],
+        ),
+        // Ceramic garden gnome, 1.6 u tall: knockable.
+        "garden_gnome": (
+            model: "models/props/garden/gnome.glb",
+            dynamic: true,
+            mass: 0.8,
+            colliders: [Cylinder(radius: 0.4, half_height: 0.8, offset: (0, 0.8, 0))],
+        ),
+        // Plastic bucket, 1.3 u tall: knockable.
+        "garden_bucket": (
+            model: "models/props/garden/bucket.glb",
+            dynamic: true,
+            mass: 0.3,
+            colliders: [Cylinder(radius: 0.62, half_height: 0.65, offset: (0, 0.65, 0))],
+        ),
+        // Football, 22 cm (0.98 u): knockable.
+        "garden_football": (
+            model: "models/props/garden/football.glb",
+            dynamic: true,
+            mass: 0.25,
+            colliders: [Ball(radius: 0.49, offset: (0, 0.49, 0))],
+        ),
+        // Tennis ball, 6.7 cm (0.3 u): knockable.
+        "garden_tennis_ball": (
+            model: "models/props/garden/tennis_ball.glb",
+            dynamic: true,
+            mass: 0.04,
+            colliders: [Ball(radius: 0.15, offset: (0, 0.15, 0))],
+        ),
+        // House-wall lantern by the back door (out of reach, 9 u up): porch light at night.
+        "garden_porch_light": (
+            model: "models/props/garden/porch_light.glb",
+            colliders: [Box(half: (0.4, 0.6, 0.4), offset: (0, 9, -0.4))],
+            lights: [(offset: (0, 8.7, -0.9), color: (1, 0.8, 0.55), lumens: 1200, range: 32, spot_deg: 0, shadows: true)],
+        ),
+        // String of fairy lights between two posts, 16 u long, bulbs sagging to 4 u.
+        "garden_fairy_lights": (
+            model: "models/props/garden/fairy_lights.glb",
+            colliders: [
+                Cylinder(radius: 0.12, half_height: 2.9, offset: (-8, 2.9, 0)),
+                Cylinder(radius: 0.12, half_height: 2.9, offset: (8, 2.9, 0)),
+            ],
+            lights: [
+                (offset: (-4, 4.6, 0), color: (1, 0.78, 0.5), lumens: 160, range: 11, spot_deg: 0),
+                (offset: (4, 4.6, 0), color: (1, 0.78, 0.5), lumens: 160, range: 11, spot_deg: 0),
+            ],
+        ),
+    },
+)
