@@ -58,3 +58,12 @@ validation (references, unlock order of cup content, presets, classes, duplicate
 settings RON round-trip and defaults; surface table and weather scaling; path precedence; pose
 interpolation, snapshot and teleport snapping; proxy despawn; loading gate; bindings defaults.
 Lifecycle and pause behaviour: `crates/rc_testkit/tests/`, `crates/rc_game/tests/flow.rs`.
+
+## Additions after T01 (orchestrator-maintained)
+| Item | Module | Added by | Purpose |
+|---|---|---|---|
+| `MusicStinger(MusicCue)` message | `audio` | orchestrator (T09 request) | UI/flow-timed stingers (Cup-end ceremony) |
+| `WeatherState.snowing` | `weather` | T15 | precipitation is snow (also during Snow blends) |
+| `CycleCamera { slot }` message | `input` | T04 | camera-mode cycle / spectate target change |
+| `SHOWROOM_FOCUS` const | `camera` | T04 | where rc_render builds the menu turntable (car faces −Z) |
+| `LoadingFailed { key, error }` message | `flow` | T01 | loader error → Unloading → Menu + error dialog |

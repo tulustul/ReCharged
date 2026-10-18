@@ -106,6 +106,7 @@ fn register_messages(app: &mut App) {
         .add_message::<RebindResult>()
         .add_message::<DeviceEvent>()
         .add_message::<PauseRequest>()
+        .add_message::<CycleCamera>()
         .add_message::<UiSound>()
         // audio
         .add_message::<MusicStinger>();

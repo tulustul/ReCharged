@@ -158,10 +158,6 @@ pub fn pending_flags(cfg: &AutomationConfig) -> Vec<&'static str> {
         (cfg.capture_previews, "--capture-previews"),
         (cfg.track_tour.is_some(), "--track-tour"),
         (
-            race.is_some_and(|r| r.players.unwrap_or(1) > 1),
-            "--players (split-screen)",
-        ),
-        (
             race.is_some_and(|r| r.mode != QuickRaceMode::Quick),
             "--mode",
         ),

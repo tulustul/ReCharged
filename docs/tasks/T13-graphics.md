@@ -33,7 +33,10 @@ materials/**, showroom/**}`, `assets/data/environments/*.ron`, `assets/textures/
    albedo, normal, roughness, tileable) and/or CC0 sources (report URLs + licence); car paint
    materials (clear-coat) from `PaintInfo`.
 6. **Showroom**: the menu garage diorama (turntable, lighting, backdrop props) showing
-   `MenuBackdrop.car/paint`.
+   `MenuBackdrop.car/paint`, built at `rc_core::SHOWROOM_FOCUS` with the car facing −Z (rc_camera's
+   `MenuCamera` orbits that point). Camera decoration: add HDR/bloom/AA/etc. to `GameCamera` /
+   `MenuCamera` via `On<Add<…>>` + settings changes (rc_camera adds no post-processing; the split
+   overlay camera must stay untouched).
 7. Registers & completes the `"visuals"` loading key for its preloads.
 
 ## T13b — content visuals

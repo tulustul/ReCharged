@@ -1,48 +1,58 @@
 //! # rc_camera — cameras & the UI host (P)
 //!
-//! - **Responsibilities:** the UI host rig (exactly one camera marked `IsDefaultUiCamera`: the
-//!   full-window 3D camera in single view, an `OverlayCamera` in split-screen); menu/loading
-//!   cameras; one session-scoped `GameCamera` per local player, re-bound to the slot's racer in
-//!   `OnEnter(RaceAttempt)`; split-screen viewports (`PlayerViewports`); camera modes, look-back,
-//!   obstruction pull-in, FOV, shake, intro fly-by, finish orbit, spectate.
-//! - **Inputs:** `LocalPlayers`, `LocalPlayer` racers and their `Visual` proxies, `Settings`,
-//!   `Track`, `CarImpact` / `CarLanded` / `Explosion`, `MenuBackdrop`.
-//! - **Outputs:** camera entities (`GameCamera`, `MenuCamera`, `OverlayCamera`, `UiHost`),
-//!   `PlayerViewports`.
-//! - **Must never:** write gameplay state, follow physics bodies when a proxy exists, or despawn
-//!   the UI host on a restart.
-//!
-//! Status (T01): a single full-window 3D backdrop camera hosts the UI in every state; T04 builds
-//! the real rig (`docs/tasks/T04-input-camera.md`).
+//! - **Responsibilities:** the UI host rig (exactly one camera carries `UiHost` +
+//!   `IsDefaultUiCamera`: the menu camera, the loading camera, the full-window game camera in a 1P
+//!   race, or the `OverlayCamera` over the split-screen views, see [`rig`]); the menu showroom
+//!   drift; one session-scoped `GameCamera` per local player, re-bound to the slot's racer in
+//!   `OnEnter(RaceAttempt)`; split-screen viewports and `PlayerViewports`; chase / far / hood
+//!   modes, look-back, obstruction pull-in, Hor+ FOV with speed/boost widening and the 2P clamp,
+//!   shake, intro fly-by, finish orbit and spectating.
+//! - **Inputs:** `RaceConfig` (local players), `LocalPlayer` racers with their `Visual` proxy
+//!   (else their interpolated `PoseHistory`), `VehicleTelemetry`, `CarControl::look_back`,
+//!   `RaceProgress`, `Standings`, `Settings` (camera mode, shake, split, FOV), `CycleCamera`,
+//!   `CarImpact` / `CarLanded` / `Explosion`, `Teleported`, `MenuBackdrop`, rapier (fixed colliders).
+//! - **Outputs:** camera entities (`GameCamera`, `MenuCamera`, `OverlayCamera`, `UiHost`) with
+//!   their `Camera`, `Transform` and `Projection`; `PlayerViewports`; the `ClearColor`.
+//! - **Must never:** write gameplay state, follow the physics body when a proxy exists, add
+//!   post-processing (rc_render decorates the cameras), or despawn the UI host on a restart.
+
+mod director;
+mod follow;
+mod layout;
+mod menu;
+mod pose;
+mod rig;
+mod shake;
 
 use bevy::prelude::*;
-use bevy::ui::IsDefaultUiCamera;
 use rc_core::prelude::*;
 
-/// Backdrop colour until rc_render provides a scene (dark navy, sRGB).
-const BACKDROP: Color = Color::srgb(0.035, 0.05, 0.1);
+pub use rig::LoadingCamera;
 
 /// Cameras and viewports.
 pub struct GameCameraPlugin;
 
 impl Plugin for GameCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_ui_host);
+        // Also registered by rc_input; registering twice is a no-op.
+        app.add_message::<CycleCamera>();
+        rig::build(app);
+        director::build(app);
+        menu::build(app);
+        app.add_systems(
+            Update,
+            (
+                menu::drift.run_if(in_state(AppState::Menu)),
+                rig::layout_viewports,
+                director::tick_intro,
+                director::bind_targets,
+                director::cycle_views,
+                director::finish_orbit,
+                shake::add_trauma,
+                follow::follow_racers,
+            )
+                .chain()
+                .in_set(CameraSet),
+        );
     }
-}
-
-// ponytail: one persistent single-view UI host for menus, loading and races; T04 adds the
-// showroom/game cameras and the split-screen overlay.
-fn spawn_ui_host(mut commands: Commands) {
-    commands.spawn((
-        Name::new("UiHost camera"),
-        Camera3d::default(),
-        Camera {
-            clear_color: ClearColorConfig::Custom(BACKDROP),
-            ..default()
-        },
-        Transform::from_xyz(0.0, 6.0, 14.0).looking_at(Vec3::ZERO, Vec3::Y),
-        UiHost,
-        IsDefaultUiCamera,
-    ));
 }

@@ -318,6 +318,15 @@ pub struct PauseRequest {
     pub slot: Option<PlayerSlot>,
 }
 
+/// The Camera action was pressed (producer input — only in a running race; consumer camera: next
+/// camera mode, or the next spectated racer once the slot's racer finished). Registered by the
+/// input and camera plugins.
+#[derive(Message, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CycleCamera {
+    /// The player who pressed it.
+    pub slot: PlayerSlot,
+}
+
 /// Devices owned by one local player.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlotBinding {

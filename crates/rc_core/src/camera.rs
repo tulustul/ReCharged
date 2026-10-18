@@ -5,6 +5,10 @@ use bevy::prelude::*;
 
 use crate::catalog::PlayerSlot;
 
+/// Where the menu showroom's car stands (turntable centre, on the floor). rc_render builds the
+/// showroom around it, rc_camera frames it.
+pub const SHOWROOM_FOCUS: Vec3 = Vec3::ZERO;
+
 /// A local player's race camera (session-scoped; re-bound to the slot's racer in
 /// `OnEnter(RaceAttempt)`, so restarts never despawn it).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
