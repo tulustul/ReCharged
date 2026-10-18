@@ -1,0 +1,113 @@
+// AI tuning (GDD §8, §15): difficulty profiles, rival personalities and the driving knobs.
+// Owner: rc_ai (docs/design/rc_ai.md). Loaded and validated by `cargo test -p rc_ai data`;
+// debug builds hot-reload this file (≤ 1 s). Units: u, s, u/s, u/s²; shares are 0–1.
+// Aggression and consistency of a rival come from catalog.ron; unknown rival ids (the autopilot)
+// drive with the neutral personality below.
+(
+    difficulty: (
+        // GDD §8.2. speed_scale multiplies the car's own speed profile; corner_grip is the share
+        // of the car's cornering grip that profile uses ("cornering margin"); mistakes are late
+        // braking and wide lines, × (1.5 − consistency); reaction is the item delay range.
+        rookie: (speed_scale: 0.86, corner_grip: 0.82, mistakes_per_min: 4.0, reaction_secs: (0.8, 1.5), perfect_start: 0.05, drift: 0.0, line_spread_u: 1.5, hoard: 0.0),
+        pro: (speed_scale: 0.94, corner_grip: 0.9, mistakes_per_min: 1.5, reaction_secs: (0.4, 0.8), perfect_start: 0.20, drift: 0.5, line_spread_u: 1.0, hoard: 0.0),
+        elite: (speed_scale: 1.0, corner_grip: 0.96, mistakes_per_min: 0.4, reaction_secs: (0.2, 0.4), perfect_start: 0.40, drift: 1.0, line_spread_u: 0.6, hoard: 0.0),
+        elite_plus: (speed_scale: 1.02, corner_grip: 0.98, mistakes_per_min: 0.3, reaction_secs: (0.15, 0.3), perfect_start: 0.60, drift: 1.0, line_spread_u: 0.5, hoard: 0.5),
+    ),
+    // hoard: keeps items for the best moment (defensive items until threatened, Turbo for long
+    // straights); boost: eagerness to spend charge (1 = any straight, from the minimum charge).
+    neutral: (hoard: 0.3, boost: 0.5),
+    personalities: {
+        "dash": (hoard: 0.2, boost: 0.5),      // clean & fast
+        "mayhem": (hoard: 0.0, boost: 0.6),    // aggressive: fires at once
+        "penny": (hoard: 0.4, boost: 0.4),     // consistent
+        "turbo_tom": (hoard: 0.1, boost: 1.0), // boost-happy
+        "glitch": (hoard: 0.1, boost: 0.7),    // erratic
+        "rusty": (hoard: 0.4, boost: 0.3),     // steady
+        "nova": (hoard: 0.95, boost: 0.5),     // item hoarder
+    },
+    driving: (
+        // Pure pursuit: look ahead this long at the current speed, within the bounds.
+        lookahead_secs: 0.45,
+        lookahead_min_u: 4.0,
+        lookahead_max_u: 16.0,
+        // Cornering grip of the car by Handling stars 1–5 (measured lateral acceleration,
+        // docs/design/rc_vehicle.md), and the braking the speed plan assumes (cars brake ≈ 40).
+        lateral_accel_by_handling: [25.0, 27.5, 30.5, 32.5, 34.5],
+        brake_decel: 28.0,
+        // The AI's line keeps this far inside the drivable edge; lane changes move this fast.
+        edge_margin_u: 1.5,
+        lane_change_ups: 4.0,
+        // Speed after finishing (cool-down lap), × the race target.
+        finished_speed_scale: 0.7,
+    ),
+    traffic: (
+        // Cars and hazards this far ahead (along the track) are considered; a car is passed with
+        // this lateral gap between the bodies (car width ≈ 1.2 u).
+        look_ahead_u: 16.0,
+        side_gap_u: 1.6,
+        // Clearance kept around hazards beyond their reach (rc_items' `ItemRadius`: oil and
+        // spring pads trigger with the car centre over the disc, the orb knocks within 3 u); cars
+        // carrying a Goo Bomb are given goo_clearance_u more.
+        hazard_clearance_u: 0.6,
+        goo_clearance_u: 2.0,
+    ),
+    charge: (
+        // Drift through corners tighter than this radius lasting at least this long (at the
+        // planned speed) and above this share of the top speed (GDD §5.3 charges above 40 %).
+        drift_max_radius_u: 32.0,
+        drift_min_secs: 1.2,
+        drift_min_speed: 0.5,
+        // Drifts end this long (at the planned speed) before the corner does, so the catch
+        // (≈ 0.5 s, docs/design/rc_vehicle.md) happens inside it; a pursuit asking for more than
+        // drift_counter_steer of counter-steer means the drift turns too tight: let go.
+        drift_exit_secs: 0.5,
+        drift_counter_steer: 0.35,
+        // Boost when the road ahead stays straight — the plan above the boosted top speed — for
+        // this long at full throttle (× (1.5 − boost)).
+        boost_straight_secs: 1.4,
+    ),
+    recovery: (
+        // Stuck: below this speed with the throttle down, or less than progress_u of progress
+        // in progress_secs → reverse for reverse_secs; after reset_after_tries tries (or off the
+        // course / upside down for too long) hold reset (rc_race respawns after 0.4 s).
+        stuck_ups: 1.5,
+        stuck_secs: 0.8,
+        progress_u: 3.0,
+        progress_secs: 2.5,
+        reverse_secs: 1.2,
+        reset_after_tries: 2,
+        reset_hold_secs: 0.6,
+        off_course_secs: 1.5,
+        flipped_secs: 0.5,
+    ),
+    catch_up: (
+        // GDD §8.1: AI behind the leading human gain up to `max`, AI ahead lose up to `max`,
+        // linearly from dead_zone_u to full_at_u of race distance; changes at most rate_per_sec.
+        max: 0.06,
+        dead_zone_u: 10.0,
+        full_at_u: 150.0,
+        rate_per_sec: 0.02,
+    ),
+    items: (
+        // GDD §6.2 / §8.1 use conditions (u). Rockets lock within 35°/80 u ahead (60 u behind).
+        rocket_cone_deg: 30.0,
+        rocket_range_u: 70.0,
+        rocket_back_range_u: 40.0,
+        leech_range_u: 38.0,
+        orb_range_u: 45.0,
+        emp_radius_u: 10.0,
+        drop_behind_u: 14.0,
+        goo_seek_u: 25.0,
+        turbo_straight_secs: 1.5,
+        // Without a threat a defensive item is used after 4 s + hoard × hoard_secs (Nova ≈ 23 s).
+        hoard_secs: 20.0,
+    ),
+    assist: (
+        // Steering assist (GDD §15): share of the gap to the racing-line steer blended in,
+        // fading as the player's own steering grows; after a respawn or crash, a stronger pull
+        // toward the track direction for recovery_secs.
+        strength: 0.4,
+        recovery_strength: 0.8,
+        recovery_secs: 1.5,
+    ),
+)

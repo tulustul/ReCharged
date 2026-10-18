@@ -66,7 +66,9 @@ offset and perfect start (`AiLineOffset`, `AiPerfectStart`), mistakes and drift 
 - **Jumps** (`Track::jumps`, 25 u before the lip to 10 u after the landing): traffic lane changes
   ≤ 0.8 u and hazard dodges ≤ 3 u (ramps and gaps have no barriers), no traffic speed limits
   (too little speed drops the car into the gap: on test_oval one slow car under the landing ramp
-  made the whole field queue and fall in), and no hazards dropped there.
+  made the whole field queue and fall in), no hazards dropped there, and on the run-up (lip within
+  45 u) the throttle never aims below 0.9× the jump's reference takeoff speed, whatever the
+  difficulty scale (rc_track guarantees landings from 0.8×).
 - **Mistakes** (GDD §8.2): every 0.5 s, chance `mistakes_per_min` × (1.5 − consistency):
   late braking (plan × 1.08–1.16) or a wide line (1–2.2 u outward, corners only), 1–2 s.
 
@@ -126,17 +128,48 @@ id (hoard, boost eagerness; aggression and consistency come from `catalog.ron`),
 `traffic`, `charge`, `recovery`, `catch_up`, `items`, `assist`.
 
 ## Lap times
-LAP_TABLE
+8 AI (the seven catalog rivals + one neutral driver) in Pro-class cars (Hornet / Torque),
+3 laps from the grid (countdown start included), 3 seeds per row, items off. *Expected* = 3 ×
+the track's reference lap (rc_track's reference car on its speed profile, flying). Respawns
+are to-track respawns summed over the 3 races (72 racer-laps). test_oval and toy_town are the
+tested layouts; the four environment tracks were mid-edit (2026-10-18 evening).
+
+| Track | Difficulty | Reference lap (s) | Flying lap, median (s) | Best lap (s) | Race ÷ expected, mean | worst | Respawns | DNF |
+|---|---|---|---|---|---|---|---|---|
+| test_oval | Rookie | 10.8 | 12.30 | 11.62 | 1.211 | 1.265 | 0 | 0 |
+| test_oval | Pro | 10.8 | 11.35 | 10.90 | 1.124 | 1.322 | 0 | 0 |
+| test_oval | Elite | 10.8 | 10.72 | 10.40 | 1.060 | 1.109 | 0 | 0 |
+| test_oval | Elite+ | 10.8 | 10.68 | 10.18 | 1.045 | 1.091 | 0 | 0 |
+| toy_town | Rookie | 24.5 | 29.60 | 28.20 | 1.250 | 1.288 | 0 | 0 |
+| toy_town | Pro | 24.5 | 27.32 | 25.98 | 1.164 | 1.244 | 0 | 0 |
+| toy_town | Elite | 24.5 | 26.37 | 24.65 | 1.138 | 1.252 | 0 | 0 |
+| toy_town | Elite+ | 24.5 | 26.40 | 24.35 | 1.131 | 1.275 | 1 | 0 |
+| sofa_circuit | Rookie | 20.1 | 21.90 | 20.42 | 1.140 | 1.204 | 0 | 0 |
+| sofa_circuit | Pro | 20.1 | 19.63 | 18.87 | 1.042 | 1.109 | 0 | 0 |
+| sofa_circuit | Elite | 20.1 | 19.15 | 17.98 | 0.997 | 1.051 | 0 | 0 |
+| sofa_circuit | Elite+ | 20.1 | 18.65 | 17.77 | 0.981 | 1.029 | 0 | 0 |
+| backyard_bash | Rookie | 21.4 | 24.52 | 23.23 | 1.186 | 1.241 | 0 | 0 |
+| backyard_bash | Pro | 21.4 | 22.17 | 21.20 | 1.081 | 1.191 | 0 | 0 |
+| backyard_bash | Elite | 21.4 | 20.92 | 20.07 | 1.037 | 1.110 | 0 | 0 |
+| backyard_bash | Elite+ | 21.4 | 20.68 | 19.87 | 1.008 | 1.089 | 0 | 0 |
+| maple_street | Rookie | 34.9 | 39.77 | 37.80 | 1.180 | 1.230 | 4 | 0 |
+| maple_street | Pro | 34.9 | 36.53 | 34.90 | 1.077 | 1.120 | 2 | 0 |
+| maple_street | Elite | 34.9 | 34.52 | 32.73 | 1.044 | 1.149 | 8 | 0 |
+| maple_street | Elite+ | 34.9 | 34.33 | 32.75 | 1.029 | 1.135 | 4 | 0 |
+| wrench_works | Rookie | 28.0 | 31.20 | 30.15 | 1.164 | 1.304 | 2 | 0 |
+| wrench_works | Pro | 28.0 | 28.68 | 27.82 | 1.079 | 1.274 | 2 | 0 |
+| wrench_works | Elite | 28.0 | 27.15 | 26.30 | 1.015 | 1.180 | 2 | 0 |
+| wrench_works | Elite+ | 28.0 | 26.85 | 26.07 | 1.009 | 1.150 | 3 | 0 |
 
 ## How to verify
-- `cargo test -p rc_ai` — unit (43): data file, validation messages and debug hot reload, speed
-  plan (curvature,
-  corner speed, braking pass, airborne, brake point, star caps & acceleration), pure pursuit
-  geometry, speed-sensitive steering, pedals, lane choice (clear road, faster car, sides, edge,
-  blocked, hazards, alongside, rear-end), recovery state machine (stuck → reverse → reset, tries
-  forgiven, flip tap, off course, trapped), item decision table, aggression/hoarding, reaction
-  delay, cancelled use, catch-up target, assist blend, perfect-start statistics, drift zones wrap,
-  prop footprints (walls as circle rows) and no prop obstacle on toy_town's racing line.
+- `cargo test -p rc_ai` — unit (43): data file, validation messages and debug hot reload; speed
+  plan (curvature, corner speed, braking pass, airborne, brake point, star caps & acceleration);
+  pure pursuit geometry, speed-sensitive steering, pedals; lane choice (clear road, faster car,
+  sides, edge, blocked, hazards, alongside, rear-end); recovery state machine (stuck → reverse →
+  reset, tries forgiven, flip tap, off course, trapped); item decision table, aggression and
+  hoarding, reaction delay, cancelled use; catch-up target; assist blend; perfect-start
+  statistics; drift zones across the start line; prop footprints (walls as circle rows) and no
+  prop obstacle on toy_town's racing line.
   Headless (`tests/`, `rc_testkit::SimPlugins`, ≈ 15 s): 8 Rookie and 8 Elite AI finish 3 laps of
   test_oval within 1.5× with ≤ 2 respawns per lap and Elite laps < 0.92× Rookie's; 8 Pro AI on
   toy_town likewise; a seeded race (items on) replays bit for bit; perfect starts at Elite+
@@ -145,12 +178,13 @@ LAP_TABLE
   a car put nose-first against a wall gets back into the race.
 - `cargo test -p rc_ai --test race -- --ignored --nocapture every_layout` (QA, ≈ 2–4 min): every
   catalog track with a data file × forward/reverse/mirror, 8 Elite AI in Elite cars, 3 laps,
-  DoD-2 limits. Snapshot 2026-10-18 23:40: all 24 variants of the 6 tracks with files pass (no
+  DoD-2 limits. Snapshot 2026-10-18 23:30: all 24 variants of the 6 tracks with files pass (no
   DNF, worst racer 1.41×, at most 22 to-track respawns per 24 racer-laps on maple_street reverse
   mirror); aisle_rush has no file yet.
 - `cargo test -p rc_ai --test race -- --ignored --nocapture lap_table` prints the table above;
-  `probe` runs one race with `AI_TRACK`, `AI_DIFF`, `AI_N`, `AI_LAPS`, `AI_SEED`, `AI_ITEMS=1`,
-  `AI_TRACE=<racer>` (per-tick trace), `AI_TRACE_HAZARDS=1`.
+  `probe` runs one race with `AI_TRACK`, `AI_DIFF`, `AI_CLASS`, `AI_N`, `AI_LAPS`, `AI_SEED`,
+  `AI_REV=1`, `AI_MIRROR=1`, `AI_ITEMS=1`, `AI_TRACE=<racer>` (per-tick trace),
+  `AI_TRACE_HAZARDS=1`.
 - In the game: `cargo run -p recharged -- --user-data-dir target/agent-data/T11 --quick-race
   toy_town --ai 7 --autopilot --exit-after 90`.
 
