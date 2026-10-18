@@ -52,11 +52,17 @@ offset and perfect start (`AiLineOffset`, `AiPerfectStart`), mistakes and drift 
   the car already is on, else the other side, else followed. Cars alongside (±3 u along the track)
   bound the lateral range (never squeeze into a car). Never drive into a slower car that overlaps
   the *current* lateral: close to 3 u + 0.25 s × v behind it. Lane changes move at 4 u/s.
-- **Hazards**: rc_items' Oil Slick / Spring Pad discs and Shock Orbs (reach from `ItemRadius`,
-  + 0.6 u) are obstacles; a hazard dodge is applied at once (a rate-limited dodge could not clear
-  a pad lying 6 u past a respawn point — the car was launched over the wall on every respawn).
-  Cars carrying a Goo Bomb get 2 u more berth. Small dynamic props are ignored (the chassis
-  knocks them away).
+- **Hazards and props**: rc_items' Oil Slick / Spring Pad discs and Shock Orbs (reach from
+  `ItemRadius`, + 0.6 u) are obstacles, and so are static, non-drivable props in the legal
+  corridor whose colliders reach into the car's height band (0.15–1.3 u above the surface; higher
+  parts are driven under): flower-pot chicanes, chair legs, tyre stacks, garden edging. Each
+  collider becomes footprint circles — boxes a row of small circles along their long side, so a
+  wall flanking a tunnel never closes it — computed once per track. A dodge is applied at once (a
+  rate-limited one could not clear a pad lying 6 u past a respawn point: the car was launched over
+  the wall on every respawn). A car well off its line (> 1.5 u) also clears obstacles on its own
+  path back (backyard_bash's garden edging across the lawn margin trapped cars for 7 s a lap).
+  Cars carrying a Goo Bomb get 2 u more berth. Dynamic props are ignored (the chassis knocks them
+  away); drivable ones (ramps, box tops) are driven.
 - **Jumps** (`Track::jumps`, 25 u before the lip to 10 u after the landing): traffic lane changes
   ≤ 0.8 u and hazard dodges ≤ 3 u (ramps and gaps have no barriers), no traffic speed limits
   (too little speed drops the car into the gap: on test_oval one slow car under the landing ramp
@@ -72,8 +78,9 @@ offset and perfect start (`AiLineOffset`, `AiPerfectStart`), mistakes and drift 
   (`VehicleTelemetry::charge_rate`), the pursuit asks for > 0.35 counter-steer (too tight), the
   car spins (> 40°), slows below the zone speed or gets within 0.5 u of the edge (its line keeps
   1 u more room: a car turned 30° reaches the barrier with its corner). After a drift the throttle
-  is eased (0.4) until the slide is caught. Measured: drifting costs ≈ 0.1–0.3 s per toy_town lap
-  on 4WD cars, so it stays a minority choice; a wall-scraping drift cost 2–5 s before these rules.
+  is eased (0.4) until the slide is caught. Measured (solo Hornet, toy_town): drifting costs
+  ≈ 0.5 s per lap (4WD cars scrub speed in a drift) that the charge partly earns back on the next
+  straight; before these entry/exit rules a wall-scraping helix drift cost 2–5 s per lap.
 - **Boost**: from `BOOST_MIN_CHARGE` + (1 − eagerness) × 0.2 when the plan stays above the boosted
   top speed for `boost_straight_secs` × (1.5 − eagerness) (integrated with the car's Accel-star
   acceleration), all wheels down, not drifting, > 50 % top; held until braking is due.
@@ -122,20 +129,25 @@ id (hoard, boost eagerness; aggression and consistency come from `catalog.ron`),
 LAP_TABLE
 
 ## How to verify
-- `cargo test -p rc_ai` — unit (40): data file and validation messages, speed plan (curvature,
+- `cargo test -p rc_ai` — unit (43): data file, validation messages and debug hot reload, speed
+  plan (curvature,
   corner speed, braking pass, airborne, brake point, star caps & acceleration), pure pursuit
   geometry, speed-sensitive steering, pedals, lane choice (clear road, faster car, sides, edge,
   blocked, hazards, alongside, rear-end), recovery state machine (stuck → reverse → reset, tries
   forgiven, flip tap, off course, trapped), item decision table, aggression/hoarding, reaction
-  delay, cancelled use, catch-up target, assist blend, perfect-start statistics, drift zones wrap.
+  delay, cancelled use, catch-up target, assist blend, perfect-start statistics, drift zones wrap,
+  prop footprints (walls as circle rows) and no prop obstacle on toy_town's racing line.
   Headless (`tests/`, `rc_testkit::SimPlugins`, ≈ 15 s): 8 Rookie and 8 Elite AI finish 3 laps of
   test_oval within 1.5× with ≤ 2 respawns per lap and Elite laps < 0.92× Rookie's; 8 Pro AI on
   toy_town likewise; a seeded race (items on) replays bit for bit; perfect starts at Elite+
   without stalls; items are used and an item race finishes; the autopilot finishes a lap and ends
   the race; the assist changes only `steer`; catch-up slows rivals ahead and is 0 in Time Trial;
   a car put nose-first against a wall gets back into the race.
-- `cargo test -p rc_ai --test race -- --ignored --nocapture every_layout` (QA, minutes): every
-  catalog track with a data file × forward/reverse/mirror, 8 Elite AI, 3 laps, DoD-2 limits.
+- `cargo test -p rc_ai --test race -- --ignored --nocapture every_layout` (QA, ≈ 2–4 min): every
+  catalog track with a data file × forward/reverse/mirror, 8 Elite AI in Elite cars, 3 laps,
+  DoD-2 limits. Snapshot 2026-10-18 23:40: all 24 variants of the 6 tracks with files pass (no
+  DNF, worst racer 1.41×, at most 22 to-track respawns per 24 racer-laps on maple_street reverse
+  mirror); aisle_rush has no file yet.
 - `cargo test -p rc_ai --test race -- --ignored --nocapture lap_table` prints the table above;
   `probe` runs one race with `AI_TRACK`, `AI_DIFF`, `AI_N`, `AI_LAPS`, `AI_SEED`, `AI_ITEMS=1`,
   `AI_TRACE=<racer>` (per-tick trace), `AI_TRACE_HAZARDS=1`.
@@ -143,12 +155,17 @@ LAP_TABLE
   toy_town --ai 7 --autopilot --exit-after 90`.
 
 ## Known limitations
-- Static props are not obstacles and shortcuts are never taken (`ponytail:` in `scene.rs`): fine
-  for today's layouts; a prop chicane needs prop footprints fed to the lane chooser.
+- Shortcuts are never taken (`ponytail:` in `scene.rs`; `Track::shortcuts` has the paths).
+- Obstacles are steered around one at a time within 16 u: a dense prop maze would need real path
+  planning. Prop footprints use the prop's horizontal extent (pitched/rolled colliders are treated
+  as upright).
+- The environment tracks (sofa_circuit, backyard_bash, maple_street, wrench_works) were being edited
+  while these numbers were taken; rerun `every_layout` when they settle.
 - One steering geometry for all cars (rc_ai cannot read vehicle params); pure pursuit absorbs it.
 - No line-of-sight test for rockets / Leech Coil; incoming rockets are met with a shield only.
-- With items on, the short test_oval is chaotic (tens of hits per race, ≈ 0.2 to-track respawns
-  per racer-lap); toy_town ≈ 0.1. Item hits and Spring Pad launches over walls cause them.
+- With items on, races stay complete (0 DNF over 18 item races) but rougher: 0.2–0.33 to-track
+  respawns per racer-lap on the short test_oval, 0.14–0.28 on toy_town, worst racers up to 1.4–1.7×
+  the expected time — item hits and Spring Pad launches over walls (GDD §6 by design).
 - Traffic costs Elite fields ≈ 1.5–2 s per toy_town lap against a solo car (conservative headway).
 - The countdown press is counted in ticks against `COUNTDOWN_TICKS`; extra fixed ticks in a frame
   at GO shift it by a tick or two (still inside the window).

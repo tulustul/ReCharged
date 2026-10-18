@@ -60,8 +60,8 @@ Read this **before** writing code.
   real profile in `~/.config`) and `--exit-after`; use `--unlock-all` to reach locked content.
   Tests write only to temporary directories. Make sure no process you started keeps running.
 - A game run opens a window on the user's desktop: keep runs short and purposeful.
-- Screenshots and scratch outputs go to the scratchpad or `target/`, never into `assets/` unless
-  they are deliverables.
+- Screenshots and scratch outputs go to **your own subfolder** of the scratchpad (named after your
+  task id) or `target/`, never into `assets/` unless they are deliverables.
 - Before reporting done: `check`, `test`, `clippy` and `fmt` are clean for your crates.
 
 ## 3. Simplicity first
