@@ -1,0 +1,155 @@
+# DoD-1, gamepad only (GDD §21): the keyboard_only.script flow on virtual gamepads — Title →
+# Settings change → Quick Race → race → Pause → Results → menu → Versus 2P join (two pads) + race →
+# Pause → Quit. Expects default settings and progress, so start from a fresh user-data dir:
+#   rm -rf target/agent-data/pad && cargo run -p recharged -- --user-data-dir target/agent-data/pad \
+#     --window 1600x900 --input-script tools/scripts/gamepad_only.script --exit-after 400
+# Exit 0 = every step ran and the UI stayed healthy. Screenshots: <user-data-dir>/screenshots/.
+# Pads: D-pad moves, A (South) confirms, B (East) backs, LB/RB tabs, Start pauses.
+
+wait ui
+3.5 nav gamepad confirm            # the splash has timed out; Title: any button
+1.5 shot pad_01_main_menu
+
+# Settings: Graphics → VSync off, then Accessibility → Steering assist on (both saved to
+# settings.ron; the assist keeps the scripted car on the track)
+0.3 nav gamepad up        # Championship → Quit (wraps)
+0.3 nav gamepad up        # Credits
+0.3 nav gamepad up        # Settings
+0.3 nav gamepad confirm   # Gameplay tab
+1.5 nav gamepad nextTab   # RB: Graphics
+0.4 nav gamepad down      # Display mode
+0.3 nav gamepad down      # Window size
+0.3 nav gamepad down      # VSync
+0.3 nav gamepad confirm   # off
+0.5 nav gamepad prevTab   # LB: Gameplay
+0.4 nav gamepad prevTab   # Accessibility
+0.4 nav gamepad down      # Colour-blind markers
+0.3 nav gamepad down      # Steering assist
+0.3 nav gamepad confirm   # on
+0.8 shot pad_02_settings
+0.3 nav gamepad back               # B: main menu
+
+# Quick Race on Backyard Bash, 1 lap (see keyboard_only.script for the grid route)
+1.2 nav gamepad down               # Quick Race
+0.3 nav gamepad confirm
+2.0 nav gamepad up
+0.3 nav gamepad left
+0.3 nav gamepad left               # Toy Town
+0.3 nav gamepad right              # Sofa Circuit
+0.3 nav gamepad right              # Backyard Bash (5 laps)
+0.3 nav gamepad right              # options: Layout
+0.3 nav gamepad down               # Mirror
+0.3 nav gamepad down               # Laps
+0.3 nav gamepad left               # 4
+0.3 nav gamepad left               # 3
+0.3 nav gamepad left               # 2
+0.3 nav gamepad left               # 1
+0.5 shot pad_03_track_select
+0.3 nav gamepad down               # Rivals
+0.3 nav gamepad down               # AI difficulty
+0.3 nav gamepad down               # Items
+0.3 nav gamepad down               # Weather
+0.3 nav gamepad down               # Time of day
+0.3 nav gamepad down               # Choose car
+0.3 nav gamepad confirm
+2.0 nav gamepad right              # Dumpster
+0.4 nav gamepad right              # Zip
+0.8 shot pad_04_car_select
+0.3 nav gamepad confirm            # race
+
+# Driving with the triggers and the stick (race ticks count from GO)
+wait countdown
+1.0 shot pad_05_countdown
+wait racing
+hold gamepad throttle 1            # RT
+@180 hold gamepad steer 0.3        # a little left-stick steering on top of the assist
+@210 hold gamepad steer 0
+@240 hold gamepad boost 1          # X
+@270 hold gamepad boost 0
+@330 tap gamepad item              # A
+@390 hold gamepad lookBack 1       # Y
+@420 shot pad_06_look_back
+@440 hold gamepad lookBack 0
+@480 tap gamepad camera            # View: far camera
+@540 shot pad_07_far_camera
+@560 tap gamepad camera            # hood
+@600 tap gamepad camera            # chase again
+@620 hold gamepad reset 1          # D-pad up held 0.4 s: back onto the track
+@650 hold gamepad reset 0
+@660 hold gamepad throttle 0.6     # partial trigger
+@700 hold gamepad throttle 1
+@720 hold gamepad drift 1          # B
+@750 hold gamepad drift 0
+@780 release gamepad
+0.2 tap gamepad pause              # Start
+wait paused
+1.0 shot pad_08_pause
+0.3 nav gamepad confirm            # Resume
+wait running
+0.2 hold gamepad throttle 1
+wait finished                      # the player finishing, or the soft-lock guard after the winner
+release gamepad
+3.0 shot pad_09_results
+0.3 nav gamepad down               # Restart → Change track
+0.3 nav gamepad down               # Menu
+0.3 nav gamepad confirm
+wait menu
+
+# Versus: P1 and P2 join with A on two pads
+2.0 nav gamepad down               # Quick Race
+0.3 nav gamepad down               # Time Trial
+0.3 nav gamepad down               # Versus
+0.3 nav gamepad confirm
+2.0 nav gamepad confirm            # pad 1 joins as P1
+0.5 nav gamepad2 confirm           # pad 2 joins as P2
+0.5 nav gamepad2 right             # P2: next car
+0.4 nav gamepad down               # P1: paint row
+0.4 nav gamepad right              # P1: next paint
+0.8 shot pad_10_lobby
+0.3 nav gamepad confirm            # P1 ready
+0.3 nav gamepad2 confirm           # P2 ready → track select (P1 picks)
+2.5 nav gamepad up
+0.3 nav gamepad left
+0.3 nav gamepad left               # Toy Town
+0.3 nav gamepad right              # Sofa Circuit
+0.3 nav gamepad right              # Backyard Bash
+0.3 nav gamepad right              # options: Layout
+0.3 nav gamepad down               # Mirror
+0.3 nav gamepad down               # Laps 5
+0.3 nav gamepad left
+0.3 nav gamepad left
+0.3 nav gamepad left
+0.3 nav gamepad left               # 1
+0.3 nav gamepad down               # Rivals
+0.3 nav gamepad down               # AI difficulty
+0.3 nav gamepad down               # Items
+0.3 nav gamepad down               # Weather
+0.3 nav gamepad down               # Time of day
+0.3 nav gamepad down               # Start race
+0.5 shot pad_11_versus_track
+0.3 nav gamepad confirm
+wait racing
+hold gamepad throttle 1
+hold gamepad2 throttle 1
+@120 hold gamepad2 steer -0.4
+@150 hold gamepad2 steer 0
+@200 tap gamepad item
+@230 tap gamepad2 item
+@300 hold gamepad2 boost 1
+@330 hold gamepad2 boost 0
+@420 shot pad_12_versus_racing
+@480 release gamepad
+@480 release gamepad2
+0.2 tap gamepad2 pause             # P2 pauses with Start
+wait paused
+1.0 shot pad_13_versus_pause
+0.3 nav gamepad down               # Restart
+0.3 nav gamepad down               # How to play
+0.3 nav gamepad down               # Settings
+0.3 nav gamepad down               # Quit race
+0.3 nav gamepad confirm            # dialog: Cancel focused
+0.4 nav gamepad left               # Quit
+0.3 nav gamepad confirm
+wait menu
+2.0 shot pad_14_menu
+1.0 exit

@@ -16,18 +16,20 @@ Usage: recharged [flags]
       [--players <n>] [--seed <n>] [--mode tt|versus|cup:<id>]
       w: clear|cloudy|rain|storm|fog|snow|random|dynamic[:<start>]   t: morning|noon|sunset|night
   --autopilot              local players driven by the AI
-  --input-script <file>    timed UiNav + driving intents
-  --exit-after <secs>      quit after N seconds of wall time (non-zero exit if the UI failed)
+  --input-script <file>    play scripted keyboard/gamepad input (format: docs/design/automation.md)
+  --exit-after <secs>      quit after N seconds of wall time (non-zero exit if the UI failed or
+                           the input script did not finish)
   --screenshot <path> [--screenshot-at <s>] [--screenshot-every <s>]   capture the window (at 3 s by default)
-  --headless-race          no window/render/audio; run the race sim and print result JSON
+  --headless-race          with --quick-race: no window/render/audio, AI drives everyone; prints
+                           the results as JSON
   --soak <minutes>         chain random races; assert counts return to baseline
   --soak-seed <n>          seed of the soak's random race sequence (default: from the clock)
-  --bench <scenario>       frame-time percentiles as JSON
-  --calibrate-medals       compute medal targets for every layout
+  --bench <track>_<n>p     autopilot race with n players (+ race options): frame times as JSON
+  --calibrate-medals       headless Time Trials on every layout -> assets/data/medals.ron
   --capture-previews       render track previews and car thumbnails
   --track-tour <track>     screenshots along the racing line (implies --quick-race <track>)
   --export-bindings <path> write the TypeScript bindings and exit
-  --window <W>x<H>         initial window size (overrides the settings' window size)
+  --window <W>x<H>         initial window size (overrides the settings' window size; --bench: 1920x1080)
   -h, --help               this text";
 
 /// Why the command line was rejected.
@@ -57,6 +59,21 @@ const RACE_OPTIONS: [&str; 10] = [
     "--mode",
 ];
 const SHOT_OPTIONS: [&str; 2] = ["--screenshot-at", "--screenshot-every"];
+/// Flags that need the window; headless runs reject them.
+const WINDOWED: [&str; 8] = [
+    "--input-script",
+    "--exit-after",
+    "--screenshot",
+    "--bench",
+    "--soak",
+    "--capture-previews",
+    "--track-tour",
+    "--window",
+];
+/// `--bench` races this seed unless `--seed` says otherwise (the same field every run).
+const BENCH_SEED: u64 = 1;
+/// `--bench` window size unless `--window` says otherwise (the budget's resolution, §9).
+const BENCH_WINDOW: (u32, u32) = (1920, 1080);
 
 /// Parses the arguments after the program name. Accepts `--flag value` and `--flag=value`.
 pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
@@ -64,7 +81,7 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
     let mut race = QuickRaceArgs::default();
     let mut shot = ScreenshotPlan::default();
     let (mut quick_track, mut shot_path) = (None, None);
-    let mut dependent: Vec<&str> = Vec::new();
+    let mut seen: Vec<&str> = Vec::new();
 
     let mut it = args.iter().map(AsRef::as_ref);
     while let Some(arg) = it.next() {
@@ -114,18 +131,47 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
             "--window" => cfg.window = Some(window_size(&value()?)?),
             _ => return Err(invalid(format!("unknown flag `{arg}`"))),
         }
-        if RACE_OPTIONS.contains(&flag) || SHOT_OPTIONS.contains(&flag) {
-            dependent.push(flag);
-        }
+        seen.push(flag);
     }
 
     let orphans = |options: &[&str]| -> Vec<&str> {
-        dependent
-            .iter()
+        seen.iter()
             .copied()
             .filter(|f| options.contains(f))
             .collect()
     };
+    let first_of = |options: &[&str]| seen.iter().copied().find(|f| options.contains(f));
+    if cfg.headless_race || cfg.calibrate_medals {
+        let run = if cfg.calibrate_medals {
+            "--calibrate-medals"
+        } else {
+            "--headless-race"
+        };
+        let race_flags = ["--quick-race", "--headless-race"];
+        let calibrate_conflict = cfg
+            .calibrate_medals
+            .then(|| first_of(&race_flags))
+            .flatten();
+        if let Some(other) = first_of(&WINDOWED).or(calibrate_conflict) {
+            return Err(invalid(format!("{run} cannot be combined with {other}")));
+        }
+        if cfg.headless_race && quick_track.is_none() {
+            return Err(invalid("--headless-race needs --quick-race <track>"));
+        }
+    }
+    if let Some(name) = &cfg.bench {
+        if let Some(other) = first_of(&["--quick-race", "--players"]) {
+            return Err(invalid(format!(
+                "--bench sets the race itself; drop {other}"
+            )));
+        }
+        let (track, players) = bench_scenario(name)?;
+        quick_track = Some(track);
+        race.players = Some(players);
+        race.seed = race.seed.or(Some(BENCH_SEED));
+        cfg.window = cfg.window.or(Some(BENCH_WINDOW));
+        cfg.autopilot = true;
+    }
     // `--track-tour <t>` without `--quick-race` tours that track.
     let quick_track = quick_track.or_else(|| cfg.track_tour.clone());
     match quick_track {
@@ -151,17 +197,18 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
     Ok(cfg)
 }
 
-/// Flags parsed but not wired to anything yet (logged once at startup).
-pub fn pending_flags(cfg: &AutomationConfig) -> Vec<&'static str> {
-    [
-        (cfg.input_script.is_some(), "--input-script"),
-        (cfg.headless_race, "--headless-race"),
-        (cfg.bench.is_some(), "--bench"),
-        (cfg.calibrate_medals, "--calibrate-medals"),
-    ]
-    .into_iter()
-    .filter_map(|(set, name)| set.then_some(name))
-    .collect()
+/// `toy_town_2p` → (`toy_town`, 2).
+fn bench_scenario(text: &str) -> Result<(TrackId, u8), CliError> {
+    let parsed = text
+        .rsplit_once('_')
+        .and_then(|(track, n)| Some((track, n.strip_suffix('p')?.parse::<u8>().ok()?)))
+        .filter(|&(track, n)| !track.is_empty() && (1..=MAX_LOCAL_PLAYERS as u8).contains(&n));
+    let (track, players) = parsed.ok_or_else(|| {
+        invalid(format!(
+            "--bench expects <track>_<n>p with n 1-{MAX_LOCAL_PLAYERS} (e.g. toy_town_2p), got `{text}`"
+        ))
+    })?;
+    Ok((TrackId::new(track), players))
 }
 
 /// `1280x720` → `(1280, 720)`.
@@ -337,15 +384,11 @@ mod tests {
             "--unlock-all",
             "--autopilot",
             "--input-script",
-            "s.ron",
-            "--headless-race",
+            "s.script",
             "--soak",
             "30",
             "--soak-seed",
             "42",
-            "--bench",
-            "split4",
-            "--calibrate-medals",
             "--capture-previews",
             "--track-tour",
             "toy_town",
@@ -353,25 +396,64 @@ mod tests {
             "ui/src/bevy.ts",
         ]);
         assert_eq!(cfg.assets_dir, Some("a".into()));
-        assert!(
-            cfg.unlock_all
-                && cfg.autopilot
-                && cfg.headless_race
-                && cfg.calibrate_medals
-                && cfg.capture_previews
-        );
-        assert_eq!(
-            (cfg.soak_minutes, cfg.bench.as_deref()),
-            (Some(30.0), Some("split4"))
-        );
+        assert!(cfg.unlock_all && cfg.autopilot && cfg.capture_previews);
+        assert_eq!(cfg.soak_minutes, Some(30.0));
         assert_eq!(cfg.track_tour, Some(TrackId::new("toy_town")));
         assert_eq!(cfg.export_bindings, Some("ui/src/bevy.ts".into()));
-        assert_eq!(cfg.input_script, Some("s.ron".into()));
+        assert_eq!(cfg.input_script, Some("s.script".into()));
         assert_eq!(cfg.soak_seed, Some(42));
         assert_eq!(ok(&["--window", "1280x720"]).window, Some((1280, 720)));
         assert!(err(&["--window", "big"]).contains("--window"));
-        assert_eq!(pending_flags(&cfg).len(), 4);
         assert!(ok(&[]) == AutomationConfig::default() && !ok(&[]).is_automated());
+    }
+
+    #[test]
+    fn headless_runs_need_a_race_and_no_window() {
+        let cfg = ok(&["--headless-race", "--quick-race", "toy_town", "--ai", "7"]);
+        assert!(cfg.headless_race && cfg.quick_race.is_some());
+        assert!(err(&["--headless-race"]).contains("needs --quick-race"));
+        let windowed = err(&[
+            "--headless-race",
+            "--quick-race",
+            "x",
+            "--screenshot",
+            "s.png",
+        ]);
+        assert!(windowed.contains("cannot be combined with --screenshot"));
+        assert!(ok(&["--calibrate-medals", "--unlock-all"]).calibrate_medals);
+        let race = err(&["--calibrate-medals", "--quick-race", "toy_town"]);
+        assert!(race.contains("--calibrate-medals cannot be combined with --quick-race"));
+        assert!(err(&["--calibrate-medals", "--exit-after", "9"]).contains("--exit-after"));
+    }
+
+    #[test]
+    fn bench_scenarios_set_up_an_autopilot_race() {
+        let cfg = ok(&["--bench", "toy_town_4p", "--weather", "rain"]);
+        assert!(cfg.autopilot && cfg.is_automated());
+        assert_eq!(cfg.bench.as_deref(), Some("toy_town_4p"));
+        let race = cfg.quick_race.expect("bench race");
+        assert_eq!((race.track.as_str(), race.players), ("toy_town", Some(4)));
+        assert_eq!(
+            (race.seed, race.weather),
+            (
+                Some(BENCH_SEED),
+                Some(WeatherChoice::Fixed(WeatherKind::Rain))
+            )
+        );
+        let race = ok(&["--bench", "maple_street_1p", "--seed", "5"])
+            .quick_race
+            .expect("race");
+        assert_eq!(
+            (race.track.as_str(), race.players, race.seed),
+            ("maple_street", Some(1), Some(5))
+        );
+        for bad in ["toy_town", "toy_town_5p", "_2p", "toy_town_xp"] {
+            assert!(err(&["--bench", bad]).contains("<track>_<n>p"), "{bad}");
+        }
+        assert!(err(&["--bench", "toy_town_1p", "--players", "2"]).contains("drop --players"));
+        assert!(
+            err(&["--bench", "toy_town_1p", "--quick-race", "x"]).contains("drop --quick-race")
+        );
     }
 
     #[test]

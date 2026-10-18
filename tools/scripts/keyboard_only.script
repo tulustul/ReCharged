@@ -1,0 +1,149 @@
+# DoD-1, keyboard only (GDD §21): Title → Settings change → Quick Race → race → Pause → Results →
+# menu → Versus 2P join (keyboard A + keyboard B) + race → Pause → Quit. Expects default settings
+# and progress, so start from a fresh user-data dir:
+#   rm -rf target/agent-data/kb && cargo run -p recharged -- --user-data-dir target/agent-data/kb \
+#     --window 1600x900 --input-script tools/scripts/keyboard_only.script --exit-after 400
+# Exit 0 = every step ran and the UI stayed healthy. Screenshots: <user-data-dir>/screenshots/.
+# Format: docs/design/automation.md. (gamepad_only.script is the same flow on pads.)
+
+wait ui
+3.5 nav keyboardA confirm          # the splash has timed out; Title: any button
+1.5 shot kb_01_main_menu
+
+# Settings: Graphics → VSync off, then Accessibility → Steering assist on (both saved to
+# settings.ron; the assist keeps the scripted car on the track)
+0.3 nav keyboardA up      # Championship → Quit (wraps)
+0.3 nav keyboardA up      # Credits
+0.3 nav keyboardA up      # Settings
+0.3 nav keyboardA confirm # Gameplay tab
+1.5 nav keyboardA nextTab # E: Graphics
+0.4 nav keyboardA down    # Display mode
+0.3 nav keyboardA down    # Window size
+0.3 nav keyboardA down    # VSync
+0.3 nav keyboardA confirm # off
+0.5 nav keyboardA prevTab # Q: Gameplay
+0.4 nav keyboardA prevTab # Accessibility
+0.4 nav keyboardA down    # Colour-blind markers
+0.3 nav keyboardA down    # Steering assist
+0.3 nav keyboardA confirm # on
+0.8 shot kb_02_settings
+0.3 nav keyboardA back             # Esc: main menu
+
+# Quick Race on Backyard Bash, 1 lap. Focusing a card selects it (laps reset to its default),
+# and the options panel is right of the last column: go top left, then right ×3.
+1.2 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA right            # Backyard Bash (5 laps)
+0.3 nav keyboardA right            # options: Layout
+0.3 nav keyboardA down             # Mirror
+0.3 nav keyboardA down             # Laps
+0.3 nav keyboardA left             # 4
+0.3 nav keyboardA left             # 3
+0.3 nav keyboardA left             # 2
+0.3 nav keyboardA left             # 1
+0.5 shot kb_03_track_select
+0.3 nav keyboardA down             # Rivals
+0.3 nav keyboardA down             # AI difficulty
+0.3 nav keyboardA down             # Items
+0.3 nav keyboardA down             # Weather
+0.3 nav keyboardA down             # Time of day
+0.3 nav keyboardA down             # Choose car
+0.3 nav keyboardA confirm
+2.0 nav keyboardA right            # Dumpster
+0.8 shot kb_04_car_select
+0.3 nav keyboardA confirm          # race
+
+# Driving (race ticks count from GO). Steering assist keeps the car on the track; both keyboard
+# schemes drive player 1 in single player.
+wait countdown
+1.0 shot kb_05_countdown
+wait racing
+hold keyboardA throttle 1
+@240 hold keyboardA boost 1        # Left Shift
+@270 hold keyboardA boost 0
+@330 tap keyboardA item            # E
+@390 hold keyboardA lookBack 1     # Q
+@420 shot kb_06_look_back
+@440 hold keyboardA lookBack 0
+@480 tap keyboardA camera          # C: far camera
+@540 shot kb_07_far_camera
+@560 tap keyboardA camera          # hood
+@600 tap keyboardA camera          # chase again
+@630 hold keyboardA reset 1        # R held 0.4 s: back onto the track
+@660 hold keyboardA reset 0
+@690 tap keyboardB item            # Enter (scheme B)
+@720 hold keyboardA drift 1        # Space
+@750 hold keyboardA drift 0
+@780 release keyboardA             # nothing held while paused (Space = drift = Confirm)
+0.2 tap keyboardA pause            # Esc
+wait paused
+1.0 shot kb_08_pause
+0.3 nav keyboardA confirm          # Resume
+wait running
+0.2 hold keyboardA throttle 1
+wait finished                      # the player finishing, or the soft-lock guard after the winner
+release keyboardA
+3.0 shot kb_09_results
+0.3 nav keyboardA down             # Restart → Change track
+0.3 nav keyboardA down             # Menu
+0.3 nav keyboardA confirm
+wait menu
+
+# Versus: P1 joins with scheme A (Space), P2 with scheme B (Enter)
+2.0 nav keyboardA down             # Quick Race
+0.3 nav keyboardA down             # Time Trial
+0.3 nav keyboardA down             # Versus
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # P1 joins
+0.5 nav keyboardB confirm          # P2 joins
+0.5 nav keyboardB right            # P2: next car
+0.8 shot kb_10_lobby
+0.3 nav keyboardA confirm          # P1 ready
+0.3 nav keyboardB confirm          # P2 ready → track select (P1 picks)
+2.5 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA right            # Backyard Bash
+0.3 nav keyboardA right            # options: Layout
+0.3 nav keyboardA down             # Mirror
+0.3 nav keyboardA down             # Laps 5
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # 1
+0.3 nav keyboardA down             # Rivals
+0.3 nav keyboardA down             # AI difficulty
+0.3 nav keyboardA down             # Items
+0.3 nav keyboardA down             # Weather
+0.3 nav keyboardA down             # Time of day
+0.3 nav keyboardA down             # Start race
+0.5 shot kb_11_versus_track
+0.3 nav keyboardA confirm
+wait racing
+hold keyboardA throttle 1          # W
+hold keyboardB throttle 1          # ↑
+@200 tap keyboardA item
+@230 tap keyboardB item
+@300 hold keyboardB boost 1        # Right Ctrl
+@330 hold keyboardB boost 0
+@420 shot kb_12_versus_racing
+@480 release keyboardA
+@480 release keyboardB
+0.2 tap keyboardB pause            # Esc
+wait paused
+1.0 shot kb_13_versus_pause
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA down             # How to play
+0.3 nav keyboardA down             # Settings
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm          # dialog: Cancel focused
+0.4 nav keyboardA left             # Quit
+0.3 nav keyboardA confirm
+wait menu
+2.0 shot kb_14_menu
+1.0 exit

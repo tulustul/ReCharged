@@ -21,6 +21,7 @@ mod nav;
 mod players;
 mod rebind;
 mod rumble;
+pub mod script;
 
 use bevy::input::gamepad::GamepadRumbleRequest;
 use bevy::prelude::*;
@@ -58,5 +59,6 @@ impl Plugin for GameInputPlugin {
             .add_systems(OnEnter(AppState::Loading), players::reconcile_session)
             .add_systems(OnEnter(PauseState::Paused), rumble::stop_all)
             .add_systems(OnEnter(AppState::Unloading), rumble::stop_all);
+        script::build(app);
     }
 }

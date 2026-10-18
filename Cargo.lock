@@ -5935,6 +5935,7 @@ dependencies = [
  "rc_vehicle",
  "rc_vfx",
  "rc_weather",
+ "serde_json",
 ]
 
 [[package]]

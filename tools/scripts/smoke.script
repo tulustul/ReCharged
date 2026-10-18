@@ -1,0 +1,28 @@
+# CI smoke run: boot → menus (keyboard) → Quick Race → drive a few seconds → pause → quit → menu,
+# then exit. Exit 0 = every step ran and the UI stayed healthy; on a stuck step or a UI error the
+# exit code is non-zero and the log names the step:
+#   cargo run -p recharged -- --user-data-dir <fresh dir> --input-script tools/scripts/smoke.script \
+#     --exit-after 120
+# Format: docs/design/automation.md.
+
+wait ui
+3.5 nav keyboardA confirm          # the splash has timed out; Title: any button
+1.0 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # Track select: the focused track → Car select
+2.0 nav keyboardA confirm          # race
+wait racing
+hold keyboardA throttle 1
+@120 tap keyboardA item
+@240 release keyboardA
+0.2 tap keyboardA pause
+wait paused
+0.5 nav keyboardA down             # Restart
+0.3 nav keyboardA down             # How to play
+0.3 nav keyboardA down             # Settings
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm          # dialog: Cancel focused
+0.4 nav keyboardA left             # Quit
+0.3 nav keyboardA confirm
+wait menu
+1.0 exit
