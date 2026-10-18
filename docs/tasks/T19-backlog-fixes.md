@@ -53,6 +53,6 @@ notes of those crates; `docs/tasks/BACKLOG.md`.
 - **B24** debounce `race.start` (one Confirm must send it once).
 - **B27** remove `RECHARGED_UI_SCRIPT`'s `nav`/`pause` verbs (superseded by `--input-script`); keep
   the fixture verbs.
-- **B4** remove unused deps (`serde`/`ron` in rc_weather and rc_audio, `bevy_rapier3d` in rc_ai),
+- **B4** remove unused deps (`serde`/`ron` in rc_weather and rc_audio; rc_ai keeps `bevy_rapier3d` — B16 uses it),
   then regenerate `rc_pins` (`python3 crates/rc_pins/update.py`) — do it last, in one go.
 - After all changes: `./tools/ci.sh` passes.
