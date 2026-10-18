@@ -58,9 +58,9 @@ use bevy::prelude::*;
 /// Everything a subsystem crate usually needs: `use rc_core::prelude::*;`.
 pub mod prelude {
     pub use crate::{
-        CorePlugin, audio::*, camera::*, catalog::*, consts::*, flow::*, input::*, interp::*, items::*,
-        paths::UserPaths, race::*, rng, rng::RngStream, schedule::*, settings::*, state::*,
-        track::*, ui::*, vehicle::*, weather::*,
+        CorePlugin, audio::*, camera::*, catalog::*, consts::*, flow::*, input::*, interp::*,
+        items::*, paths::UserPaths, race::*, rng, rng::RngStream, schedule::*, settings::*,
+        state::*, track::*, ui::*, vehicle::*, weather::*,
     };
 }
 
@@ -107,6 +107,7 @@ fn register_messages(app: &mut App) {
         .add_message::<DeviceEvent>()
         .add_message::<PauseRequest>()
         .add_message::<CycleCamera>()
+        .add_message::<PlayerDropped>()
         .add_message::<UiSound>()
         // audio
         .add_message::<MusicStinger>();

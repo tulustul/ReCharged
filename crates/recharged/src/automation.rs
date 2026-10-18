@@ -16,7 +16,13 @@ pub struct AutomationPlugin;
 impl Plugin for AutomationPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, log_flags)
-            .add_systems(Last, (take_screenshots, exit_after).chain());
+            // Before OnAppExitSystems so rc_game's save flush sees the AppExit in the same frame.
+            .add_systems(
+                Last,
+                (take_screenshots, exit_after)
+                    .chain()
+                    .before(bevy::app::OnAppExitSystems),
+            );
     }
 }
 

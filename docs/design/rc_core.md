@@ -68,3 +68,6 @@ Lifecycle and pause behaviour: `crates/rc_testkit/tests/`, `crates/rc_game/tests
 | `SHOWROOM_FOCUS` const | `camera` | T04 | where rc_render builds the menu turntable (car faces −Z) |
 | `LoadingFailed { key, error }` message | `flow` | T01 | loader error → Unloading → Menu + error dialog |
 | `ShowroomReady` resource | `ui` | T05 | rc_render inserts it while the menu showroom renders the car; React leaves the centre to the 3D car |
+| `HintsSeen(Vec<HintKind>)` resource | `flow` | T07 | written by rc_game from the profile; rc_race filters hints |
+| `PlayerDropped { slot }` message | `flow` | T07 | rc_game → rc_race: AI takes over the slot's racer |
+| `AutomationConfig::soak_seed` | `flow` | T07 | `--soak-seed <n>` |

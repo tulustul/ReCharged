@@ -21,6 +21,7 @@ Usage: recharged [flags]
   --screenshot <path> [--screenshot-at <s>] [--screenshot-every <s>]   capture the window (at 3 s by default)
   --headless-race          no window/render/audio; run the race sim and print result JSON
   --soak <minutes>         chain random races; assert counts return to baseline
+  --soak-seed <n>          seed of the soak's random race sequence (default: from the clock)
   --bench <scenario>       frame-time percentiles as JSON
   --calibrate-medals       compute medal targets for every layout
   --capture-previews       render track previews and car thumbnails
@@ -103,6 +104,7 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
             "--screenshot-every" => shot.every = Some(seconds(flag, &value()?)?),
             "--headless-race" => cfg.headless_race = true,
             "--soak" => cfg.soak_minutes = Some(seconds(flag, &value()?)?),
+            "--soak-seed" => cfg.soak_seed = Some(number(flag, &value()?)?),
             "--bench" => cfg.bench = Some(value()?),
             "--calibrate-medals" => cfg.calibrate_medals = true,
             "--capture-previews" => cfg.capture_previews = true,
@@ -147,20 +149,14 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
 
 /// Flags parsed but not wired to anything yet (logged once at startup).
 pub fn pending_flags(cfg: &AutomationConfig) -> Vec<&'static str> {
-    let race = cfg.quick_race.as_ref();
     [
         (cfg.autopilot, "--autopilot"),
         (cfg.input_script.is_some(), "--input-script"),
         (cfg.headless_race, "--headless-race"),
-        (cfg.soak_minutes.is_some(), "--soak"),
         (cfg.bench.is_some(), "--bench"),
         (cfg.calibrate_medals, "--calibrate-medals"),
         (cfg.capture_previews, "--capture-previews"),
         (cfg.track_tour.is_some(), "--track-tour"),
-        (
-            race.is_some_and(|r| r.mode != QuickRaceMode::Quick),
-            "--mode",
-        ),
     ]
     .into_iter()
     .filter_map(|(set, name)| set.then_some(name))
@@ -331,6 +327,8 @@ mod tests {
             "--headless-race",
             "--soak",
             "30",
+            "--soak-seed",
+            "42",
             "--bench",
             "split4",
             "--calibrate-medals",
@@ -355,7 +353,8 @@ mod tests {
         assert_eq!(cfg.track_tour, Some(TrackId::new("toy_town")));
         assert_eq!(cfg.export_bindings, Some("ui/src/bevy.ts".into()));
         assert_eq!(cfg.input_script, Some("s.ron".into()));
-        assert_eq!(pending_flags(&cfg).len(), 8);
+        assert_eq!(cfg.soak_seed, Some(42));
+        assert_eq!(pending_flags(&cfg).len(), 7);
         assert!(ok(&[]) == AutomationConfig::default() && !ok(&[]).is_automated());
     }
 

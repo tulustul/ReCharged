@@ -98,8 +98,9 @@ pub struct GhostData {
     pub samples: Vec<GhostSample>,
 }
 
-/// Setup of the current session. Written only by rc_game before `Loading` (replaced for a next
-/// race); read-only otherwise.
+/// Setup of the current session. Written only by rc_game: before `Loading` (replaced for a next
+/// race) and between attempts during `Setup` (new Time Trial ghost, collected Golden Battery,
+/// dropped player → autopilot). Everyone else reads it, once per attempt.
 #[derive(Resource, Debug, Clone, Default, PartialEq)]
 pub struct RaceConfig {
     /// Mode.

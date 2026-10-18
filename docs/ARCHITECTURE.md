@@ -274,7 +274,9 @@ struct WeatherSetup { weather: WeatherChoice, time: TimeOfDay }
     ghost: Option<GhostData>,        // Time Trial
 }
 ```
-Written only by rc_game before `Loading` (and replaced for a next race); read-only otherwise.
+Written only by rc_game: before `Loading` (replaced for a next race) and between attempts
+(during `Setup`: new Time Trial ghost, collected Golden Battery, dropped player → autopilot);
+read-only for everyone else, who must re-read it per attempt.
 `Human { autopilot: true }` → rc_race also adds `AiDriver` to that racer (camera/HUD stay).
 
 ### 4.3 The racer entity

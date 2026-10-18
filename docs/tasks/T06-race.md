@@ -30,7 +30,16 @@
    point never ahead of the last validated checkpoint.
 5. Golden Battery pickup → `RaceEvent::GoldenBattery`. Ghost recording at 20 Hz (Time Trial) and
    `GhostCar` playback.
-6. Onboarding hints (`RaceEvent::Hint`) per GDD §13 triggers.
+6. Onboarding hints (`RaceEvent::Hint`) per GDD §13 triggers — only if
+   `Settings.gameplay.hints` is on and the kind is not in `rc_core::HintsSeen` (missing resource =
+   empty); remember within the session what was already emitted.
+7. **Integration with rc_game (T07, done)**: insert `RaceResults` no later than entering `Finished`;
+   remove it in `OnEnter(Setup)` and `OnEnter(Unloading)`. On `PlayerDropped { slot }` add `AiDriver`
+   to that slot's racer. Read `RaceConfig` per attempt (rc_game may update it during Setup). Set
+   `GhostData.geometry_hash` from `TrackSummary`. **Take over phase driving** from rc_game's
+   placeholder `crates/rc_game/src/phases.rs`: delete that file and its one registration line in
+   `crates/rc_game/src/lib.rs` (granted to you for exactly this), and replace the orchestrator's
+   placeholder grid spawner in `crates/rc_race/src/spawn.rs` with track grid slots.
 
 ## Tests
 Unit: checkpoint/lap rules incl. start-line wrap and reverse layouts; standings ordering with ties

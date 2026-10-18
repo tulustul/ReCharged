@@ -1,133 +1,48 @@
 //! The real app flow (rc_game) driven by `GameCommand`s: transition table, loading gate,
 //! placeholder phases, restart without reload, every exit through `Unloading` without leaks,
-//! and pause (ARCHITECTURE §3.1).
+//! pause and its robustness triggers, Versus sessions, unlock validation, `--quick-race` and
+//! `--soak` (ARCHITECTURE §3.1, §5.12, §8).
+
+mod common;
 
 use bevy::prelude::*;
+use bevy::window::WindowFocused;
+use common::*;
 use rc_core::prelude::*;
-use rc_game::{GameCommand, GameFlowPlugin, RaceRequest};
+use rc_game::{GameCommand, GameNotice, PlayerCar, RaceOutcome, RaceRequest, VersusSession};
 use rc_testkit::*;
 
-const SESSION_THINGS: usize = 3;
-const ATTEMPT_THINGS: usize = 2;
-
-#[derive(Component)]
-struct SessionThing;
-
-#[derive(Component)]
-struct AttemptThing;
-
-#[derive(Resource, Default)]
-struct Counters {
-    loads: u32,
-    attempts: u32,
-    race_ticks: u32,
-    phases: Vec<RacePhase>,
+fn app(name: &str) -> App {
+    app_in(&data_dir(name), None, None)
 }
 
-#[derive(Resource)]
-struct FailLoading;
-
-/// Dummy loader + attempt spawner + a race-tick counter, as sim crates will do it.
-fn dummy_world(app: &mut App) {
-    LoadingTasks::register(app, "dummy");
-    app.init_resource::<Counters>()
-        .add_systems(OnEnter(AppState::Loading), dummy_loader)
-        .add_systems(OnEnter(RaceAttempt), dummy_spawner)
-        .add_systems(
-            FixedUpdate,
-            (|mut c: ResMut<Counters>| c.race_ticks += 1).in_set(SimSet::Race),
-        )
-        .add_systems(Update, record_phases);
-}
-
-fn dummy_loader(
-    mut commands: Commands,
-    mut counters: ResMut<Counters>,
-    fail: Option<Res<FailLoading>>,
-    mut done: MessageWriter<LoadingDone>,
-    mut failed: MessageWriter<LoadingFailed>,
-) {
-    counters.loads += 1;
-    for _ in 0..SESSION_THINGS {
-        commands.spawn((SessionThing, DespawnOnExit(RaceSession)));
-    }
-    if fail.is_some() {
-        failed.write(LoadingFailed {
-            key: "dummy",
-            error: "broken".into(),
-        });
-    } else {
-        done.write(LoadingDone("dummy"));
-    }
-}
-
-fn dummy_spawner(mut commands: Commands, mut counters: ResMut<Counters>) {
-    counters.attempts += 1;
-    for index in 0..ATTEMPT_THINGS {
-        commands.spawn((
-            AttemptThing,
-            Racer { index, ..default() },
-            DespawnOnExit(RaceAttempt),
-        ));
-    }
-}
-
-fn record_phases(
-    mut events: MessageReader<StateTransitionEvent<RacePhase>>,
-    mut counters: ResMut<Counters>,
-) {
-    counters
-        .phases
-        .extend(events.read().filter_map(|e| e.entered));
-}
-
-fn app() -> App {
-    headless_app((GameFlowPlugin, dummy_world))
-}
-
-fn send(app: &mut App, command: GameCommand) {
-    app.world_mut().write_message(command);
-}
-
-fn counters(app: &App) -> &Counters {
-    app.world().resource::<Counters>()
-}
-
-fn wait_for_phase(app: &mut App, phase: RacePhase) {
-    step_until(app, &format!("{phase:?}"), |w| {
-        w.get_resource::<State<RacePhase>>()
-            .is_some_and(|s| *s.get() == phase)
-    });
-}
-
-fn wait_for_state(app: &mut App, state: AppState) {
-    step_until(app, &format!("{state:?}"), |w| {
-        *w.resource::<State<AppState>>().get() == state
-    });
+fn racers(app: &mut App) -> usize {
+    count_entities::<With<Racer>>(app)
 }
 
 #[test]
 fn boot_loads_the_catalog_and_opens_the_menu() {
-    let app = app();
+    let app = app("boot");
     assert_eq!(app_state(&app), AppState::Menu);
+    let world = app.world();
     assert!(
-        app.world()
+        world
             .resource::<Catalog>()
             .track(&"test_oval".into())
             .is_some()
     );
-    assert!(app.world().get_resource::<Settings>().is_some());
+    assert!(world.get_resource::<Settings>().is_some());
+    assert!(world.get_resource::<rc_game::Profile>().is_some());
+    assert!(world.get_resource::<rc_game::MedalTable>().is_some());
+    assert!(!world.resource::<LobbyState>().open);
 }
 
 #[test]
 fn race_restart_next_race_and_quit_follow_the_transition_table() {
-    let mut app = app();
+    let mut app = app("table");
     let baseline = count_entities::<()>(&mut app);
 
-    send(
-        &mut app,
-        GameCommand::StartRace(RaceRequest::quick("test_oval")),
-    );
+    start(&mut app, RaceRequest::quick("test_oval"));
     wait_for_phase(&mut app, RacePhase::Racing);
     assert_eq!(
         counters(&app).phases,
@@ -142,10 +57,7 @@ fn race_restart_next_race_and_quit_follow_the_transition_table() {
         app.world().resource::<RaceConfig>().racers.len(),
         MAX_RACERS
     );
-    assert_eq!(
-        count_entities::<With<AttemptThing>>(&mut app),
-        ATTEMPT_THINGS
-    );
+    assert_eq!(racers(&mut app), MAX_RACERS);
 
     app.world_mut().resource_mut::<Counters>().phases.clear();
     send(&mut app, GameCommand::Restart);
@@ -161,10 +73,7 @@ fn race_restart_next_race_and_quit_follow_the_transition_table() {
         (1, 2),
         "restart does not reload"
     );
-    assert_eq!(
-        count_entities::<With<AttemptThing>>(&mut app),
-        ATTEMPT_THINGS
-    );
+    assert_eq!(racers(&mut app), MAX_RACERS);
 
     send(&mut app, GameCommand::NextRace);
     wait_for_state(&mut app, AppState::Unloading);
@@ -184,12 +93,9 @@ fn race_restart_next_race_and_quit_follow_the_transition_table() {
 
 #[test]
 fn quitting_while_still_in_setup_leaks_nothing() {
-    let mut app = app();
+    let mut app = app("setup-quit");
     let baseline = count_entities::<()>(&mut app);
-    send(
-        &mut app,
-        GameCommand::StartRace(RaceRequest::quick("test_oval")),
-    );
+    start(&mut app, RaceRequest::quick("test_oval"));
     // The gate has opened: InRace (Setup) is entered on the next update — quit in that frame.
     step_until(&mut app, "the gate to open", |w| {
         matches!(
@@ -205,12 +111,9 @@ fn quitting_while_still_in_setup_leaks_nothing() {
 
 #[test]
 fn restart_and_quit_in_the_same_frame_leak_nothing() {
-    let mut app = app();
+    let mut app = app("restart-quit");
     let baseline = count_entities::<()>(&mut app);
-    send(
-        &mut app,
-        GameCommand::StartRace(RaceRequest::quick("test_oval")),
-    );
+    start(&mut app, RaceRequest::quick("test_oval"));
     wait_for_phase(&mut app, RacePhase::Countdown);
     send(&mut app, GameCommand::Restart);
     send(&mut app, GameCommand::QuitToMenu);
@@ -219,34 +122,34 @@ fn restart_and_quit_in_the_same_frame_leak_nothing() {
 }
 
 #[test]
-fn a_load_error_goes_back_to_the_menu() {
-    let mut app = app();
+fn a_load_error_goes_back_to_the_menu_with_an_error() {
+    let mut app = app("load-error");
     app.insert_resource(FailLoading);
     let baseline = count_entities::<()>(&mut app);
-    send(
-        &mut app,
-        GameCommand::StartRace(RaceRequest::quick("test_oval")),
-    );
+    start(&mut app, RaceRequest::quick("test_oval"));
     wait_for_state(&mut app, AppState::Unloading);
     wait_for_state(&mut app, AppState::Menu);
     assert_eq!(counters(&app).attempts, 0);
     assert_eq!(count_entities::<()>(&mut app), baseline);
+    assert!(
+        seen(&app)
+            .notices
+            .iter()
+            .any(|n| matches!(n, GameNotice::Error(e) if e.contains("broken")))
+    );
 }
 
 #[test]
-fn pause_freezes_race_ticks_and_phases_until_resume() {
-    let mut app = app();
-    send(
-        &mut app,
-        GameCommand::StartRace(RaceRequest::quick("test_oval")),
-    );
+fn pause_freezes_the_simulation_and_phases_until_resume() {
+    let mut app = app("pause");
+    start(&mut app, RaceRequest::quick("test_oval"));
     wait_for_phase(&mut app, RacePhase::Countdown);
 
     send(&mut app, GameCommand::Pause);
     step(&mut app, 2);
-    let ticks = counters(&app).race_ticks;
+    let ticks = counters(&app).sim_ticks;
     step(&mut app, 120);
-    assert_eq!(counters(&app).race_ticks, ticks, "race ticks frozen");
+    assert_eq!(counters(&app).sim_ticks, ticks, "simulation frozen");
     assert_eq!(
         race_phase(&app),
         Some(RacePhase::Countdown),
@@ -256,7 +159,7 @@ fn pause_freezes_race_ticks_and_phases_until_resume() {
     send(&mut app, GameCommand::Resume);
     send(&mut app, GameCommand::Resume); // idempotent
     wait_for_phase(&mut app, RacePhase::Racing);
-    assert!(counters(&app).race_ticks > ticks);
+    assert!(counters(&app).sim_ticks > ticks);
 
     app.world_mut().write_message(PauseRequest { slot: None });
     step(&mut app, 2);
@@ -264,4 +167,286 @@ fn pause_freezes_race_ticks_and_phases_until_resume() {
         *app.world().resource::<State<PauseState>>().get(),
         PauseState::Paused
     );
+}
+
+fn paused(app: &App) -> bool {
+    app.world()
+        .get_resource::<State<PauseState>>()
+        .is_some_and(|s| *s.get() == PauseState::Paused)
+}
+
+#[test]
+fn a_disconnected_controller_or_lost_focus_pauses_the_race() {
+    let mut app = app("robust");
+    app.world_mut().write_message(DeviceEvent::Disconnected {
+        slot: PlayerSlot(0),
+    });
+    step(&mut app, 2);
+    assert!(seen(&app).notices.is_empty(), "nothing happens in menus");
+
+    start(&mut app, RaceRequest::quick("test_oval"));
+    wait_for_phase(&mut app, RacePhase::Countdown);
+    app.world_mut().write_message(DeviceEvent::Disconnected {
+        slot: PlayerSlot(0),
+    });
+    step(&mut app, 2);
+    assert!(paused(&app));
+    assert!(
+        seen(&app)
+            .notices
+            .contains(&GameNotice::ControllerDisconnected(PlayerSlot(0)))
+    );
+
+    send(&mut app, GameCommand::Resume);
+    step(&mut app, 2);
+    assert!(!paused(&app));
+    let window = app.world_mut().spawn_empty().id();
+    app.world_mut().write_message(WindowFocused {
+        window,
+        focused: true,
+    });
+    step(&mut app, 2);
+    assert!(!paused(&app), "gaining focus does nothing");
+    app.world_mut().write_message(WindowFocused {
+        window,
+        focused: false,
+    });
+    step(&mut app, 2);
+    assert!(paused(&app), "losing focus pauses; resuming needs input");
+
+    // Automated runs often never get the focus: no auto-pause there.
+    let automation = AutomationConfig {
+        exit_after: Some(600.0),
+        ..default()
+    };
+    let mut app = app_in(&data_dir("robust-automated"), Some(automation), None);
+    start(&mut app, RaceRequest::quick("test_oval"));
+    wait_for_phase(&mut app, RacePhase::Countdown);
+    let window = app.world_mut().spawn_empty().id();
+    app.world_mut().write_message(WindowFocused {
+        window,
+        focused: false,
+    });
+    step(&mut app, 2);
+    assert!(!paused(&app));
+}
+
+#[test]
+fn finished_races_cannot_be_paused() {
+    let mut app = app_in(&data_dir("finished-pause"), None, Some(5));
+    start(&mut app, RaceRequest::quick("test_oval"));
+    wait_for_phase(&mut app, RacePhase::Finished);
+    send(&mut app, GameCommand::Pause);
+    step(&mut app, 2);
+    assert!(!paused(&app));
+}
+
+#[test]
+fn locked_content_is_rejected_unless_unlock_all() {
+    let mut app = app("locked");
+    start(&mut app, RaceRequest::quick("maple_street"));
+    step(&mut app, 3);
+    assert_eq!(app_state(&app), AppState::Menu);
+    assert!(
+        seen(&app)
+            .notices
+            .iter()
+            .any(|n| matches!(n, GameNotice::Error(e) if e.contains("locked")))
+    );
+
+    let all = AutomationConfig {
+        unlock_all: true,
+        ..default()
+    };
+    let mut app = app_in(&data_dir("unlock-all"), Some(all), None);
+    start(&mut app, RaceRequest::quick("maple_street"));
+    wait_for_state(&mut app, AppState::Loading);
+    let profile = app.world().resource::<rc_game::Profile>();
+    assert!(profile.unlocked.is_empty(), "--unlock-all earns nothing");
+}
+
+fn versus_request(track: &str) -> RaceRequest {
+    RaceRequest {
+        mode: GameMode::Versus,
+        humans: vec![
+            PlayerCar {
+                slot: PlayerSlot(0),
+                car: "zip".into(),
+                paint: PaintId(0),
+            },
+            PlayerCar {
+                slot: PlayerSlot(1),
+                car: "sparky".into(),
+                paint: PaintId(2),
+            },
+        ],
+        ai: Some(2),
+        ..RaceRequest::quick(track)
+    }
+}
+
+fn versus_points(app: &App, slot: u8) -> u32 {
+    app.world()
+        .resource::<VersusSession>()
+        .points(PlayerSlot(slot))
+}
+
+#[test]
+fn versus_keeps_a_scoreboard_over_rematches_and_tracks_and_ai_takes_over_dropped_players() {
+    let mut app = app_in(&data_dir("versus"), None, Some(5));
+    let baseline = count_entities::<()>(&mut app);
+    send(&mut app, GameCommand::OpenLobby);
+    step(&mut app, 2);
+    assert!(app.world().resource::<LobbyState>().open);
+
+    start(&mut app, versus_request("test_oval"));
+    wait_for_outcome(&mut app);
+    assert!(
+        !app.world().resource::<LobbyState>().open,
+        "the lobby closes for the race"
+    );
+    // Grid order P1, P2, AI, AI; everyone finishes in grid order.
+    assert_eq!(app.world().resource::<RaceOutcome>().points, [10, 8, 0, 0]);
+    assert_eq!((versus_points(&app, 0), versus_points(&app, 1)), (10, 8));
+
+    app.world_mut().resource_mut::<FinishOrder>().0 = vec![1, 0, 2, 3];
+    send(&mut app, GameCommand::Rematch);
+    wait_for_next_outcome(&mut app);
+    assert_eq!(counters(&app).loads, 1, "rematch does not reload");
+    assert_eq!((versus_points(&app, 0), versus_points(&app, 1)), (18, 18));
+
+    send(&mut app, GameCommand::Restart); // replays the rematch: its points are reverted
+    step(&mut app, 2);
+    assert_eq!((versus_points(&app, 0), versus_points(&app, 1)), (10, 8));
+    wait_for_outcome(&mut app);
+    assert_eq!(
+        app.world()
+            .resource::<VersusSession>()
+            .series
+            .races_played(),
+        2
+    );
+
+    send(&mut app, GameCommand::DropPlayer(PlayerSlot(1)));
+    step(&mut app, 2);
+    assert_eq!(seen(&app).dropped, [PlayerSlot(1)]);
+    let autopilot = |app: &App| {
+        app.world().resource::<RaceConfig>().racers.iter().any(|r| {
+            matches!(
+                r.controller,
+                Controller::Human {
+                    slot: PlayerSlot(1),
+                    autopilot: true
+                }
+            )
+        })
+    };
+    assert!(autopilot(&app));
+
+    let next = TrackVariant::forward("toy_town");
+    send(&mut app, GameCommand::NextTrack(next.clone()));
+    wait_for_next_outcome(&mut app);
+    assert_eq!(app.world().resource::<RaceConfig>().variant, next);
+    assert!(autopilot(&app), "the AI keeps the dropped player's car");
+    assert_eq!(
+        app.world()
+            .resource::<VersusSession>()
+            .series
+            .races_played(),
+        3
+    );
+
+    send(&mut app, GameCommand::QuitToMenu);
+    wait_for_state(&mut app, AppState::Menu);
+    assert_eq!(count_entities::<()>(&mut app), baseline);
+    assert!(
+        app.world().contains_resource::<VersusSession>(),
+        "back to the lobby: session kept"
+    );
+    start(&mut app, versus_request("test_oval"));
+    wait_for_outcome(&mut app);
+    assert_eq!(
+        app.world()
+            .resource::<VersusSession>()
+            .series
+            .races_played(),
+        4
+    );
+    assert!(
+        !autopilot(&app),
+        "a race from the lobby has its players back"
+    );
+    send(&mut app, GameCommand::QuitToMenu);
+    wait_for_state(&mut app, AppState::Menu);
+    send(&mut app, GameCommand::CloseLobby);
+    step(&mut app, 2);
+    assert!(!app.world().contains_resource::<VersusSession>());
+}
+
+#[test]
+fn quick_race_flag_starts_the_cup_race_on_its_track() {
+    let automation = AutomationConfig {
+        unlock_all: true,
+        quick_race: Some(QuickRaceArgs {
+            track: "backyard_bash".into(),
+            mode: QuickRaceMode::Cup("rookie_cup".into()),
+            ..default()
+        }),
+        ..default()
+    };
+    let mut app = app_in(&data_dir("quick-cup"), Some(automation), None);
+    wait_for_state(&mut app, AppState::InRace);
+    let config = app.world().resource::<RaceConfig>();
+    assert_eq!(
+        config.mode,
+        GameMode::Championship {
+            cup: "rookie_cup".into(),
+            race_index: 2
+        }
+    );
+    assert_eq!(config.racers.len(), MAX_RACERS);
+}
+
+fn soak(app: &mut App) -> AppExit {
+    for _ in 0..60 * 60 * 2 {
+        if let Some(exit) = app.should_exit() {
+            return exit;
+        }
+        app.update();
+    }
+    panic!("the soak never ended");
+}
+
+fn soak_app(name: &str, minutes: f32) -> App {
+    let automation = AutomationConfig {
+        soak_minutes: Some(minutes),
+        soak_seed: Some(7),
+        ..default()
+    };
+    app_in(&data_dir(name), Some(automation), Some(30))
+}
+
+#[test]
+fn a_short_soak_chains_races_without_leaks() {
+    let mut app = soak_app("soak", 1.0);
+    assert_eq!(soak(&mut app), AppExit::Success);
+    assert!(
+        counters(&app).loads >= 5,
+        "races were chained: {} loads",
+        counters(&app).loads
+    );
+}
+
+/// A plugin bug the soak must catch: an attempt entity without a scope.
+fn leaky(app: &mut App) {
+    app.add_systems(OnEnter(RaceAttempt), |mut commands: Commands| {
+        commands.spawn(Transform::default());
+    });
+}
+
+#[test]
+fn the_soak_catches_a_leak() {
+    let mut app = soak_app("soak-leak", 1.0);
+    leaky(&mut app);
+    assert!(matches!(soak(&mut app), AppExit::Error(_)));
 }

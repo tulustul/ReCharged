@@ -34,8 +34,7 @@ pub(crate) fn build(app: &mut App) {
     .add_systems(
         Update,
         drive_phases
-            .in_set(FlowSet)
-            .after(crate::flow::Transitions)
+            .in_set(crate::Step::Phases)
             .run_if(in_state(PauseState::Running).and_then(resource_exists::<PhaseClock>)),
     );
 }

@@ -1,11 +1,13 @@
-//! App-flow contracts: the loading gate, lobby state and automation flags
-//! (ARCHITECTURE §3.1, §4.6, §8). `GameCommand` (the flow's input) lives in rc_game.
+//! App-flow contracts: the loading gate, lobby state, seen hints, dropped Versus players and
+//! automation flags (ARCHITECTURE §3.1, §4.6, §8). `GameCommand` (the flow's input), the profile
+//! and the cup/Versus series live in rc_game.
 
 use std::path::PathBuf;
 
 use bevy::prelude::*;
 
-use crate::catalog::{CarId, CupId, TrackId};
+use crate::catalog::{CarId, CupId, PlayerSlot, TrackId};
+use crate::race::HintKind;
 use crate::weather::{TimeOfDay, WeatherChoice};
 
 /// The loading gate. Loaders register a key at build time; rc_game is the only runtime writer: it
@@ -102,6 +104,21 @@ impl Default for LobbyState {
     }
 }
 
+/// Onboarding hints the player has already seen (GDD §13: each is shown once). Written only by
+/// rc_game (from the profile, and when it sees a `RaceEvent::Hint`); rc_race emits a hint only when
+/// `Settings.gameplay.hints` is on and the kind is not listed here. Absent without rc_game.
+#[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
+pub struct HintsSeen(pub Vec<HintKind>);
+
+/// A Versus player whose controller disconnected was dropped: the AI drives their car from now on
+/// (producer rc_game; consumer rc_race, which adds `AiDriver` to that slot's racer). Later attempts
+/// of the session get `Controller::Human { autopilot: true }` for the slot from `RaceConfig`.
+#[derive(Message, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerDropped {
+    /// The dropped player.
+    pub slot: PlayerSlot,
+}
+
 /// Mode of an automated quick race (`--mode`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum QuickRaceMode {
@@ -177,6 +194,9 @@ pub struct AutomationConfig {
     pub headless_race: bool,
     /// `--soak <minutes>`: chain random races, assert counts return to baseline.
     pub soak_minutes: Option<f32>,
+    /// `--soak-seed <n>`: seed of the soak's random choices, to replay a failed soak (default: from
+    /// the clock; the soak logs the seed it uses).
+    pub soak_seed: Option<u64>,
     /// `--bench <scenario>`: frame-time percentiles as JSON.
     pub bench: Option<String>,
     /// `--calibrate-medals`.

@@ -76,8 +76,14 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
     let mut app = App::new();
     // Systems that fail log the error instead of panicking the game.
     app.set_error_handler(bevy::ecs::error::error);
+    // Before DefaultPlugins: rc_game's session-log layer reads the user-data dir from it.
+    app.insert_resource(paths.clone());
     app.add_plugins(
         DefaultPlugins
+            .set(bevy::log::LogPlugin {
+                custom_layer: rc_game::session_log_layer,
+                ..default()
+            })
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     title: "ReCharged".into(),
@@ -103,7 +109,6 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
         )),
     )
     .insert_resource(config)
-    .insert_resource(paths)
     .add_plugins((
         CorePlugin,
         rc_vehicle::PhysicsPlugin,
