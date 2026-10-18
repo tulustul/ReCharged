@@ -122,5 +122,5 @@ cargo test -p rc_ai --test race -- --ignored every_layout   # AI races on every 
 - `docs/tasks/` — task briefs, status board and backlog
 
 ## Credits & licences
-Code and generated assets: see the repository licence. Font: Saira (SIL OFL 1.1, licence in
-`assets/fonts/`). External assets are listed in `assets/CREDITS.md`.
+No licence has been chosen for the code and generated assets yet (the owner's decision). Font:
+Saira (SIL OFL 1.1, licence in `assets/fonts/`). External assets are listed in `assets/CREDITS.md`.
