@@ -21,7 +21,7 @@
 | T13 | graphics (render) | T02, T08 | T13b done; T13a in progress |
 | T14 | VFX | T03 | done (37 tests) |
 | T15 | weather | T01 | done (12 tests) |
-| T05b | race HUD | T05, T06 | in progress |
+| T05b | race HUD | T05, T06 | done |
 | T16 | environments & tracks (2 waves) | T02, art bible | toy done; house, street, garden, supermarket, workshop in progress |
 | T17 | automation tools (input script, headless race, determinism, medals, bench) | T06, T11 | in progress |
 | T18 | QA playtests & bug triage | all | todo |

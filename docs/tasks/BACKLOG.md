@@ -18,3 +18,5 @@ QA/polish phase (T18) or when the owning area is touched next.
 | B11 | Rockets never re-acquire a lock; explosions/EMP ignore walls; orb uses racing-width edges not barriers | rc_items | T12 |
 | B12 | World-space wheel contact point/normal on `WheelState` so skid marks, debris and splashes sit exactly on ramps/curbs | rc_core + rc_vehicle → rc_vfx | T14 |
 | B13 | Soft-depth fade for big particle puffs (hard edge where they meet the ground) | rc_vfx | T14 |
+| B14 | Toy Town looked slow in agents' runs (≈¼ speed) — measure in isolation (no other game windows); if real: LODs/culling for the 70 shelves (~0.5 M tris) and instancing | rc_render / env toy | T05b |
+| B15 | HUD: no message for a missed checkpoint (rc_race emits no event) | rc_race + ui | T05b |
