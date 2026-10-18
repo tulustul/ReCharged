@@ -12,7 +12,8 @@ notes of those crates; `docs/tasks/BACKLOG.md`.
 **Owned:** `crates/rc_race/**`, `crates/rc_items/**`, `assets/data/items.ron`, `crates/rc_ai/**`,
 `assets/data/ai.ron`, `crates/rc_camera/**`, `crates/rc_track/**` (lint only),
 `tools/blender/props/street/**` + `assets/data/{props/street.ron,tracks/maple_street.ron,decor/maple_street.ron}`
-(B19 data fixes only).
+(B19 data fixes only), `assets/data/tracks/test_oval.ron` (B5: turn 1 loses its banking, which sank
+under the grass) and `assets/data/medals.ron` (recalibrate once at the end — AI changes move lap times).
 - **B10** a finished human's car is handed to the AI (insert `AiDriver`) so it keeps driving sensibly
   while spectating/waiting.
 - **B15** emit `RaceEvent { kind: RaceEventKind::MissedCheckpoint }` (already in rc_core) when a racer
