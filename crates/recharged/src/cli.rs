@@ -27,6 +27,7 @@ Usage: recharged [flags]
   --capture-previews       render track previews and car thumbnails
   --track-tour <track>     screenshots along the racing line
   --export-bindings <path> write the TypeScript bindings and exit
+  --window <W>x<H>         initial window size (overrides the settings' window size)
   -h, --help               this text";
 
 /// Why the command line was rejected.
@@ -110,6 +111,7 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
             "--capture-previews" => cfg.capture_previews = true,
             "--track-tour" => cfg.track_tour = Some(TrackId::new(value()?)),
             "--export-bindings" => cfg.export_bindings = Some(value()?.into()),
+            "--window" => cfg.window = Some(window_size(&value()?)?),
             _ => return Err(invalid(format!("unknown flag `{arg}`"))),
         }
         if RACE_OPTIONS.contains(&flag) || SHOT_OPTIONS.contains(&flag) {
@@ -161,6 +163,19 @@ pub fn pending_flags(cfg: &AutomationConfig) -> Vec<&'static str> {
     .into_iter()
     .filter_map(|(set, name)| set.then_some(name))
     .collect()
+}
+
+/// `1280x720` → `(1280, 720)`.
+fn window_size(text: &str) -> Result<(u32, u32), CliError> {
+    let parsed = text
+        .split_once(['x', 'X'])
+        .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
+        .filter(|&(w, h)| (320..=7680).contains(&w) && (240..=4320).contains(&h));
+    parsed.ok_or_else(|| {
+        invalid(format!(
+            "--window expects <W>x<H> (e.g. 1280x720), got {text:?}"
+        ))
+    })
 }
 
 fn takes_value(flag: &str) -> bool {
@@ -354,6 +369,8 @@ mod tests {
         assert_eq!(cfg.export_bindings, Some("ui/src/bevy.ts".into()));
         assert_eq!(cfg.input_script, Some("s.ron".into()));
         assert_eq!(cfg.soak_seed, Some(42));
+        assert_eq!(ok(&["--window", "1280x720"]).window, Some((1280, 720)));
+        assert!(err(&["--window", "big"]).contains("--window"));
         assert_eq!(pending_flags(&cfg).len(), 7);
         assert!(ok(&[]) == AutomationConfig::default() && !ok(&[]).is_automated());
     }

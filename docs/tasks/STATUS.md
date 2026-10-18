@@ -12,7 +12,7 @@
 | T02 | track system + test_oval + toy_town layout | T01 | done (39 tests) |
 | T03 | vehicle physics | T01 | done (58 tests, stars ±1 %) |
 | T04 | input + cameras (split-screen rig first) | T01 | done (rig B overlay; 67 tests) |
-| T05 | UI framework + menus | T01 | in progress |
+| T05 | UI framework + menus | T01 | done (all screens; HUD = T05b) |
 | T07 | game flow, progression, persistence | T01 | done (54 tests) |
 | T09b | rc_audio system (phase 2 of T09) | T01, T09a | done (in-race listen pending integration) |
 | T06 | race rules | T02, T03 | in progress |

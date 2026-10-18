@@ -207,6 +207,9 @@ pub struct AutomationConfig {
     pub track_tour: Option<TrackId>,
     /// `--export-bindings <path>`: write the TS bindings and exit.
     pub export_bindings: Option<PathBuf>,
+    /// `--window <W>x<H>`: initial window size in logical px; overrides the window size from
+    /// `Settings` for this run (screenshots at fixed resolutions).
+    pub window: Option<(u32, u32)>,
 }
 
 impl AutomationConfig {

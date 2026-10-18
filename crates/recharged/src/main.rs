@@ -87,7 +87,11 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     title: "ReCharged".into(),
-                    resolution: WindowResolution::new(1600, 900),
+                    resolution: config
+                        .window
+                        .map_or(WindowResolution::new(1600, 900), |(w, h)| {
+                            WindowResolution::new(w, h)
+                        }),
                     ..default()
                 }),
                 ..default()
