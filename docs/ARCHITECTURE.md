@@ -330,6 +330,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `DeviceEvent::{ Joined { slot, device }, Left { slot }, Disconnected { slot }, LastUsed { slot, kind } }` | input | game, ui |
 | `PauseRequest { slot: Option<PlayerSlot> }` | input, game (focus loss) | game |
 | `UiSound(UiCue)` | ui | audio |
+| `MusicStinger(MusicCue)` | ui / game (Cup-end ceremony) | audio |
 | `Teleported { entity }` | vehicle (respawn), track (prop reset), race/items (spawns) | core (snapshot snap) |
 | `LoadingDone(&'static str)` | every loader | game (`LoadingTasks`) |
 | `LoadingFailed { key, error }` | any loader | game (→ Unloading → Menu + error dialog) |
@@ -567,6 +568,9 @@ indoors). Pause pauses Engines/Sfx/Ambience. No audio device → muted, no panic
     `.after(AnimationSet::Tick).before(AnimationSet::Apply)`.
   - `ReactUiPlugin.hot_reload(cfg!(debug_assertions))`; missing `ui.ready` 15 s after start is
     an error (automation runs exit non-zero).
+  - rc_ui owns Bevy's `UiScale` = min(w/1920, h/1080) of the window's logical size (menus are
+    authored at 1080p); converting window logical px (e.g. `PlayerViewports`) to UI px divides by
+    it.
 - **React (`ui/src`)**:
   ```
   index.tsx · App.tsx (ErrorBoundary → ui.error; switch on app.state) · bevy.ts (generated)

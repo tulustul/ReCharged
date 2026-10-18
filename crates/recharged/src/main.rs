@@ -92,7 +92,7 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
             }),
     )
     .add_plugins(
-        ReactPlugins.set(
+        ReactPlugins.set(rc_ui::with_fonts(
             ReactUiPlugin::new(bundle)
                 .hot_reload(cfg!(debug_assertions))
                 // The F12 devtools keep their layout in the user-data dir, not in the cwd.
@@ -100,7 +100,7 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
                     settings_path: Some(paths.data_dir.join("devtools.json")),
                     ..default()
                 }),
-        ),
+        )),
     )
     .insert_resource(config)
     .insert_resource(paths)

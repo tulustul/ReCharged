@@ -13,13 +13,19 @@
 //! - **Must never:** move cars itself (it requests `RespawnCar`), read input devices, or spawn
 //!   attempt entities in `OnEnter(RacePhase::Setup)`.
 //!
-//! Status: skeleton (T01; rc_game drives a placeholder phase sequence); implemented by T06.
+//! Status: placeholder racer spawner (orchestrator, for T03/T04/T09 integration); rc_game drives a
+//! placeholder phase sequence; the full race rules are implemented by T06.
 
 use bevy::prelude::*;
+use rc_core::prelude::*;
+
+mod spawn;
 
 /// Race rules and racer spawning.
 pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.add_systems(OnEnter(RaceAttempt), spawn::spawn_racers);
+    }
 }

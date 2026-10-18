@@ -15,6 +15,7 @@
 //!
 //! Module = area; a task brief may grant additive edits in one module.
 
+pub mod audio;
 pub mod camera;
 pub mod catalog;
 pub mod consts;
@@ -33,6 +34,7 @@ pub mod ui;
 pub mod vehicle;
 pub mod weather;
 
+pub use audio::*;
 pub use camera::*;
 pub use catalog::*;
 pub use consts::*;
@@ -56,7 +58,7 @@ use bevy::prelude::*;
 /// Everything a subsystem crate usually needs: `use rc_core::prelude::*;`.
 pub mod prelude {
     pub use crate::{
-        CorePlugin, camera::*, catalog::*, consts::*, flow::*, input::*, interp::*, items::*,
+        CorePlugin, audio::*, camera::*, catalog::*, consts::*, flow::*, input::*, interp::*, items::*,
         paths::UserPaths, race::*, rng, rng::RngStream, schedule::*, settings::*, state::*,
         track::*, ui::*, vehicle::*, weather::*,
     };
@@ -104,5 +106,7 @@ fn register_messages(app: &mut App) {
         .add_message::<RebindResult>()
         .add_message::<DeviceEvent>()
         .add_message::<PauseRequest>()
-        .add_message::<UiSound>();
+        .add_message::<UiSound>()
+        // audio
+        .add_message::<MusicStinger>();
 }

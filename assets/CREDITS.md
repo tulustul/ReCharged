@@ -6,3 +6,4 @@ see `docs/PRACTICES.md` §7. Maintained by the orchestrator from task reports.
 
 | Asset (path) | Author | Source (URL) | Licence | Notes |
 |---|---|---|---|---|
+| `assets/fonts/Saira-*.ttf` | Omnibus-Type / The Saira Project Authors | https://github.com/google/fonts/tree/main/ofl/saira | SIL OFL 1.1 | licence: `assets/fonts/Saira-OFL.txt` |
