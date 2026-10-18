@@ -1,5 +1,6 @@
 //! `race.*` channels (start, restart, next race, rematch, next track, resume, quit, the session
-//! snapshot) and `loading.progress`. Results, standings and the scoreboard: [`crate::results`].
+//! snapshot) and `loading.progress`. Results, standings and the scoreboard: [`crate::results`];
+//! the HUD channels: [`crate::hud`].
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -8,6 +9,7 @@ use rc_core::prelude::*;
 use rc_game::{CupRun, GameCommand, PlayerCar, RaceOutcome, RaceRequest, VersusSession};
 
 use crate::content::{UiDifficulty, UiTimeOfDay, UiWeatherChoice};
+use crate::hud::{HudView, UiHudSnapshot};
 use crate::results::{UiCupStandings, UiResults, UiVersusScore};
 
 /// A game mode.
@@ -234,20 +236,27 @@ impl From<&RaceConfig> for UiRaceSetup {
             weather: config.weather.weather.into(),
             time: config.weather.time.into(),
             items: config.items,
-            racers: config
-                .racers
-                .iter()
-                .map(|r| UiRacer {
-                    name: r.name.clone(),
-                    car: r.car.0.clone(),
-                    slot: match r.controller {
-                        Controller::Human { slot, .. } => Some(slot.0),
-                        Controller::Ai { .. } => None,
-                    },
-                    color: r.color,
-                })
-                .collect(),
+            racers: UiRacer::of(config),
         }
+    }
+}
+
+impl UiRacer {
+    /// The racers of a session in grid order.
+    pub(crate) fn of(config: &RaceConfig) -> Vec<Self> {
+        config
+            .racers
+            .iter()
+            .map(|r| Self {
+                name: r.name.clone(),
+                car: r.car.0.clone(),
+                slot: match r.controller {
+                    Controller::Human { slot, .. } => Some(slot.0),
+                    Controller::Ai { .. } => None,
+                },
+                color: r.color,
+            })
+            .collect()
     }
 }
 
@@ -274,6 +283,8 @@ pub struct UiRaceSession {
     pub cup: Option<UiCupStandings>,
     /// Scoreboard (Versus sessions).
     pub versus: Option<UiVersusScore>,
+    /// The race HUD's state (inside a session).
+    pub hud: Option<UiHudSnapshot>,
 }
 
 /// React → Bevy request `race.snapshot`: the [`UiRaceSession`].
@@ -292,14 +303,17 @@ struct Session<'w> {
 
 pub(crate) fn register(app: &mut App) {
     app.add_react_event::<LoadingProgress>()
-        .add_react_request_handler(|request: On<Request<RaceSnapshot>>, s: Session| {
-            request.respond(UiRaceSession {
-                setup: s.config.map(|c| UiRaceSetup::from(&*c)),
-                results: s.results.map(|r| UiResults::new(&r, s.outcome.as_deref())),
-                cup: s.cup.map(|c| UiCupStandings::from(&*c)),
-                versus: s.versus.map(|v| UiVersusScore::from(&*v)),
-            });
-        })
+        .add_react_request_handler(
+            |request: On<Request<RaceSnapshot>>, s: Session, hud: HudView| {
+                request.respond(UiRaceSession {
+                    setup: s.config.map(|c| UiRaceSetup::from(&*c)),
+                    results: s.results.map(|r| UiResults::new(&r, s.outcome.as_deref())),
+                    cup: s.cup.map(|c| UiCupStandings::from(&*c)),
+                    versus: s.versus.map(|v| UiVersusScore::from(&*v)),
+                    hud: hud.snapshot(),
+                });
+            },
+        )
         .add_react_handler(
             |start: On<StartRace>, mut out: MessageWriter<GameCommand>| {
                 out.write(GameCommand::StartRace(RaceRequest::from(start.event())));

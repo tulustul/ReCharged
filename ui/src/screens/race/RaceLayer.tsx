@@ -1,18 +1,19 @@
-// Everything React shows during a race session: the HUD (T05b; a small status chip until then),
-// the pause menu and its sub-screens, and the post-race flow — Results → Cup standings / Versus
-// scoreboard → the mode's next step (GDD §3.3).
-import { useEffect, useState } from "react";
+// Everything React shows during a race session: the HUD (`ui/src/hud`), the pause menu and its
+// sub-screens, and the post-race flow — Results → Cup standings / Versus scoreboard → the mode's
+// next step (GDD §3.3). The results wait a moment after the race ends so the finish banner shows.
+import { useEffect, useState, type ReactNode } from "react";
 
 import { bevy, type AppStatus } from "../../bevy";
 import { createMorpher, morphStyle, router, type Route } from "../../nav/routes";
 import { hmrSingleton } from "../../state/store";
 import { openDialog } from "../../state/overlays";
-import { catalog, session } from "../../state/stores";
+import { Hud } from "../../hud/Hud";
+import { demoMode, session } from "../../state/stores";
 import { useStore } from "../../state/useStore";
 import { appStrings } from "../../strings/app";
 import { results as words, standings as cupWords } from "../../strings/race";
-import { fill, text } from "../../theme/styles";
-import { color, frame, radius } from "../../theme/tokens";
+import { fill } from "../../theme/styles";
+import { color } from "../../theme/tokens";
 import { HowToPlay } from "../HowToPlay";
 import { Settings } from "../settings/Settings";
 import { TrackSelect } from "../TrackSelect";
@@ -23,6 +24,8 @@ import { CupStandings, VersusScore } from "./Standings";
 type View = "results" | "standings" | "score" | "changeTrack";
 
 const raceMorph = hmrSingleton("__rc_raceMorph", createMorpher);
+/** The finish banner's moment before the results take over. */
+const RESULTS_DELAY_MS = 2600;
 
 export function RaceLayer({ status }: { status: AppStatus }) {
   const sess = useStore(session);
@@ -30,6 +33,7 @@ export function RaceLayer({ status }: { status: AppStatus }) {
   const [view, setView] = useState<View>("results");
   const [sub, setSub] = useState<"howTo" | "settings" | null>(null);
   const finished = status.phase === "finished";
+  const results = useAfter(finished, demoMode.get() ? 0 : RESULTS_DELAY_MS);
   const modeKind = sess.setup?.mode.kind;
   // Every race end (and a new session's mode) starts the post-race flow at the results.
   useEffect(() => setView("results"), [finished, modeKind]);
@@ -93,8 +97,8 @@ export function RaceLayer({ status }: { status: AppStatus }) {
     { label: a.menu, run: () => toMenu("main") },
   ];
 
-  let content = <StatusChip status={status} />;
-  if (finished) {
+  let content: ReactNode = null;
+  if (results) {
     content = (
       <node style={{ ...fill, backgroundColor: color.scrim }}>
         {view === "results" && <Results actions={resultActions[mode]} />}
@@ -119,16 +123,27 @@ export function RaceLayer({ status }: { status: AppStatus }) {
         <Pause onHowTo={() => setSub("howTo")} onSettings={() => setSub("settings")} />
       );
   }
-  return <node style={{ ...fill, ...morphStyle(morph) }}>{content}</node>;
-}
-
-/** ponytail: a status chip stands in for the race HUD until T05b builds it. */
-function StatusChip({ status }: { status: AppStatus }) {
-  const setup = useStore(session).setup;
-  const track = useStore(catalog)?.tracks.find((t) => t.id === setup?.track)?.name ?? setup?.track ?? "";
   return (
-    <node style={{ positionType: "absolute", left: frame.x / 2, top: frame.top / 2, padding: { horizontal: 16, vertical: 8 }, borderRadius: radius.m, backgroundColor: "rgba(4, 8, 20, 0.6)" }}>
-      <text style={{ ...text.caps, color: color.textDim }}>{`${track} · ${status.phase ?? ""}`.toUpperCase()}</text>
+    <node style={fill}>
+      {/* Hidden (kept mounted: feed, bindings and banners survive) while the pause menu is open. */}
+      {!results && (
+        <node style={{ ...fill, display: status.paused ? "none" : "flex" }}>
+          <Hud status={status} />
+        </node>
+      )}
+      <node style={{ ...fill, ...morphStyle(morph) }}>{content}</node>
     </node>
   );
+}
+
+/** True once `on` has held for `ms` (false again as soon as it drops). */
+function useAfter(on: boolean, ms: number) {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    setLate(false);
+    if (!on) return;
+    const timer = setTimeout(() => setLate(true), ms);
+    return () => clearTimeout(timer);
+  }, [on, ms]);
+  return on && late;
 }

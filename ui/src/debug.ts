@@ -1,9 +1,10 @@
 // Scripted steps for automated screenshots and smoke runs (`RECHARGED_UI_SCRIPT`, see rc_ui
 // `debug.rs`): `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample
-// data for screens whose data only exists after real races, `tab <id>` is handled by tabbed
-// screens. Navigation itself is scripted with real `ui.nav` steps (`nav down`, `nav confirm`).
+// data for screens whose data only exists after real races (`demo hud …`: the race HUD, see
+// `hud/demo.ts`), `tab <id>` is handled by tabbed screens. Navigation itself is scripted with real `ui.nav` steps (`nav down`, `nav confirm`).
 import type { AppStatus, UiCupStandings, UiResults, UiVersusScore } from "./bevy";
 import { useDebug } from "./hooks";
+import { demoHud, endHudDemo } from "./hud/demo";
 import { resetTo, type Route } from "./nav/routes";
 import { draft, type MenuMode } from "./state/draft";
 import { lobbyChoices } from "./state/lobby";
@@ -115,9 +116,16 @@ export function useDebugRoutes() {
   });
   useDebug("demo", (scene) => {
     demoMode.set(true);
+    if (scene === "hud" || scene.startsWith("hud ")) {
+      const phase = demoHud(scene.slice(3));
+      // Over a real race the app state stays real; otherwise pretend one runs.
+      if (appState.get()?.state !== "inRace") inRace({ phase });
+      return;
+    }
     switch (scene) {
       case "menu":
         demoMode.set(false);
+        endHudDemo();
         return inMenu();
       case "results":
         setup("quickRace");

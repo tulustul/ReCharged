@@ -84,7 +84,7 @@ function CupCard({ cup, focused, onHover, onPress }: { cup: UiCup; index: number
         border: 2,
         borderColor: focused ? color.cyan : color.glassBorder,
         backgroundColor: focused ? "rgba(18, 34, 72, 0.88)" : "rgba(10, 18, 40, 0.78)",
-        boxShadow: focused ? [{ color: color.cyanGlow, blurRadius: 24 }] : [],
+        boxShadow: focused ? [{ color: color.cyanGlow, blurRadius: 24 }] : undefined, // `[]` would paint a default black shadow
         transform: { scale: focused ? 1.03 : 1, translateY: focused ? -8 : 0 },
         transition: focusTransition,
       }}

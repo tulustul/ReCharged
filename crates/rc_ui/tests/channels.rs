@@ -11,6 +11,13 @@ fn app() -> App {
     headless_app((GameFlowPlugin, rc_ui::register_bindings))
 }
 
+fn countdown(app: &mut App) {
+    app.world_mut()
+        .resource_mut::<NextState<RacePhase>>()
+        .set(RacePhase::Countdown);
+    wait_for_phase(app, RacePhase::Countdown);
+}
+
 fn wait_for_phase(app: &mut App, phase: RacePhase) {
     step_until(app, &format!("{phase:?}"), |w| {
         w.get_resource::<State<RacePhase>>()
@@ -38,12 +45,16 @@ fn race_buttons_start_restart_and_quit_without_reloading() {
         time: None,
         items: None,
     });
-    wait_for_phase(&mut app, RacePhase::Countdown);
+    step_until(&mut app, "the race", |w| {
+        *w.resource::<State<AppState>>().get() == AppState::InRace
+    });
     let config = app.world().resource::<RaceConfig>().clone();
     assert_eq!(
         (config.racers.len(), config.racers[0].car.as_str()),
         (3, "zip")
     );
+    // rc_race (not in this app) would run the intro and countdown; stand in for it.
+    countdown(&mut app);
 
     app.world_mut().trigger(RestartRace);
     wait_for_phase(&mut app, RacePhase::Setup);
@@ -53,7 +64,7 @@ fn race_buttons_start_restart_and_quit_without_reloading() {
         "restart stays in the session (no reload)"
     );
     assert_eq!(app.world().resource::<RaceConfig>(), &config);
-    wait_for_phase(&mut app, RacePhase::Countdown);
+    countdown(&mut app);
 
     app.world_mut().trigger(QuitRace);
     step_until(&mut app, "the menu", |w| {

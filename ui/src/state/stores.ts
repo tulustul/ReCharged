@@ -26,7 +26,7 @@ export const records = store<UiRecords | null>("records", null);
 export const settings = store<UiSettings | null>("settings", null);
 export const bindings = store<UiBindings | null>("bindings", null);
 export const lobby = store<UiLobby | null>("lobby", null);
-export const session = store<UiRaceSession>("session", { setup: null, results: null, cup: null, versus: null });
+export const session = store<UiRaceSession>("session", { setup: null, results: null, cup: null, versus: null, hud: null });
 export const loadingProgress = store<number>("loadingProgress", 0);
 /** Glyph device per player slot (the last device that player used). */
 export const devices = store<UiDeviceKind[]>("devices", ["keyboardA", "keyboardA", "keyboardA", "keyboardA"]);

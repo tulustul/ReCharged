@@ -50,6 +50,8 @@ function onNotice(n: UiNotice) {
   switch (n.kind) {
     case "goldenBattery":
       sfx("unlock");
+      // In the race the HUD already announces it in the player's view.
+      if (appState.get()?.state === "inRace") return;
       pushToast({ tone: "success", title: appStrings.batteryTitle, text: appStrings.batteryText(trackName(n.track)) });
       return;
     case "recordsDiscarded":

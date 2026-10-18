@@ -1,8 +1,8 @@
 //! # rc_ui — the bevy-react bridge (F2)
 //!
 //! - **Responsibilities:** every typed React channel, one module per namespace (`app`, `ui`,
-//!   `input`, `menu`, `profile`, `records`, `settings`, `lobby`, `race`, `results`; shared types in
-//!   `content`; T05b adds `hud`), mapping React messages to `GameCommand`s and rc_core messages and
+//!   `input`, `menu`, `profile`, `records`, `settings`, `lobby`, `race`, `results`, `hud`; shared
+//!   types in `content`), mapping React messages to `GameCommand`s and rc_core messages and
 //!   pushing state to React;
 //!   [`register_bindings`], shared by the app and the TypeScript exporter ([`export_bindings`]);
 //!   the UI fonts ([`with_fonts`]); `UiScale` (menus are authored at [`DESIGN_SIZE`] UI px and
@@ -10,10 +10,11 @@
 //!   `RECHARGED_UI_SCRIPT` automation hook ([`debug`]).
 //! - **Inputs:** React messages/requests, `AppState` / `RacePhase` / `PauseState`, `UiNav`,
 //!   `DeviceEvent`, `RebindResult`, `LoadingTasks`, `Catalog`, `Settings`, `LocalPlayers`,
-//!   `LobbyState`, `RaceConfig`, `RaceResults`; rc_game's `Profile`, `CupRun`, `VersusSession`,
+//!   `LobbyState`, `RaceConfig`, `RaceResults`, the race state (`RaceStatus`, `Standings`, racer
+//!   components, item entities, `RaceEvent`, `HitEvent`, `TrackSummary`, `PlayerViewports`); rc_game's `Profile`, `CupRun`, `VersusSession`,
 //!   `RaceOutcome`, `GameNotice`; `AutomationConfig`, `UserPaths`.
 //! - **Outputs:** React events, `GameCommand`s, `UiSound`, `MusicStinger`, `RebindRequest`,
-//!   `MenuBackdrop` (sole writer), `UiScale` (sole writer), [`UiStatus`].
+//!   `MenuBackdrop` (sole writer), `UiScale` (sole writer), [`UiStatus`], the HUD's shared values.
 //! - **Must never:** send events per frame (state changes and ≤ 10 Hz batches only), leave a
 //!   request unanswered, hold gameplay logic, or write `Settings` (rc_game applies them).
 //!
@@ -61,6 +62,7 @@ pub mod app;
 pub mod content;
 pub mod debug;
 pub mod filters;
+pub mod hud;
 pub mod input;
 pub mod lobby;
 pub mod menu;
@@ -111,6 +113,7 @@ impl Plugin for GameUiPlugin {
                     .in_set(UiSet),
             );
         debug::build(app);
+        hud::build(app);
     }
 }
 
@@ -125,6 +128,7 @@ pub fn register_bindings(app: &mut App) {
     app::register(app);
     debug::register(app);
     filters::register(app);
+    hud::register(app);
     input::register(app);
     lobby::register(app);
     menu::register(app);

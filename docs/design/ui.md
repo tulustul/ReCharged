@@ -7,18 +7,20 @@ sends intents. Everything crosses typed channels generated into `ui/src/bevy.ts`
 ## Structure
 | Where | What |
 |---|---|
-| `crates/rc_ui/src/` | one module per namespace: `app` (state, info, quit), `ui` (ready/error, `ui.sound` cues with a 40 ms retrigger guard, `ui.stinger`, `ui.nav`, `toast` = rc_game notices held until `ui.ready`), `input` (devices, bindings, rebind), `menu` (catalog view, `menu.backdrop` → `MenuBackdrop`), `profile` (profile/records/NEW badges), `settings` (mirror of `Settings` without bindings), `lobby`, `race` (commands, `race.snapshot`, `loading.progress`), `results` (`race.results` = `RaceResults` + `RaceOutcome`, `cup.standings`, `versus.score`), `filters` (`chargeSwap` morph, embedded WESL), `debug` (`RECHARGED_UI_SCRIPT`) |
+| `crates/rc_ui/src/` | one module per namespace: `app` (state, info, quit), `ui` (ready/error, `ui.sound` cues with a 40 ms retrigger guard, `ui.stinger`, `ui.nav`, `toast` = rc_game notices held until `ui.ready`), `input` (devices, bindings, rebind), `menu` (catalog view, `menu.backdrop` → `MenuBackdrop`), `profile` (profile/records/NEW badges), `settings` (mirror of `Settings` without bindings), `lobby`, `race` (commands, `race.snapshot`, `loading.progress`), `results` (`race.results` = `RaceResults` + `RaceOutcome`, `cup.standings`, `versus.score`), `hud` (race HUD: `race.setup`, `race.hud`, `race.event`, `viewports`, `hud.bind/unbind` — `docs/design/hud.md`), `filters` (`chargeSwap` morph, embedded WESL), `debug` (`RECHARGED_UI_SCRIPT`) |
 | `ui/src/theme/` | `tokens.ts` (colours, slot colours, sizes, spacing, layers), `styles.ts` (text presets, glass), `motion.ts` (springs, timings) |
 | `ui/src/components/` | Button, Panel, Tabs, List/Carousel (`lists.tsx`), Grid/StatBar/LockOverlay/Spinner (`bits.tsx`), OptionRow/Toggle/Slider/Cycler (`controls.tsx`), Dialog, Toast, Glyph, Badge, Hints, Screen (frame), TrackArt, Backdrop, icons |
 | `ui/src/nav/` | `focus.ts` regions model, `stack.ts` nav layers, `router.ts` stack ops (pure, tested); `input.ts` (`useNav`, glyph device per slot), `useFocusNav.ts`, `routes.ts` (menu routes + morph transitions) |
 | `ui/src/state/` | `store.ts` (tiny external store + `hmrSingleton`), `stores.ts` (all singletons), `Feeds.tsx` (snapshots + events), `draft.ts` (race being set up + option rules), `lobby.ts` (per-slot choices), `overlays.ts` (dialogs, toasts), `unlocks.ts` |
 | `ui/src/screens/` | Splash, Title, MainMenu, CupSelect, TrackSelect, CarSelect, Lobby, Garage, Records, HowToPlay, `settings/` (Settings + `rows.ts`), Credits, CupEnd, Loading, `race/` (RaceLayer, Pause, Results, Standings = cup standings + Versus scoreboard) |
+| `ui/src/hud/` | the race HUD (T05b, `docs/design/hud.md`) |
 | `ui/src/strings/` | every user-facing string, one file per area |
 | `ui/src/debug.ts` | scripted verbs (`go`, `demo`) and sample data for screenshots |
 | `assets/fonts/` | Saira (variable, upright = body, italic = `"Display"`), SIL OFL 1.1 (`Saira-OFL.txt`); registered by `rc_ui::with_fonts` in the binary |
 
 `App.tsx` picks the layer by app state: menus (router + Backdrop), Loading, or the RaceLayer
-(HUD stand-in until T05b, pause, post-race flow). Dialogs and toasts are `<root>`s above everything.
+(the HUD — hidden under the pause menu —, pause, post-race flow; results wait 2.6 s after the
+race ends so the finish banner shows). Dialogs and toasts are `<root>`s above everything.
 Each menu screen sits in an ErrorBoundary keyed by route (reports `ui.error`, offers Back).
 
 ## Look
@@ -80,21 +82,20 @@ NEW badges come from `Profile::new_unlocks`; focusing an item sends `profile.see
 ## Channels (final)
 - **Events**: `app.state`, `ui.nav`, `input.device`, `input.rebindResult`, `bindings.changed`,
   `lobby.slots`, `loading.progress`, `toast`, `profile.changed`, `profile.unlocked`, `race.results`,
-  `cup.standings`, `versus.score`, `debug.act`.
+  `cup.standings`, `versus.score`, `race.setup`, `race.hud`, `race.event`, `viewports`, `debug.act`.
 - **Messages**: `ui.ready`, `ui.error`, `ui.sound`, `ui.stinger`, `menu.backdrop`, `race.start`,
   `race.restart`, `race.next`, `race.rematch`, `race.nextTrack`, `race.resume`, `race.quit`,
   `lobby.open`, `lobby.close`, `settings.apply`, `input.rebind`, `input.resetBindings`,
-  `input.dropPlayer`, `profile.reset`, `profile.seen`, `app.quit`.
+  `input.dropPlayer`, `profile.reset`, `profile.seen`, `hud.bind`, `hud.unbind`, `app.quit`.
 - **Requests**: `app.snapshot`, `app.info`, `catalog.get`, `profile.get`, `records.get`,
-  `settings.get`, `bindings.get`, `lobby.snapshot`, `race.snapshot` (setup + results + cup + versus;
-  T05b extends it for the HUD).
-- T05b adds `race.hud`, `race.event`, `viewports`, `hud.bind/unbind` in a `hud` module.
+  `settings.get`, `bindings.get`, `lobby.snapshot`, `race.snapshot` (setup + results + cup + versus
+  + the HUD's setup/tick/views).
 
 ## Automation & screenshots
 `RECHARGED_UI_SCRIPT="<secs> <action>; …"` (timed from `ui.ready`): `nav <action> [slot|-]
 [device]` sends a real `ui.nav`, `pause` sends `GameCommand::Pause`, anything else is a `debug.act`
 for React: `go <route> [mode]`, `demo results|cupResults|versusResults|pause|racing|loading|lobby|
-cupEnd|unlocks|dialog|menu`, `tab <id>` (Settings, How to play, Records). Example acceptance run
+cupEnd|unlocks|dialog|menu`, `demo hud [1-4] <scene>` (see `hud.md`), `tab <id>` (Settings, How to play, Records). Example acceptance run
 (Title → Main → Quick Race → Track → Car → race → Pause → Quit):
 `RECHARGED_UI_SCRIPT="3.2 nav confirm; 4.8 nav down; 5.6 nav confirm; 7.6 nav confirm; 9.4 nav
 confirm; 16 pause; 18 nav down; 18.4 nav down; 18.8 nav down; 19.2 nav down; 20 nav confirm; 21 nav
@@ -108,8 +109,9 @@ so node can run them. `npm run typecheck`, `npm run build`. Rust: `cargo test -p
 profile/records/standings views, script parser, UiScale, channel round trip, `bevy.ts` freshness).
 
 ## Known limitations
-- The race HUD is a status chip until T05b; per-frame HUD values will use shared values.
 - Track previews do not exist yet: TrackArt draws an environment-coloured card instead.
 - Lobby: devices join by button press only (no mouse join, by design).
 - An animated `opacity` on a `<text>` rendered a dark box behind the text in this build, so pulses
   animate the text colour instead (`interpolateColor`).
+- `boxShadow: []` paints a default black shadow (bevy-react parses the empty list as one default
+  shadow): conditional shadows use `undefined`.

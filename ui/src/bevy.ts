@@ -37,6 +37,15 @@ paused: boolean,
  */
 showroom: boolean, };
 export type ApplySettings = UiSettings;
+export type BindHud = { 
+/**
+ * Per-player visuals.
+ */
+players: Array<UiPlayerValues>, 
+/**
+ * Minimap dots by grid index.
+ */
+dots: Array<UiDotValues>, };
 export type BloomParams = { radius: number | string, threshold: number, intensity: number, };
 export type BlurParams = { radius: number | string, };
 export type BrightnessParams = { amount: number, };
@@ -593,6 +602,15 @@ trophy: UiTrophy, };
 export type UiDeviceKind = "keyboardA" | "keyboardB" | "gamepad" | "mouse";
 export type UiDifficulty = "rookie" | "pro" | "elite" | "elitePlus";
 export type UiDisplayMode = "windowed" | "borderless";
+export type UiDotValues = { 
+/**
+ * X.
+ */
+x: number, 
+/**
+ * Y.
+ */
+y: number, };
 export type UiDrive = "rwd" | "awd";
 export type UiDriveAction = "throttle" | "brake" | "steerLeft" | "steerRight" | "drift" | "useItem" | "boost" | "lookBack" | "reset" | "camera" | "pause";
 export type UiError = { 
@@ -606,6 +624,83 @@ message: string,
 stack?: string, };
 export type UiGameplay = { speedUnit: UiSpeedUnit, cameraMode: UiCameraMode, cameraShake: boolean, hudScale: number, minimap: boolean, split: UiSplit, aiCatchUp: boolean, aiDifficulty: UiDifficulty, hints: boolean, };
 export type UiGraphics = { preset: UiQuality, displayMode: UiDisplayMode, windowSize: [number, number], vsync: boolean, fovDeg: number, shadows: UiShadows, antiAliasing: UiAntiAliasing, ambientOcclusion: boolean, bloom: boolean, motionBlur: boolean, particles: UiParticles, volumetricFog: boolean, };
+export type UiHint = "driftCharge" | "boostReady" | "itemReady" | "holdReset" | "wrongWay";
+export type UiHudSetup = { 
+/**
+ * Mode.
+ */
+mode: UiMode, 
+/**
+ * Laps.
+ */
+laps: number, 
+/**
+ * Items enabled (the item slot shows).
+ */
+items: boolean, 
+/**
+ * Racing a Time Trial ghost.
+ */
+ghost: boolean, 
+/**
+ * Racers in grid order; `race.hud` refers to them by index.
+ */
+racers: Array<UiRacer>, 
+/**
+ * Minimap outline: x, y pairs in the 0–1 square (aspect kept, centred).
+ */
+outline: Array<number>, 
+/**
+ * Speed unit setting.
+ */
+speedUnit: UiSpeedUnit, 
+/**
+ * HUD scale setting (0.75–1.25).
+ */
+hudScale: number, 
+/**
+ * Minimap setting.
+ */
+minimap: boolean, 
+/**
+ * Reduce flashing: no pulsing warnings or flashing meters.
+ */
+reduceFlashing: boolean, };
+export type UiHudSnapshot = { 
+/**
+ * As `race.setup`.
+ */
+setup: UiHudSetup, 
+/**
+ * As `race.hud` (`null` before the attempt runs).
+ */
+tick: UiHudTick | null, 
+/**
+ * As `viewports`.
+ */
+viewports: UiViewports, };
+export type UiHudTick = { 
+/**
+ * Race clock, ms since GO.
+ */
+raceMs: number, 
+/**
+ * Countdown number showing (3, 2, 1; 0 = none).
+ */
+countdown: number, 
+/**
+ * Soft-lock guard: whole seconds until the race ends.
+ */
+endsIn: number | null, 
+/**
+ * Racer grid indices by position.
+ */
+standings: Array<number>, 
+/**
+ * Local players by slot.
+ */
+players: Array<UiPlayerHud>, };
+export type UiItemKind = "turboCell" | "sparkRocket" | "leechCoil" | "shockOrb" | "empPulse" | "gooBomb" | "oilSlick" | "springPad" | "shieldBubble" | "stormStrike";
 export type UiLayoutRecord = { 
 /**
  * Track id.
@@ -783,6 +878,100 @@ car: string,
  * Paint id.
  */
 paint: number, };
+export type UiPlayerHud = { 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * Grid index (into the `race.setup` racers).
+ */
+racer: number, 
+/**
+ * Position, 1-based.
+ */
+position: number, 
+/**
+ * Current lap, 1-based (1 on the grid, never above the race's laps).
+ */
+lap: number, 
+/**
+ * Time on the current lap, ms (0 once finished).
+ */
+lapMs: number, 
+/**
+ * Latest completed lap, ms.
+ */
+lastLapMs: number | null, 
+/**
+ * Best lap of this race, ms.
+ */
+bestLapMs: number | null, 
+/**
+ * Total time once finished, ms.
+ */
+finishMs: number | null, 
+/**
+ * Speed in display km/h.
+ */
+kmh: number, 
+/**
+ * Charge 0–1 (tenths).
+ */
+charge: number, 
+/**
+ * Enough charge to boost.
+ */
+boostReady: boolean, 
+/**
+ * Spending charge right now.
+ */
+spending: boolean, 
+/**
+ * Held item (usable).
+ */
+item: UiItemKind | null, 
+/**
+ * The item roulette is spinning.
+ */
+roulette: boolean, 
+/**
+ * Driving the wrong way.
+ */
+wrongWay: boolean, 
+/**
+ * A Spark Rocket is locked on this car (direction: the `arrow` shared value).
+ */
+lockOn: boolean, 
+/**
+ * Goo Bomb stuck to this car: fuse seconds left.
+ */
+goo: number | null, 
+/**
+ * Shield seconds left.
+ */
+shield: number | null, };
+export type UiPlayerValues = { 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * Speed, u/s.
+ */
+speed: number, 
+/**
+ * Charge 0–1.
+ */
+charge: number, 
+/**
+ * Charging glow 0–1 (charge gain rate).
+ */
+glow: number, 
+/**
+ * Direction of a rocket locked on this car: degrees clockwise from straight ahead.
+ */
+arrow: number, };
 export type UiProfile = { 
 /**
  * Unlocked content.
@@ -809,6 +998,111 @@ goldMedals: number,
  */
 stats: UiStats, };
 export type UiQuality = "low" | "medium" | "high" | "ultra" | "custom";
+export type UiRaceEvent = { "kind": "countdown", 
+/**
+ * The number.
+ */
+n: number, } | { "kind": "go" } | { "kind": "perfectStart", 
+/**
+ * Slot 0–3.
+ */
+slot: number, } | { "kind": "stall", 
+/**
+ * Slot 0–3.
+ */
+slot: number, } | { "kind": "split", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * Seconds, + = slower.
+ */
+secs: number, } | { "kind": "lap", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * The completed lap, 1-based.
+ */
+lap: number, 
+/**
+ * Lap time, ms.
+ */
+ms: number, 
+/**
+ * Personal best of this race.
+ */
+best: boolean, 
+/**
+ * Fastest lap of anyone so far (from lap 2).
+ */
+fastest: boolean, } | { "kind": "finalLap", 
+/**
+ * Slot 0–3.
+ */
+slot: number, } | { "kind": "finished", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * Position.
+ */
+rank: number, 
+/**
+ * Total time, ms.
+ */
+ms: number, } | { "kind": "goldenBattery", 
+/**
+ * Slot 0–3.
+ */
+slot: number, } | { "kind": "endsIn", 
+/**
+ * Seconds left.
+ */
+secs: number, } | { "kind": "hint", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * Which.
+ */
+hint: UiHint, } | { "kind": "hit", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * The item.
+ */
+by: UiItemKind, 
+/**
+ * Who fired it (none: own item or unknown).
+ */
+attacker: string | null, 
+/**
+ * The shield blocked it.
+ */
+blocked: boolean, } | { "kind": "landed", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * The item.
+ */
+by: UiItemKind, 
+/**
+ * Who was hit.
+ */
+victim: string, 
+/**
+ * Their shield blocked it.
+ */
+blocked: boolean, };
 export type UiRacePhase = "setup" | "intro" | "countdown" | "racing" | "finished";
 export type UiRaceSession = { 
 /**
@@ -826,7 +1120,11 @@ cup: UiCupStandings | null,
 /**
  * Scoreboard (Versus sessions).
  */
-versus: UiVersusScore | null, };
+versus: UiVersusScore | null, 
+/**
+ * The race HUD's state (inside a session).
+ */
+hud: UiHudSnapshot | null, };
 export type UiRaceSetup = { 
 /**
  * Mode.
@@ -896,6 +1194,23 @@ export type UiRecords = {
  * Layout records.
  */
 layouts: Array<UiLayoutRecord>, };
+export type UiRect = { 
+/**
+ * Left.
+ */
+x: number, 
+/**
+ * Top.
+ */
+y: number, 
+/**
+ * Width.
+ */
+w: number, 
+/**
+ * Height.
+ */
+h: number, };
 export type UiResultEntry = { 
 /**
  * Final position, 1-based.
@@ -1220,6 +1535,24 @@ races: number,
  * Rows ordered by points.
  */
 rows: Array<UiScoreRow>, };
+export type UiViewport = { 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * The view in UI px.
+ */
+rect: UiRect, };
+export type UiViewports = { 
+/**
+ * Views by slot (empty outside a race).
+ */
+players: Array<UiViewport>, 
+/**
+ * The free quadrant (3 players).
+ */
+panel: UiRect | null, };
 export type UiWeatherChoice = { "kind": "fixed", 
 /**
  * The preset.
@@ -1230,6 +1563,7 @@ weather: UiWeatherKind, } | { "kind": "random" } | { "kind": "dynamic",
  */
 start: UiWeatherKind, };
 export type UiWeatherKind = "clear" | "cloudy" | "rain" | "storm" | "fog" | "snow";
+export type UnbindHud = null;
 export type Unlocked = { 
 /**
  * The unlocks.
@@ -1242,6 +1576,8 @@ export interface ReactMessages {
   "app.quit": AppQuit;
   "gamepad.rumble": GamepadRumble;
   "gamepad.stopRumble": GamepadStopRumble;
+  "hud.bind": BindHud;
+  "hud.unbind": UnbindHud;
   "input.dropPlayer": DropPlayer;
   "input.rebind": Rebind;
   "input.resetBindings": ResetBindings;
@@ -1296,11 +1632,15 @@ export interface ReactEvents {
   "lobby.slots": UiLobby;
   "profile.changed": UiProfile;
   "profile.unlocked": Unlocked;
+  "race.event": UiRaceEvent;
+  "race.hud": UiHudTick;
   "race.results": UiResults;
+  "race.setup": UiHudSetup;
   resize: Resize;
   toast: UiNotice;
   "ui.nav": NavEvent;
   "versus.score": UiVersusScore;
+  viewports: UiViewports;
 }
 
 /** Every registered filter name and its params type, split by family.
@@ -1559,6 +1899,10 @@ export const bevy = {
     getAll(): Promise<Array<GamepadConnectedData>> { return request("gamepad.getAll", null); },
     rumble(value: GamepadRumble): void { emit("gamepad.rumble", value); },
     stopRumble(value: GamepadStopRumble): void { emit("gamepad.stopRumble", value); },
+  },
+  hud: {
+    bind(value: BindHud): void { emit("hud.bind", value); },
+    unbind(value: UnbindHud): void { emit("hud.unbind", value); },
   },
   input: {
     dropPlayer(value: DropPlayer): void { emit("input.dropPlayer", value); },

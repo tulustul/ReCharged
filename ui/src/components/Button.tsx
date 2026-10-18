@@ -54,7 +54,7 @@ export function Button({ label, focused = false, onPress, onHover, locked, badge
         border: 1,
         borderColor: focused ? "rgba(255, 255, 255, 0.5)" : variant === "primary" ? color.voltGlow : color.glassBorder,
         backgroundGradient: focused ? hot[variant] : idle,
-        boxShadow: focused ? [{ color: variant === "primary" ? color.voltGlow : color.cyanGlow, blurRadius: 18 }] : [],
+        boxShadow: focused ? [{ color: variant === "primary" ? color.voltGlow : color.cyanGlow, blurRadius: 18 }] : undefined, // `[]` would paint a default black shadow
         transform: { scale: focused ? 1.035 : 1 },
         transition: focusTransition,
         ...style,
