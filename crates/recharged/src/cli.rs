@@ -25,7 +25,7 @@ Usage: recharged [flags]
   --bench <scenario>       frame-time percentiles as JSON
   --calibrate-medals       compute medal targets for every layout
   --capture-previews       render track previews and car thumbnails
-  --track-tour <track>     screenshots along the racing line
+  --track-tour <track>     screenshots along the racing line (implies --quick-race <track>)
   --export-bindings <path> write the TypeScript bindings and exit
   --window <W>x<H>         initial window size (overrides the settings' window size)
   -h, --help               this text";
@@ -126,6 +126,8 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
             .filter(|f| options.contains(f))
             .collect()
     };
+    // `--track-tour <t>` without `--quick-race` tours that track.
+    let quick_track = quick_track.or_else(|| cfg.track_tour.clone());
     match quick_track {
         Some(track) => cfg.quick_race = Some(QuickRaceArgs { track, ..race }),
         None if !orphans(&RACE_OPTIONS).is_empty() => {
@@ -156,8 +158,6 @@ pub fn pending_flags(cfg: &AutomationConfig) -> Vec<&'static str> {
         (cfg.headless_race, "--headless-race"),
         (cfg.bench.is_some(), "--bench"),
         (cfg.calibrate_medals, "--calibrate-medals"),
-        (cfg.capture_previews, "--capture-previews"),
-        (cfg.track_tour.is_some(), "--track-tour"),
     ]
     .into_iter()
     .filter_map(|(set, name)| set.then_some(name))
@@ -370,7 +370,7 @@ mod tests {
         assert_eq!(cfg.soak_seed, Some(42));
         assert_eq!(ok(&["--window", "1280x720"]).window, Some((1280, 720)));
         assert!(err(&["--window", "big"]).contains("--window"));
-        assert_eq!(pending_flags(&cfg).len(), 6);
+        assert_eq!(pending_flags(&cfg).len(), 4);
         assert!(ok(&[]) == AutomationConfig::default() && !ok(&[]).is_automated());
     }
 
