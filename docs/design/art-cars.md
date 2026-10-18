@@ -19,7 +19,8 @@ reproduces the same model (see the triangle-order note below).
 `check_cars.py` checks: glb parses; scene roots `body`, `wheel_fl/fr/rl/rr` (+ `antenna` under
 `body`); wheel nodes translation-only at the table layout (±0.01 u) and equal to `wheels.ron`;
 wheel mesh radius/width; required materials; ≤ 25 k triangles; body length/width/height and
-lowest point vs the envelope; thumbnail 512² RGBA.
+lowest point vs the envelope (hard-coded exceptions: hornet's flaps, phantom's wing to 0.56);
+thumbnail 512² RGBA.
 
 ## Structure (all cars)
 
@@ -46,7 +47,7 @@ lowest point vs the envelope; thumbnail 512² RGBA.
 | zip | mini touring sedan: box flares, white twin stripes, wing on stands, splitter, diffuser, black tail panel | turquoise `#12B5CF` / white `#F4F4F2` | silver 8-spoke, street | 3 | 22 673 |
 | torque | muscle fastback: haunches over fat rear tyres, chrome supercharger + scoop, quad lamps, chrome bumpers, ducktail, twin pipes | candy red `#C8161E` / white `#F4F4F0` | chrome 5-spoke, white-letter street tyres | 88 | 24 610 |
 | hornet | rally hatch: black roof + bonnet stripe, roof scoop, roof spoiler, white mud flaps behind every wheel, 4 rally lamps, skid plate | hornet yellow `#EAA80A` / black `#1D1D20` | white 8-spoke, gravel blocks | 5 | 24 295 |
-| phantom | low GT coupe: wide haunches, full-width dual-element wing on swan necks with tall endplates, canards, diffuser, slim LED lamps | violet metallic `#3F1F80` / carbon black `#1E1E22` | gold 6-spoke, street | 9 | 22 243 |
+| phantom | low GT coupe: wide haunches, full-width dual-element wing high on swan necks (to 0.56) with tall endplates, canards, diffuser, slim LED lamps | violet metallic `#3F1F80` / carbon black `#1E1E22` | gold 6-spoke, street | 9 | 22 483 |
 | volt_gt | hypercar: teardrop canopy with black roof, side intakes, louvred engine cover and haunches, cyan `glow` DRL band, rocker strips, rear band, cover lines | pearl white `#E9EDF0` / black `#17181B`, glow cyan | graphite turbine, street | 1 | 22 405 |
 | bolt | futuristic formula: needle nose, canopy + airbox, sidepods, shark fin with glow edge, wide front wing, twin-fin rear wing, exposed wishbones | hot magenta `#E01E78` / black `#17181B`, glow cyan | black turbine, slicks with glowing sidewall rings | 0 | 18 954 |
 
@@ -70,9 +71,9 @@ Suggested 4 base paints per car (base / accent) for `catalog.ron`:
 - **Volt GT** rear tyre tops reach the 0.46 body height (allowed by `car-dimensions.md`); they
   show through louvre slots on the haunches. Its fenders are capped at the body height.
 - **Bolt**: open wheels rise above the 0.42 body height (allowed).
-- **Phantom's wing** is capped by the 0.50 body height, so from the low chase camera it reads as
-  a full-width dark bar with corner endplates rather than a towering wing. Raising phantom's
-  height to ~0.56 in `car-dimensions.md` would let it stand on taller swan necks.
+- **Phantom's wing** uses the `car-dimensions.md` footnote allowance: the body stays within
+  0.50, only the dual-element wing on its swan necks rises to 0.56 (hard-coded as `WING_TOP` in
+  `cars/phantom.py` and `check_cars.py`), so it floats clear of the deck from the chase camera.
 - Arms, hub carriers and shocks are part of `body` (static); when the renderer moves wheels for
   suspension travel the arms do not follow (ends hide inside the rims).
 - Bodies may exceed the envelope by ≤ 0.01 u where decals sit on the nose/tail

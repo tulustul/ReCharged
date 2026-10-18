@@ -22,6 +22,8 @@ MATERIALS = {'paint', 'paint_accent', 'light_head', 'light_tail', 'light_brake',
 TOL = 0.01
 # flexible parts allowed below the chassis clearance: hornet's rally mud flaps (signature)
 LOW_PARTS = {'hornet': 0.09}
+# car-dimensions.md footnote: phantom's rear wing (on its stands) may rise to 0.56
+WING_TOP = {'phantom': 0.56}
 
 
 def dims():
@@ -127,8 +129,9 @@ def check(car, D):
     lo, hi, _ = mesh_bounds(g, nodes['body'][1]['mesh'])
     if hi[2] - lo[2] > D['length'] + 0.02:
         errs.append(f'body length {hi[2] - lo[2]:.3f} > {D["length"]}')
-    if hi[1] > D['height'] + TOL:
-        errs.append(f'body height {hi[1]:.3f} > {D["height"]}')
+    top = max(D['height'], WING_TOP.get(car, 0.0))
+    if hi[1] > top + TOL:
+        errs.append(f'body height {hi[1]:.3f} > {top}')
     if hi[0] - lo[0] > D['width'] + 0.02:
         errs.append(f'body width {hi[0] - lo[0]:.3f} > {D["width"]}')
     if lo[1] < min(D['clearance'] - 0.015, LOW_PARTS.get(car, 1.0)):

@@ -1,6 +1,6 @@
 """Phantom — Elite low sports coupe: metallic violet GT body with wide haunches, full-width
-wing on swan-neck stands, splitter + canards, diffuser, slim LED lamps, white roof and side
-blades, gold 6-spoke rims. Number 9.
+dual-element wing high on swan-neck stands, splitter + canards, diffuser, slim LED lamps,
+carbon roof and side blades, gold 6-spoke rims. Number 9.
 
     blender -b -P tools/blender/cars/phantom.py -- [--preview DIR]
 """
@@ -23,6 +23,7 @@ yF, yR = D['wheelbase'] / 2, -D['wheelbase'] / 2
 zF, zR = D['radius']
 CLR = D['clearance']
 HL, HW, HH = D['length'] / 2, D['width'] / 2, D['height']
+WING_TOP = 0.56  # car-dimensions.md footnote: only the rear wing may rise above the 0.50 body
 
 # --- shell -------------------------------------------------------------------------------------
 prof = shell.Profile([
@@ -70,14 +71,16 @@ decals = core.obj_from_bm('decals', bm, weighted=False, angle=60)
 
 # --- hard parts: wing + stands, splitter, canards, skirts, diffuser, mirrors ---------------------
 bm = core.new_bm()
-parts.wing(bm, V((0, -0.875, 0.432)), 1.07, 0.24, thick=0.17, angle=-22, mat='paint_accent',
-           plate=(0.15, 0.27), plate_mat='paint_accent')
-parts.wing(bm, V((0, -0.975, 0.474)), 1.07, 0.08, thick=0.14, angle=-38, mat='paint_accent')
+parts.wing(bm, V((0, -0.875, WING_TOP - 0.057)), 1.07, 0.24, thick=0.17, angle=-22,
+           mat='paint_accent', plate=(0.15, 0.27), plate_mat='paint_accent')
+parts.wing(bm, V((0, -0.975, WING_TOP - 0.035)), 1.07, 0.08, thick=0.14, angle=-38,
+           mat='paint_accent')
 geo.slab(bm, [(0.86, 0.53, CLR, CLR + 0.022, 0.01), (1.012, 0.50, CLR, CLR + 0.022, 0.01)],
          mi('plastic'))  # splitter
 for s in (-1, 1):
-    geo.tube(bm, [(s * 0.22, -0.77, 0.41), (s * 0.22, -0.79, 0.445), (s * 0.22, -0.845, 0.462),
-                  (s * 0.22, -0.875, 0.45)], 0.014, mi('plastic'), n=6, corner=0.03)  # swan neck
+    geo.tube(bm, [(s * 0.22, -0.74, 0.37), (s * 0.22, -0.76, 0.47), (s * 0.22, -0.80, WING_TOP - 0.025),
+                  (s * 0.22, -0.845, WING_TOP - 0.02), (s * 0.22, -0.865, WING_TOP - 0.037)],
+             0.014, mi('plastic'), n=6, corner=0.03)  # swan neck hooks onto the wing top
     geo.extrude_x(bm, [(0.96, 0.17), (0.86, 0.20), (0.86, 0.215), (0.97, 0.19)],
                   s * 0.48, s * 0.545, mi('plastic'))  # canards
     geo.box(bm, V((s * 0.535, 0.0, CLR + 0.025)), (0.035, 0.74, 0.05), mi('plastic'))  # skirts
