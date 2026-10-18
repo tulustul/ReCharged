@@ -22,7 +22,7 @@
 | T14 | VFX | T03 | in progress |
 | T15 | weather | T01 | done (12 tests) |
 | T05b | race HUD | T05, T06 | in progress |
-| T16 | environments & tracks (2 waves) | T02, art bible | wave 1 in progress (toy, house, street) |
+| T16 | environments & tracks (2 waves) | T02, art bible | waves 1+2 in progress (toy, house, street, garden, supermarket, workshop) |
 | QA | playtests, soak, bench, DoD checks | all | todo |
 
 Milestones: M1 walking skeleton (T01–T05 basics) → M2 vertical slice on Toy Town (+2P smoke test)
