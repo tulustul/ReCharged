@@ -1,0 +1,23 @@
+// volt_gt: hypercar: top speed, stable 4WD.
+// Stars (catalog.ron): speed 5, accel 4, handling 3, weight 2. Geometry: car-dimensions.md.
+// Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
+(
+    id: "volt_gt",
+    drive: Awd,
+    top_speed: 36.0, // Speed 5★
+    accel_time: 2.75, // Accel 4★: 0 → 99 % of top speed
+    reverse_speed: 14.0,
+    brake_decel: 40.0,
+    body: (length: 2.10, width: 1.15, height: 0.46, clearance: 0.07),
+    wheelbase: 1.32,
+    front: (track: 1.00, radius: 0.22, width: 0.19),
+    rear: (track: 1.02, radius: 0.23, width: 0.24),
+    mass: 2.3, // Weight 2★
+    com_height: 0.17,
+    suspension: (bump: 0.07, droop: 0.05, frequency: 3.3, damping: 0.50),
+    tyres: (grip: 1.25, rear_grip: 1.33, traction: 1.9, drift_grip: 0.60), // Handling 3★
+    steering: (lock_deg: 31.0, counter_steer: 0.50, drift_angle_deg: 22.0, stability: 0.7),
+    air_control: 0.90,
+    landing_loss: 0.06,
+    downforce: 0.35,
+)

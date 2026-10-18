@@ -1,0 +1,23 @@
+// phantom: sports coupe: precise, planted by its wing.
+// Stars (catalog.ron): speed 4, accel 4, handling 4, weight 3. Geometry: car-dimensions.md.
+// Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
+(
+    id: "phantom",
+    drive: Rwd,
+    top_speed: 33.0, // Speed 4★
+    accel_time: 2.75, // Accel 4★: 0 → 99 % of top speed
+    reverse_speed: 13.0,
+    brake_decel: 40.0,
+    body: (length: 2.05, width: 1.12, height: 0.50, clearance: 0.08),
+    wheelbase: 1.30,
+    front: (track: 0.98, radius: 0.22, width: 0.18),
+    rear: (track: 1.00, radius: 0.23, width: 0.22),
+    mass: 2.6, // Weight 3★
+    com_height: 0.18,
+    suspension: (bump: 0.07, droop: 0.05, frequency: 3.2, damping: 0.50),
+    tyres: (grip: 1.35, rear_grip: 1.43, traction: 2.1, drift_grip: 0.60), // Handling 4★
+    steering: (lock_deg: 34.0, counter_steer: 0.50, drift_angle_deg: 22.0, stability: 0.7),
+    air_control: 0.80,
+    landing_loss: 0.09,
+    downforce: 0.35,
+)

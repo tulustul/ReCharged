@@ -1,0 +1,23 @@
+// torque: muscle car: fast on straights, wide turns, tail-happy.
+// Stars (catalog.ron): speed 4, accel 3, handling 2, weight 4. Geometry: car-dimensions.md.
+// Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
+(
+    id: "torque",
+    drive: Rwd,
+    top_speed: 33.0, // Speed 4★
+    accel_time: 3.00, // Accel 3★: 0 → 99 % of top speed
+    reverse_speed: 13.0,
+    brake_decel: 40.0,
+    body: (length: 2.15, width: 1.15, height: 0.60, clearance: 0.10),
+    wheelbase: 1.35,
+    front: (track: 0.98, radius: 0.24, width: 0.18),
+    rear: (track: 1.02, radius: 0.26, width: 0.26),
+    mass: 3.0, // Weight 4★
+    com_height: 0.22,
+    suspension: (bump: 0.08, droop: 0.07, frequency: 2.8, damping: 0.45),
+    tyres: (grip: 1.15, rear_grip: 1.22, traction: 2.1, drift_grip: 0.60), // Handling 2★
+    steering: (lock_deg: 28.0, counter_steer: 0.50, drift_angle_deg: 22.0, stability: 0.7),
+    air_control: 0.68,
+    landing_loss: 0.12,
+    downforce: 0.20,
+)

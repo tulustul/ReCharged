@@ -1,0 +1,23 @@
+// sparky: off-road buggy: long travel, grippy, forgiving.
+// Stars (catalog.ron): speed 2, accel 3, handling 4, weight 2. Geometry: car-dimensions.md.
+// Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
+(
+    id: "sparky",
+    drive: Awd,
+    top_speed: 27.0, // Speed 2★
+    accel_time: 3.00, // Accel 3★: 0 → 99 % of top speed
+    reverse_speed: 11.0,
+    brake_decel: 40.0,
+    body: (length: 2.00, width: 1.25, height: 0.75, clearance: 0.22),
+    wheelbase: 1.30,
+    front: (track: 1.10, radius: 0.30, width: 0.22),
+    rear: (track: 1.10, radius: 0.32, width: 0.25),
+    mass: 2.3, // Weight 2★
+    com_height: 0.30,
+    suspension: (bump: 0.14, droop: 0.10, frequency: 2.4, damping: 0.42),
+    tyres: (grip: 1.35, rear_grip: 1.43, traction: 1.9, drift_grip: 0.60), // Handling 4★
+    steering: (lock_deg: 34.0, counter_steer: 0.50, drift_angle_deg: 22.0, stability: 0.7),
+    air_control: 0.90,
+    landing_loss: 0.06,
+    downforce: 0.15,
+)

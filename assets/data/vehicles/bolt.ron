@@ -1,0 +1,23 @@
+// bolt: open-wheel formula: fastest, lightest, twitchy.
+// Stars (catalog.ron): speed 5, accel 5, handling 3, weight 1. Geometry: car-dimensions.md.
+// Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
+(
+    id: "bolt",
+    drive: Rwd,
+    top_speed: 36.0, // Speed 5★
+    accel_time: 2.50, // Accel 5★: 0 → 99 % of top speed
+    reverse_speed: 14.0,
+    brake_decel: 40.0,
+    body: (length: 2.20, width: 1.15, height: 0.42, clearance: 0.06),
+    wheelbase: 1.40,
+    front: (track: 1.04, radius: 0.22, width: 0.18),
+    rear: (track: 1.06, radius: 0.24, width: 0.26),
+    mass: 2.0, // Weight 1★
+    com_height: 0.16,
+    suspension: (bump: 0.06, droop: 0.05, frequency: 3.4, damping: 0.52),
+    tyres: (grip: 1.25, rear_grip: 1.33, traction: 2.1, drift_grip: 0.60), // Handling 3★
+    steering: (lock_deg: 31.0, counter_steer: 0.50, drift_angle_deg: 22.0, stability: 0.7),
+    air_control: 1.00,
+    landing_loss: 0.04,
+    downforce: 0.40,
+)

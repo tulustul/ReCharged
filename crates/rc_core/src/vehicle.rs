@@ -44,6 +44,9 @@ pub struct WheelState {
     pub surface: Option<SurfaceKind>,
     /// Slip ratio/angle magnitude 0–1 (skid sounds, marks).
     pub slip: f32,
+    /// Wheel centre offset from its rest position along the car's up axis in u (+ = pushed up
+    /// into the body, − = hanging down; visuals add it to the model's rest wheel position).
+    pub offset: f32,
 }
 
 /// Physical state of a car after the latest tick. Written only by rc_vehicle (`SimSet::PostPhysics`).
@@ -75,6 +78,35 @@ pub struct VehicleTelemetry {
     pub up_dot: f32,
     /// The latest landing was clean (all wheels within 0.15 s, tilt < 20°).
     pub clean_landing: bool,
+    /// Charge gained per second right now from drifting, air time and drafting (GDD §5.3), as a
+    /// fraction of the meter per second (drift alone peaks at 0.22): drift spark size/colour,
+    /// sizzle pitch, meter glow.
+    pub charge_rate: f32,
+}
+
+/// Top speed in u/s by Speed stars 1–5 (GDD §5.1). Index with `stars - 1`, or use
+/// [`top_speed_for_stars`].
+pub const TOP_SPEED_BY_STARS: [f32; 5] = [24.0, 27.0, 30.0, 33.0, 36.0];
+
+/// Seconds from standstill to top speed by Accel stars 1–5 (GDD §5.1; rc_vehicle measures it to
+/// 99 % of the top speed). Use [`zero_to_top_secs_for_stars`].
+pub const ZERO_TO_TOP_SECS_BY_STARS: [f32; 5] = [3.5, 3.25, 3.0, 2.75, 2.5];
+
+/// Mass of a 3★-weight car: an `ApplyImpulse` is scaled by `(REFERENCE_CAR_MASS / mass)^0.5`, so
+/// an impulse of `REFERENCE_CAR_MASS × Δv` changes a reference car's velocity by `Δv`.
+pub const REFERENCE_CAR_MASS: f32 = 2.6;
+
+/// Smallest charge that starts the charge boost (GDD §5.3); the HUD meter glows from here.
+pub const BOOST_MIN_CHARGE: f32 = 0.15;
+
+/// Top speed (u/s) of a car with `stars` Speed stars (clamped to 1–5).
+pub fn top_speed_for_stars(stars: u8) -> f32 {
+    TOP_SPEED_BY_STARS[usize::from(stars.clamp(1, 5) - 1)]
+}
+
+/// 0 → top time (s) of a car with `stars` Accel stars (clamped to 1–5).
+pub fn zero_to_top_secs_for_stars(stars: u8) -> f32 {
+    ZERO_TO_TOP_SECS_BY_STARS[usize::from(stars.clamp(1, 5) - 1)]
 }
 
 /// Battery charge 0–1 (GDD §5.3). Written only by rc_vehicle.
@@ -144,7 +176,7 @@ pub struct CarRespawned {
 }
 
 /// Instant impulse on a car, e.g. a tumble (producer items; consumer vehicle, which scales it by
-/// `(reference mass / mass)^0.5`).
+/// `(REFERENCE_CAR_MASS / mass)^0.5`, so heavier cars resist knock-back).
 #[derive(Message, Debug, Clone, Copy, PartialEq)]
 pub struct ApplyImpulse {
     /// The car.

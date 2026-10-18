@@ -1,26 +1,81 @@
 //! # rc_vehicle — RC car physics (L1)
 //!
-//! - **Responsibilities:** the rapier body of every `Racer` (spawned on `Added<Racer>` from
-//!   `assets/data/vehicles/<car>.ron`), suspension, tyres, drift, air control, downforce,
-//!   boost/charge rules, speed cap, auto-right; executes `RespawnCar`, `ApplyImpulse`,
-//!   `DrainCharge` / `GrantCharge`; owns rapier's configuration ([`PhysicsPlugin`]).
+//! - **Responsibilities:** the rapier body of every `Racer` (built on `Added<Racer>` from
+//!   `assets/data/vehicles/<car>.ron`), 4 ray-cast wheels (3 rays each approximate the round
+//!   tyre) with spring-damper suspension, a slip-based tyre model (× surface × weather ×
+//!   effects), speed-sensitive steering, drift, air control, downforce, auto-right, battery
+//!   charge & boost rules, the 1.5× speed cap;
+//!   executes `RespawnCar`, `ApplyImpulse`, `DrainCharge` / `GrantCharge`; owns rapier's
+//!   configuration ([`PhysicsPlugin`]: gravity, fixed step, frozen while paused).
 //! - **Inputs:** `CarControl`, `StatusEffects`, `CatchUp`, `WeatherState`, `Surface` of the
-//!   ground, the request messages above, `PauseState`.
+//!   ground colliders, `RacePhase` (cars are held in Intro/Countdown), `UserPaths`,
+//!   `RaceConfig` (cars to check), the request messages above.
 //! - **Outputs:** `VehicleTelemetry`, `Charge`, `CarImpact`, `CarLanded`, `CarRespawned`,
-//!   `Teleported`, the car bodies' `Transform` (only rc_vehicle and rapier write it).
-//! - **Must never:** decide respawns (rc_race does), read input devices, or touch visuals.
+//!   `Teleported`, the bodies' `Transform` (only rc_vehicle and rapier write it),
+//!   [`VehicleLibrary`], `LoadingDone("vehicles")` / `LoadingFailed`.
+//! - **Must never:** decide respawns (rc_race does), read input devices, touch visuals, or treat
+//!   AI cars differently from human ones.
 //!
-//! Status: skeleton (T01) + rapier setup; implemented by T03 (`docs/tasks/T03-vehicle.md`).
+//! Design note: `docs/design/rc_vehicle.md`.
+
+mod assists;
+mod charge;
+mod drive;
+mod model;
+mod outputs;
+mod params;
+mod requests;
+mod spawn;
+mod state;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use rc_core::prelude::*;
 
-/// The car physics model.
+pub use model::{CarSpec, TOP_SPEED_REACHED, WheelSpec};
+pub use params::{
+    Axle, BodyDims, LOADING_KEY, Steering, Suspension, Tyres, VEHICLES_DIR, VehicleLibrary,
+    VehicleParams,
+};
+
+/// The car physics model. Add after [`PhysicsPlugin`] and `CorePlugin`.
 pub struct VehiclePlugin;
 
 impl Plugin for VehiclePlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        LoadingTasks::register(app, LOADING_KEY);
+        app.add_systems(OnEnter(AppState::Loading), params::load_library)
+            .add_systems(OnEnter(AppState::Unloading), params::unload_library)
+            .add_systems(
+                FixedUpdate,
+                (
+                    spawn::spawn_bodies,
+                    spawn::rebuild_bodies.run_if(resource_exists_and_changed::<VehicleLibrary>),
+                    requests::execute_respawns,
+                    requests::apply_impulses,
+                    spawn::sync_ghosting,
+                    drive::drive_cars,
+                )
+                    .chain()
+                    .in_set(SimSet::Vehicle),
+            )
+            .add_systems(
+                FixedUpdate,
+                (
+                    outputs::motion,
+                    charge::update_charge,
+                    outputs::write_telemetry,
+                    outputs::report_impacts,
+                )
+                    .chain()
+                    .in_set(SimSet::PostPhysics),
+            );
+        #[cfg(debug_assertions)]
+        app.add_systems(
+            Update,
+            params::hot_reload.run_if(resource_exists::<VehicleLibrary>),
+        );
+    }
 }
 
 /// Rapier in `FixedUpdate` at [`SIM_HZ`], exactly one physics step per tick, gravity
