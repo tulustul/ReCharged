@@ -1,4 +1,4 @@
-//! `app.*` channels: app state for React stores, quitting.
+//! `app.*` channels: app state for React stores, build info, quitting.
 
 use bevy::prelude::*;
 use bevy_react::prelude::*;
@@ -39,7 +39,7 @@ pub enum UiRacePhase {
     Finished,
 }
 
-/// Bevy → React event `app.state`: sent whenever the state changes; also the `app.snapshot`
+/// Bevy → React event `app.state`: sent whenever the status changes; also the `app.snapshot`
 /// response (events are not buffered, so stores request a snapshot on mount).
 #[react_event(name = "app.state")]
 #[serde(rename_all = "camelCase")]
@@ -52,11 +52,27 @@ pub struct AppStatus {
     pub phase: Option<UiRacePhase>,
     /// The race is paused.
     pub paused: bool,
+    /// The 3D menu showroom renders the backdrop car (`ShowroomReady`); without it the menus draw
+    /// their own background and 2D car art.
+    pub showroom: bool,
 }
 
 /// React → Bevy request `app.snapshot`: the current [`AppStatus`].
 #[react_request(name = "app.snapshot", response = AppStatus)]
 pub struct AppSnapshot;
+
+/// Static facts about the build (title screen).
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct AppInfo {
+    /// Game version, e.g. `"0.1.0"`.
+    pub version: String,
+}
+
+/// React → Bevy request `app.info`: the [`AppInfo`].
+#[react_request(name = "app.info", response = AppInfo)]
+pub struct GetAppInfo;
 
 /// React → Bevy message `app.quit`: exit the game (React confirms first).
 #[react_message(name = "app.quit")]
@@ -65,13 +81,21 @@ pub struct AppQuit;
 pub(crate) fn register(app: &mut App) {
     app.add_react_event::<AppStatus>()
         .add_react_request_handler(on_snapshot)
-        .add_react_handler(on_quit);
+        .add_react_request_handler(|request: On<Request<GetAppInfo>>| {
+            request.respond(AppInfo {
+                version: env!("CARGO_PKG_VERSION").into(),
+            });
+        })
+        .add_react_handler(|_: On<AppQuit>, mut out: MessageWriter<GameCommand>| {
+            out.write(GameCommand::QuitGame);
+        });
 }
 
 fn status(
     state: &State<AppState>,
     phase: Option<&State<RacePhase>>,
     pause: Option<&State<PauseState>>,
+    showroom: bool,
 ) -> AppStatus {
     AppStatus {
         state: match state.get() {
@@ -89,6 +113,7 @@ fn status(
             RacePhase::Finished => UiRacePhase::Finished,
         }),
         paused: pause.is_some_and(|p| *p.get() == PauseState::Paused),
+        showroom,
     }
 }
 
@@ -97,10 +122,16 @@ pub(crate) fn push_state(
     state: Res<State<AppState>>,
     phase: Option<Res<State<RacePhase>>>,
     pause: Option<Res<State<PauseState>>>,
+    showroom: Option<Res<ShowroomReady>>,
     mut sent: Local<Option<AppStatus>>,
     events: ReactEvents,
 ) {
-    let now = status(&state, phase.as_deref(), pause.as_deref());
+    let now = status(
+        &state,
+        phase.as_deref(),
+        pause.as_deref(),
+        showroom.is_some(),
+    );
     if *sent != Some(now) {
         events.send(&now);
         *sent = Some(now);
@@ -112,13 +143,15 @@ fn on_snapshot(
     state: Option<Res<State<AppState>>>,
     phase: Option<Res<State<RacePhase>>>,
     pause: Option<Res<State<PauseState>>>,
+    showroom: Option<Res<ShowroomReady>>,
 ) {
     match state {
-        Some(state) => request.respond(status(&state, phase.as_deref(), pause.as_deref())),
+        Some(state) => request.respond(status(
+            &state,
+            phase.as_deref(),
+            pause.as_deref(),
+            showroom.is_some(),
+        )),
         None => request.respond_err("app state not initialised"),
     }
-}
-
-fn on_quit(_: On<AppQuit>, mut out: MessageWriter<GameCommand>) {
-    out.write(GameCommand::QuitGame);
 }

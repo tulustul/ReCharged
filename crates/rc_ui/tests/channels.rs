@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use rc_core::prelude::*;
 use rc_game::GameFlowPlugin;
 use rc_testkit::*;
-use rc_ui::race::{QuitRace, RestartRace, StartRace};
+use rc_ui::race::{QuitRace, RestartRace, StartRace, UiMode, UiPlayerChoice};
 
 fn app() -> App {
     headless_app((GameFlowPlugin, rc_ui::register_bindings))
@@ -22,12 +22,21 @@ fn wait_for_phase(app: &mut App, phase: RacePhase) {
 fn race_buttons_start_restart_and_quit_without_reloading() {
     let mut app = app();
     app.world_mut().trigger(StartRace {
+        mode: UiMode::QuickRace,
         track: "test_oval".into(),
-        reverse: None,
-        mirror: None,
-        car: Some("zip".into()),
+        reverse: false,
+        mirror: false,
+        players: vec![UiPlayerChoice {
+            slot: 0,
+            car: "zip".into(),
+            paint: 1,
+        }],
         ai: Some(2),
+        difficulty: None,
         laps: None,
+        weather: None,
+        time: None,
+        items: None,
     });
     wait_for_phase(&mut app, RacePhase::Countdown);
     let config = app.world().resource::<RaceConfig>().clone();

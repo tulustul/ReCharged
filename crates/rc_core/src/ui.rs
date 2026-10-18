@@ -54,6 +54,12 @@ pub enum BackdropFocus {
     Car,
 }
 
+/// Present while the 3D menu showroom actually renders the [`MenuBackdrop`] car. Inserted and
+/// removed only by rc_render; rc_ui reads it: without it the menus draw their own background and
+/// 2D car art instead of leaving room for the 3D car.
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ShowroomReady;
+
 /// What the menu showroom shows. Written only by rc_ui; read by render and camera.
 #[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
 pub struct MenuBackdrop {

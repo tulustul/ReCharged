@@ -1,61 +1,141 @@
+// The front end: one screen at a time per app state (menus, loading, race), dialogs and toasts on
+// top. Every screen sits in an ErrorBoundary that reports to Bevy (`ui.error`) and offers a way back.
 import { useEffect } from "react";
-import type { BevyStyle } from "bevy-react/jsx";
 
 import { bevy } from "./bevy";
+import { Backdrop } from "./components/Backdrop";
+import { Button } from "./components/Button";
+import { DialogHost } from "./components/Dialog";
+import { ToastHost } from "./components/Toast";
+import { useDebugRoutes } from "./debug";
+import { SplitContext } from "./hooks";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { useNav } from "./nav/input";
+import { back, menuMorph, morphStyle, router, type Route } from "./nav/routes";
+import { top } from "./nav/router";
+import { CarSelect } from "./screens/CarSelect";
+import { Credits } from "./screens/Credits";
+import { CupEnd } from "./screens/CupEnd";
+import { CupSelect } from "./screens/CupSelect";
+import { Garage } from "./screens/Garage";
+import { HowToPlay } from "./screens/HowToPlay";
 import { Loading } from "./screens/Loading";
+import { Lobby } from "./screens/Lobby";
 import { MainMenu } from "./screens/MainMenu";
-import { RacePlaceholder } from "./screens/RacePlaceholder";
-import { screenFor } from "./state/appState";
-import { useAppState } from "./state/useAppState";
+import { RaceLayer } from "./screens/race/RaceLayer";
+import { Records } from "./screens/Records";
+import { Settings } from "./screens/settings/Settings";
+import { Splash } from "./screens/Splash";
+import { Title } from "./screens/Title";
+import { TrackSelect } from "./screens/TrackSelect";
+import { Feeds } from "./state/Feeds";
+import { appState, session } from "./state/stores";
+import { useStore } from "./state/useStore";
 import { appStrings } from "./strings/app";
-import { colors, fontSize, space } from "./theme/tokens";
+import { hint } from "./strings/common";
+import { fill, text } from "./theme/styles";
+import { color, space } from "./theme/tokens";
 
 export function App() {
   useEffect(() => {
     bevy.ui.ready(null); // again after every hot reload: harmless, Bevy only notes it
   }, []);
+  useDebugRoutes();
+  // Split-screen races host the UI on a transparent overlay camera: no 3D frame to blur, so
+  // every panel (dialogs included) switches to translucent fills.
+  const status = useStore(appState);
+  const humans = useStore(session).setup?.racers.filter((r) => r.slot !== null).length ?? 1;
+  const split = status?.state === "inRace" && humans > 1;
   return (
-    <node style={root}>
-      <ErrorBoundary fallback={(error) => <ErrorScreen error={error} />}>
-        <Screens />
+    <SplitContext.Provider value={split}>
+      <node style={{ width: "100%", height: "100%" }}>
+        <Feeds />
+        <ErrorBoundary fallback={(error) => <ScreenError error={error} />}>
+          <Main />
+        </ErrorBoundary>
+        <DialogHost />
+        <ToastHost />
+      </node>
+    </SplitContext.Provider>
+  );
+}
+
+function Main() {
+  const status = useStore(appState);
+  switch (status?.state) {
+    case "loading":
+      return <Loading />;
+    case "unloading":
+      // One frame between a race and the menu (or the next load): no flash of either screen.
+      return <node style={{ ...fill, backgroundColor: color.bg }} />;
+    case "inRace":
+      return <RaceLayer status={status} />;
+    default:
+      return (
+        <>
+          <Backdrop />
+          <MenuHost />
+        </>
+      );
+  }
+}
+
+function MenuHost() {
+  const route = top(useStore(router));
+  const morph = useStore(menuMorph.morph);
+  return (
+    <node style={{ ...fill, ...morphStyle(morph) }}>
+      <ErrorBoundary key={route} fallback={(error) => <ScreenError error={error} />}>
+        <ScreenFor route={route} />
       </ErrorBoundary>
     </node>
   );
 }
 
-function Screens() {
-  const status = useAppState();
-  switch (screenFor(status)) {
-    case "menu":
+function ScreenFor({ route }: { route: Route }) {
+  switch (route) {
+    case "splash":
+      return <Splash />;
+    case "title":
+      return <Title />;
+    case "main":
       return <MainMenu />;
-    case "loading":
-      return <Loading />;
-    case "race":
-      return status ? <RacePlaceholder status={status} /> : null;
-    default:
-      return null;
+    case "cupSelect":
+      return <CupSelect />;
+    case "cupEnd":
+      return <CupEnd />;
+    case "trackSelect":
+      return <TrackSelect />;
+    case "carSelect":
+      return <CarSelect />;
+    case "lobby":
+      return <Lobby />;
+    case "garage":
+      return <Garage />;
+    case "records":
+      return <Records />;
+    case "howToPlay":
+      return <HowToPlay onBack={back} />;
+    case "settings":
+      return <Settings onBack={back} />;
+    case "credits":
+      return <Credits />;
   }
 }
 
-function ErrorScreen({ error }: { error: Error }) {
+/** Fallback of a broken screen: what happened and a way back. */
+function ScreenError({ error }: { error: Error }) {
+  useNav((e) => {
+    if (e.action === "back" || e.action === "confirm") back();
+  });
   return (
-    <node style={errorBox}>
-      <text style={errorTitle}>{appStrings.errorTitle}</text>
-      <text style={errorText}>{String(error.message)}</text>
+    <node style={{ ...fill, alignItems: "center", justifyContent: "center" }}>
+      <node style={{ width: 900, flexDirection: "column", gap: space.m, alignItems: "flexStart" }}>
+        <text style={{ ...text.h2, color: color.danger }}>{appStrings.errorTitle}</text>
+        <text style={text.body}>{appStrings.errorHint}</text>
+        <text style={{ ...text.small, color: color.textFaint }}>{String(error.message)}</text>
+        <Button label={hint.back} focused onPress={back} style={{ margin: { top: space.m } }} />
+      </node>
     </node>
   );
 }
-
-const root: BevyStyle = {
-  width: "100%",
-  height: "100%",
-  justifyContent: "center",
-  alignItems: "center",
-};
-
-const errorBox: BevyStyle = { flexDirection: "column", gap: space.s, padding: space.l };
-
-const errorTitle: BevyStyle = { color: colors.danger, fontSize: fontSize.title / 2, fontWeight: "bold" };
-
-const errorText: BevyStyle = { color: colors.text, fontSize: fontSize.body };

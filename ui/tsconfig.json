@@ -15,7 +15,8 @@
     "skipLibCheck": true,
     "types": [
       "react"
-    ]
+    ],
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src"
