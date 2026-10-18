@@ -1,0 +1,26 @@
+// Toy Town decor (rc_render, physics-free, out of reach): pennant bunting strung under the
+// ceiling and hanging aisle signs over the wall shelves. Format: crates/rc_render/src/props/
+// decor.rs. Models: tools/blender/props/toy/{bunting,sign}.py; both have their origin at the
+// ceiling attachment (the room is 16 u high) and hang below it. Touchable dressing lives in the
+// track's prop list (assets/data/tracks/toy_town.ron) with colliders.
+(
+    decor: [
+        // Bunting east–west, 30 u spans, lowest flag tip ≈ 13 u (none over the castle).
+        (model: "models/props/toy/bunting.glb", pos: (-15, 15.9, -30)),
+        (model: "models/props/toy/bunting.glb", pos: (15, 15.9, -30), yaw: 180),
+        (model: "models/props/toy/bunting.glb", pos: (45, 15.9, -30)),
+        (model: "models/props/toy/bunting.glb", pos: (-45, 15.9, 0), yaw: 180),
+        (model: "models/props/toy/bunting.glb", pos: (-15, 15.9, 0)),
+        (model: "models/props/toy/bunting.glb", pos: (15, 15.9, 0), yaw: 180),
+        (model: "models/props/toy/bunting.glb", pos: (45, 15.9, 0)),
+        (model: "models/props/toy/bunting.glb", pos: (-45, 15.9, 30)),
+        (model: "models/props/toy/bunting.glb", pos: (-15, 15.9, 30), yaw: 180),
+        (model: "models/props/toy/bunting.glb", pos: (15, 15.9, 30)),
+        (model: "models/props/toy/bunting.glb", pos: (45, 15.9, 30), yaw: 180),
+        // Aisle signs over the south and north shelf rows, car pictogram toward the track.
+        (model: "models/props/toy/sign.glb", pos: (-40, 16, 59)),
+        (model: "models/props/toy/sign.glb", pos: (35, 16, 59)),
+        (model: "models/props/toy/sign.glb", pos: (-5, 16, -54.5), yaw: 180),
+        (model: "models/props/toy/sign.glb", pos: (50, 16, -54.5), yaw: 180),
+    ],
+)

@@ -1,13 +1,18 @@
 // Toy Town — toy store / playroom (GDD §7.1, art bible §3.2). ~640 u, 3 laps, indoor ★.
-// Format and conventions: docs/design/rc_track.md. Plot it:
+// Format and conventions: docs/design/rc_track.md; environment notes: docs/design/env-toy.md.
 //   cargo run -p rc_track --example plot -- toy_town [--rev] [--mirror]
-// Orange ToyTrack ribbon (top at y = 0.3) on a teal Carpet play-mat (y = 0.05) on a beech Wood
-// floor (y = 0). Forward = clockwise from above. Lap: start straight (west) → banked T1 → the
-// dollhouse drive-through (chokepoint) → 1¼-turn helix climbing 6 u → elevated north straight
-// → Fwd jump down to the mat → banked NE turn → infield straight with the Rev jump (a hump in
-// forward) → big banked U-turn with the toy-box shortcut (Golden Battery on the box, plank ramp
-// forward only) → exit straight → final hairpin.
-// Turns have a point every 30°; heights change on straights.
+// A giant orange ToyTrack ribbon (top at y = 0.3) on a teal Carpet play-mat (y = 0.05) on the
+// beech Wood floor (y = 0) of a toy store. Forward = clockwise from above. Lap: start straight
+// (west, under the start gate) → raised banked T1 → the dollhouse drive-through (chokepoint) →
+// 1¼-turn helix around the play castle, climbing 6 u → elevated north straight → Fwd jump down
+// toward the ball pit → raised banked NE turn → infield straight with the Rev jump (a hump in
+// forward) past the rocking-horse and bear displays → raised banked U-turn with the shortcut
+// through two knockable block gates (Golden Battery on the play table, up the toy-track ramp,
+// forward only) → exit straight → raised final hairpin.
+// Banked turns are lifted (20° → y 1.8, 15° → y 1.35) so their inner lip stays above the mat;
+// heights change on the straights. Turns have a point every 30°. Pillars under every raised
+// stretch are generated (tools/blender/props/toy/supports.py); out-of-reach decor (bunting,
+// aisle signs) lives in assets/data/decor/toy_town.ron.
 (
     style: ToyTrack,
     start: 0,
@@ -17,21 +22,21 @@
     points: [
         // Start straight, heading west (−X).
         (pos: (14, 0.3, 50), width: 10, surface: ToyTrack, wall_left: true, wall_right: true, offroad_margin: 6), // 0: start / finish
-        (pos: (-12, 0.3, 50)), // 1
-        (pos: (-38, 0.3, 50)), // 2
-        // T1: radius 19, banked 20°.
-        (pos: (-47.5, 0.3, 47.454), bank_deg: 20), // 3
-        (pos: (-54.454, 0.3, 40.5), bank_deg: 20), // 4
-        (pos: (-57, 0.3, 31)), // 5
+        (pos: (-12, 0.4, 50)), // 1
+        (pos: (-38, 1.1, 50)), // 2: rising into the raised banked T1
+        // T1: radius 19, banked 20°, raised 1.8 so the inner lip stays above the mat.
+        (pos: (-47.5, 1.8, 47.454), bank_deg: 20), // 3
+        (pos: (-54.454, 1.8, 40.5), bank_deg: 20), // 4
+        (pos: (-57, 1.2, 31)), // 5
         // West straight, heading north: the dollhouse tunnel narrows the track to 7 u (its own
         // walls replace the barriers there).
-        (pos: (-57, 0.3, 21), width: 10), // 6
+        (pos: (-57, 0.45, 21), width: 10), // 6
         (pos: (-57, 0.3, 13), width: 7, wall_left: false, wall_right: false), // 7: dollhouse
         (pos: (-57, 0.3, 1), width: 7), // 8
         (pos: (-57, 0.3, -7), width: 10, wall_left: true, wall_right: true), // 9
         (pos: (-57, 0.3, -25)), // 10: helix entry
         // Helix: radius 17 around the helix tower at (-40, -25), 1¼ turns, +6 u, banked 12°.
-        (pos: (-54.722, 0.7, -33.5), bank_deg: 12), // 11
+        (pos: (-54.722, 0.7, -33.5), bank_deg: 6), // 11
         (pos: (-48.5, 1.1, -39.722), bank_deg: 12), // 12
         (pos: (-40, 1.5, -42), bank_deg: 12), // 13
         (pos: (-31.5, 1.9, -39.722), bank_deg: 12), // 14
@@ -52,19 +57,19 @@
         (pos: (-4, 6.3, -42)), // 27
         (pos: (2, 6.8, -42)), // 28: Fwd jump lip
         (pos: (14, 3.3, -42)), // 29: Fwd jump landing
-        (pos: (34, 0.3, -42)), // 30
-        (pos: (42, 0.3, -42)), // 31
-        // T3 (NE): radius 16, banked 20°.
-        (pos: (50, 0.3, -39.856), bank_deg: 20), // 32
-        (pos: (55.856, 0.3, -34), bank_deg: 20), // 33
-        (pos: (58, 0.3, -26)), // 34
-        (pos: (58, 0.3, -20)), // 35
-        // T5 into the infield: radius 14, banked 15°.
-        (pos: (56.124, 0.3, -13), bank_deg: 15), // 36
-        (pos: (51, 0.3, -7.876), bank_deg: 15), // 37
+        (pos: (34, 1.8, -42)), // 30: the landing runs out level with the raised T3
+        (pos: (42, 1.8, -42)), // 31
+        // T3 (NE): radius 16, banked 20°, raised 1.8.
+        (pos: (50, 1.8, -39.856), bank_deg: 20), // 32
+        (pos: (55.856, 1.8, -34), bank_deg: 20), // 33
+        (pos: (58, 1.8, -26)), // 34
+        (pos: (58, 1.5, -20)), // 35
+        // T5 into the infield: radius 14, banked 15°, raised 1.35.
+        (pos: (56.124, 1.35, -13), bank_deg: 15), // 36
+        (pos: (51, 1.35, -7.876), bank_deg: 15), // 37
         // Infield straight, heading west, with the reverse jump: in reverse the ramp (8°) climbs
         // east to the lip at x = 15 and flies 8 u to the landing at x = 23.
-        (pos: (44, 0.3, -6)), // 38
+        (pos: (44, 0.8, -6)), // 38
         (pos: (36, 0.3, -6)), // 39
         (pos: (23, 1.3, -6)), // 40: Rev jump landing
         (pos: (15, 2.3, -6)), // 41: Rev jump lip
@@ -73,25 +78,26 @@
         // Openings in the inner barrier at both ends lead into the shortcut; the wide off-road
         // margin keeps the whole interior legal.
         (pos: (-5, 0.3, -6), wall_left: false, offroad_margin: 16), // 43: shortcut entry opening
-        (pos: (-15, 0.3, -3.321), bank_deg: -15, wall_left: true), // 44
-        (pos: (-22.321, 0.3, 4), bank_deg: -15), // 45
-        (pos: (-25, 0.3, 14), bank_deg: -15), // 46
-        (pos: (-22.321, 0.3, 24), bank_deg: -15), // 47
-        (pos: (-15, 0.3, 31.321), bank_deg: -15), // 48
+        (pos: (-15, 1.35, -3.321), bank_deg: -15, wall_left: true), // 44
+        (pos: (-22.321, 1.35, 4), bank_deg: -15), // 45
+        (pos: (-25, 1.35, 14), bank_deg: -15), // 46
+        (pos: (-22.321, 1.35, 24), bank_deg: -15), // 47
+        (pos: (-15, 1.35, 31.321), bank_deg: -15), // 48
         (pos: (-5, 0.3, 34), wall_left: false), // 49: shortcut exit opening
         // Exit straight, heading east.
         (pos: (1, 0.3, 34), wall_left: true, offroad_margin: 6), // 50
         (pos: (18, 0.3, 34)), // 51
-        (pos: (35, 0.3, 34)), // 52
-        (pos: (52, 0.3, 34)), // 53
-        // Final hairpin: radius 8, banked 15°.
-        (pos: (56, 0.3, 35.072), bank_deg: 15), // 54
-        (pos: (58.928, 0.3, 38), bank_deg: 15), // 55
-        (pos: (60, 0.3, 42), bank_deg: 15), // 56
-        (pos: (58.928, 0.3, 46), bank_deg: 15), // 57
-        (pos: (56, 0.3, 48.928), bank_deg: 15), // 58
-        (pos: (52, 0.3, 50)), // 59
-        (pos: (33, 0.3, 50)), // 60
+        (pos: (35, 0.6, 34)), // 52
+        (pos: (52, 1.25, 34)), // 53
+        // Final hairpin: radius 8, banked 15°, raised 1.35.
+        (pos: (56, 1.35, 35.072), bank_deg: 15), // 54
+        (pos: (58.928, 1.35, 38), bank_deg: 15), // 55
+        (pos: (60, 1.35, 42), bank_deg: 15), // 56
+        (pos: (58.928, 1.35, 46), bank_deg: 15), // 57
+        (pos: (56, 1.35, 48.928), bank_deg: 15), // 58
+        (pos: (52, 1.25, 50)), // 59
+        (pos: (38, 0.4, 50)), // 60
+        (pos: (26, 0.3, 50)), // 61: the grid stays level
     ],
     gaps: [
         (from: 28, to: 29, dir: Fwd), // drop off the elevated straight
@@ -113,30 +119,284 @@
         // Through the U-turn's interior, around the toy box (both directions).
         (path: [(-5, 0.3, -6), (-12, 0.05, 2), (-14, 0.05, 14), (-12, 0.05, 26), (-5, 0.3, 34)], width: 6, dir: Both),
     ],
-    // On the toy box's lid: reach it up the plank ramp (forward only), drop off the far side.
-    golden_battery: (pos: (-5, 3.6, 14)),
+    // On the play table: reach it up the toy-track ramp (forward only), drop off the far side.
+    golden_battery: (pos: (-5, 3.55, 14)),
     props: [
-        (kind: "toy_dollhouse", pos: (-57, 0.05, 7)),
-        (kind: "toy_helix_tower", pos: (-40, 0.05, -25)),
-        (kind: "toy_cardboard_box", pos: (-5, 0.05, 14)),
-        (kind: "toy_plank_ramp", pos: (-5, 0.05, 5.5), yaw: 180, dir: Fwd),
-        // Block tower A (2 × 2 × 3) east of the box.
-        (kind: "toy_block_cube", pos: (5.3, 0.05, 6.3)), (kind: "toy_block_cube", pos: (6.7, 0.05, 6.3)),
-        (kind: "toy_block_cube", pos: (5.3, 0.05, 7.7)), (kind: "toy_block_cube", pos: (6.7, 0.05, 7.7)),
-        (kind: "toy_block_cube", pos: (5.3, 1.45, 6.3)), (kind: "toy_block_cube", pos: (6.7, 1.45, 6.3)),
-        (kind: "toy_block_cube", pos: (5.3, 1.45, 7.7)), (kind: "toy_block_cube", pos: (6.7, 1.45, 7.7)),
-        (kind: "toy_block_cube", pos: (5.3, 2.85, 6.3)), (kind: "toy_block_cube", pos: (6.7, 2.85, 6.3)),
-        (kind: "toy_block_cube", pos: (5.3, 2.85, 7.7)), (kind: "toy_block_cube", pos: (6.7, 2.85, 7.7)),
-        // Block tower B (2 × 2 × 3).
-        (kind: "toy_block_cube", pos: (5.3, 0.05, 20.3)), (kind: "toy_block_cube", pos: (6.7, 0.05, 20.3)),
-        (kind: "toy_block_cube", pos: (5.3, 0.05, 21.7)), (kind: "toy_block_cube", pos: (6.7, 0.05, 21.7)),
-        (kind: "toy_block_cube", pos: (5.3, 1.45, 20.3)), (kind: "toy_block_cube", pos: (6.7, 1.45, 20.3)),
-        (kind: "toy_block_cube", pos: (5.3, 1.45, 21.7)), (kind: "toy_block_cube", pos: (6.7, 1.45, 21.7)),
-        (kind: "toy_block_cube", pos: (5.3, 2.85, 20.3)), (kind: "toy_block_cube", pos: (6.7, 2.85, 20.3)),
-        (kind: "toy_block_cube", pos: (5.3, 2.85, 21.7)), (kind: "toy_block_cube", pos: (6.7, 2.85, 21.7)),
-        // A pyramid (3 + 2 + 1) between them.
-        (kind: "toy_block_cube", pos: (9, 0.05, 12.6)), (kind: "toy_block_cube", pos: (9, 0.05, 14)),
-        (kind: "toy_block_cube", pos: (9, 0.05, 15.4)), (kind: "toy_block_cube", pos: (9, 1.45, 13.3)),
-        (kind: "toy_block_cube", pos: (9, 1.45, 14.7)), (kind: "toy_block_cube", pos: (9, 2.85, 14)),
+        // --- hero pieces ------------------------------------------------------------------
+        (kind: "toy_dollhouse", pos: (-57, 0.05, 7)), // the drive-through
+        (kind: "toy_castle", pos: (-40, 0.05, -25), yaw: -135), // inside the helix, gate toward the room
+        (kind: "toy_play_table", pos: (-5, 0.05, 14)), // Golden Battery perch
+        (kind: "toy_track_ramp", pos: (-5, 0.05, 5.1), yaw: 180, dir: Fwd), // up onto the table
+        (kind: "toy_start_arch", pos: (14, 0.05, 50), yaw: 90), // across the start line
+        (kind: "toy_bear", pos: (-66, 0.05, 57), yaw: -65), // watching the start straight and T1
+        (kind: "toy_rocking_horse", pos: (-44, 0.05, 15), yaw: 90), // by the dollhouse porch
+        (kind: "toy_ball_pit", pos: (22, 0.05, -26), yaw: 30), // seen from the jump
+        // --- knockable jumbo blocks (29 dynamic bodies, stacked on the 1.4 u grid) -----------
+        // A block gate across the shortcut path (cubes), knocked flat by the first car through.
+        (kind: "toy_block_cube", pos: (-14.4, 0.05, 8)),
+        (kind: "toy_block_cube", pos: (-11.6, 0.05, 8), yaw: 90),
+        (kind: "toy_block_cube", pos: (-14.4, 1.45, 8)),
+        (kind: "toy_block_cube", pos: (-11.6, 1.45, 8), yaw: 90),
+        (kind: "toy_block_plank", pos: (-13, 2.85, 8)),
+        (kind: "toy_block_roof", pos: (-13, 3.55, 8)),
+        // A second gate further along the shortcut (pillars).
+        (kind: "toy_block_pillar", pos: (-14.4, 0.05, 20)),
+        (kind: "toy_block_pillar", pos: (-11.6, 0.05, 20)),
+        (kind: "toy_block_pillar", pos: (-14.4, 1.45, 20)),
+        (kind: "toy_block_pillar", pos: (-11.6, 1.45, 20)),
+        (kind: "toy_block_plank", pos: (-13, 2.85, 20)),
+        (kind: "toy_block_roof", pos: (-13, 3.55, 20)),
+        // A pyramid on the inside of the exit straight, where the shortcut rejoins.
+        (kind: "toy_block_cube", pos: (6, 0.3, 29.8)),
+        (kind: "toy_block_cube", pos: (7.4, 0.3, 29.8), yaw: 90),
+        (kind: "toy_block_cube", pos: (8.8, 0.3, 29.8), yaw: 180),
+        (kind: "toy_block_cube", pos: (6.7, 1.7, 29.8), yaw: 270),
+        (kind: "toy_block_cube", pos: (8.1, 1.7, 29.8)),
+        (kind: "toy_block_cube", pos: (7.4, 3.1, 29.8), yaw: 90),
+        // A stack on the elevated straight: clip it and the blocks tumble down to the mat.
+        (kind: "toy_block_cube", pos: (-12.7, 6.3, -38.4)),
+        (kind: "toy_block_cube", pos: (-11.3, 6.3, -38.4), yaw: 180),
+        (kind: "toy_block_cube", pos: (-12, 7.7, -38.4), yaw: 90),
+        // Towers on both sides of the dollhouse's open north exit.
+        (kind: "toy_block_cube", pos: (-50.3, 0.05, -4.2)),
+        (kind: "toy_block_cube", pos: (-50.3, 0.05, -2.8), yaw: 180),
+        (kind: "toy_block_cube", pos: (-50.3, 1.45, -4.2), yaw: 90),
+        (kind: "toy_block_cube", pos: (-50.3, 1.45, -2.8), yaw: 270),
+        (kind: "toy_block_cube", pos: (-63.7, 0.05, -4.2)),
+        (kind: "toy_block_cube", pos: (-63.7, 0.05, -2.8), yaw: 180),
+        (kind: "toy_block_cube", pos: (-63.7, 1.45, -4.2), yaw: 90),
+        (kind: "toy_block_cube", pos: (-63.7, 1.45, -2.8), yaw: 270),
+        // --- toys around the track (static) ------------------------------------------------
+        (kind: "toy_robot", pos: (17.5, 0.05, 58.6)), // the starter, flag over the line
+        (kind: "toy_train", pos: (30, 0.05, 14), yaw: -60),
+        (kind: "toy_stacking_rings", pos: (-32, 0.05, 38)),
+        (kind: "toy_duck", pos: (68, 0.05, 40), yaw: 90),
+        (kind: "toy_crayons", pos: (-20, 0.05, 42), yaw: 20),
+        (kind: "toy_crayons", pos: (8, 0.05, 41.8), yaw: 160),
+        (kind: "toy_foam_tiles", pos: (-45.5, 0.05, 6.5), yaw: 10), // porch patio
+        (kind: "toy_block_pile", pos: (-8, 0.05, -53), yaw: 20),
+        (kind: "toy_block_pile", pos: (37, 0.05, -30), yaw: -40),
+        (kind: "toy_block_pile", pos: (52, 0.05, 14), yaw: 70),
+        (kind: "toy_block_pile", pos: (-42, 0.05, 38), yaw: 15),
+        // Store displays on the open floor: a line of rocking horses and a pair of giant bears
+        // facing the infield straight, a play-table island under the jump's flight path,
+        // a kids' corner by the train, pallets of boxed toys.
+        (kind: "toy_rocking_horse", pos: (1.5, 0.05, -17.5), yaw: 180),
+        (kind: "toy_rocking_horse", pos: (6.5, 0.05, -17.5), yaw: 180),
+        (kind: "toy_rocking_horse", pos: (11.5, 0.05, -17.5), yaw: 180),
+        (kind: "toy_bear", pos: (-6, 0.05, -23.5), yaw: 170),
+        (kind: "toy_bear", pos: (-1.5, 0.05, -26), yaw: 200),
+        (kind: "toy_play_table", pos: (8, 0.05, -28), yaw: 90), // display island; cars fit under it
+        (kind: "toy_bear", pos: (24, 0.05, 7), yaw: -20),
+        (kind: "toy_foam_tiles", pos: (33, 0.05, 20), yaw: -15),
+        (kind: "toy_stacking_rings", pos: (27.5, 0.05, 19.5)),
+        (kind: "toy_duck", pos: (25.5, 0.05, 21.5), yaw: 30),
+        (kind: "toy_crayons", pos: (29.5, 0.05, 22.5), yaw: -50),
+        (kind: "toy_bear", pos: (55, 0.05, 61), yaw: 15),
+        (kind: "toy_rocking_horse", pos: (-48, 0.05, 61), yaw: 30),
+        (kind: "toy_train", pos: (-40, 0.05, 61.5), yaw: 90),
+        (kind: "toy_box", pos: (-30, 0.05, 61)),
+        (kind: "toy_box", pos: (-26.9, 0.05, 61)),
+        (kind: "toy_box", pos: (-28.45, 2.25, 61)),
+        (kind: "toy_box", pos: (28, 0.05, -56.5), yaw: 180),
+        (kind: "toy_box", pos: (31.1, 0.05, -56.5), yaw: 180),
+        (kind: "toy_box", pos: (29.55, 2.25, -56.5), yaw: 180),
+        (kind: "toy_box", pos: (60, 0.05, 6), yaw: 90),
+        (kind: "toy_box", pos: (60, 0.05, 9.1), yaw: 90),
+        (kind: "toy_box", pos: (60, 2.25, 7.55), yaw: 90),
+        (kind: "toy_box", pos: (32, 0.05, -17.5), yaw: 180),
+        (kind: "toy_box", pos: (35.1, 0.05, -17.5), yaw: 180),
+        (kind: "toy_box", pos: (33.55, 2.25, -17.5), yaw: 180),
+        (kind: "toy_box", pos: (43, 0.05, 22.5)),
+        (kind: "toy_box", pos: (46.1, 0.05, 22.5)),
+        (kind: "toy_box", pos: (44.55, 2.25, 22.5)),
+        (kind: "toy_box", pos: (38, 0.05, 61)),
+        (kind: "toy_box", pos: (41.1, 0.05, 61)),
+        (kind: "toy_box", pos: (39.55, 2.25, 61)),
+        // --- store fittings: gondola shelves along the walls, cubbies under the windows ------
+        // South wall (facing north).
+        (kind: "toy_shelf_b", pos: (-69, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-63.55, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-58.1, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (-52.65, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-47.2, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-41.75, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (-36.3, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-30.85, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-25.4, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (-19.95, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-14.5, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (-9.05, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (-3.6, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (1.85, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (7.3, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (12.75, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (18.2, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (23.65, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (29.1, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (34.55, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (40, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (45.45, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (50.9, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (56.35, 0.05, 66.7)),
+        (kind: "toy_shelf_b", pos: (61.8, 0.05, 66.7)),
+        (kind: "toy_shelf_a", pos: (67.25, 0.05, 66.7)),
+        // North wall (facing south).
+        (kind: "toy_shelf_a", pos: (-69, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-63.55, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-58.1, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-52.65, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-47.2, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-41.75, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-36.3, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-30.85, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-25.4, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-19.95, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-14.5, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-9.05, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-3.6, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (1.85, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (7.3, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (12.75, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (18.2, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (23.65, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (29.1, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (34.55, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (40, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (45.45, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (50.9, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (56.35, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (61.8, 0.05, -60.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (67.25, 0.05, -60.7), yaw: 180),
+        // West wall between the windows (facing east).
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, -59.3), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-74.7, 0.05, -53.85), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, -48.4), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, -42.95), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-74.7, 0.05, -7.3), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, -1.85), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, 3.6), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-74.7, 0.05, 9.05), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, 44.7), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, 50.15), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-74.7, 0.05, 55.6), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-74.7, 0.05, 61.05), yaw: -90),
+        // East wall between the windows (facing west).
+        (kind: "toy_shelf_b", pos: (76.7, 0.05, -59.3), yaw: 90),
+        (kind: "toy_shelf_a", pos: (76.7, 0.05, -53.85), yaw: 90),
+        (kind: "toy_shelf_a", pos: (76.7, 0.05, -15.2), yaw: 90),
+        (kind: "toy_shelf_b", pos: (76.7, 0.05, 21.2), yaw: 90),
+        (kind: "toy_shelf_a", pos: (76.7, 0.05, 55.3), yaw: 90),
+        (kind: "toy_shelf_a", pos: (76.7, 0.05, 60.75), yaw: 90),
+        // Cubbies under the shop windows.
+        (kind: "toy_cubby", pos: (-75, 0.05, -33.5), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, -28.6), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, -23.7), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, -18.8), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, -13.9), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, 18.5), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, 23.4), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, 28.3), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, 33.2), yaw: -90),
+        (kind: "toy_cubby", pos: (-75, 0.05, 38.1), yaw: -90),
+        (kind: "toy_cubby", pos: (77, 0.05, -44), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, -39.1), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, -34.2), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, -29.3), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, -24.4), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, -7.6), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, -2.7), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 2.2), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 7.1), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 12), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 28.8), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 33.7), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 38.6), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 43.5), yaw: 90),
+        (kind: "toy_cubby", pos: (77, 0.05, 48.4), yaw: 90),
+        // Pillars under every raised stretch of the ribbon (helix, elevated straight, landing,
+        // banked edges, the infield hump). Generated: python3 tools/blender/props/toy/supports.py
+        // supports:begin
+        (kind: "toy_track_support", pos: (-38.87, 0.84, 56.59), yaw: -7.5),
+        (kind: "toy_track_support", pos: (-37.13, 0.84, 43.41), yaw: 172.5),
+        (kind: "toy_track_support", pos: (-50.56, 3.33, 52.90), yaw: -29.3),
+        (kind: "toy_track_support", pos: (-59.90, 3.33, 43.56), yaw: -60.7),
+        (kind: "toy_track_support", pos: (-63.59, 0.94, 31.87), yaw: -82.5),
+        (kind: "toy_track_support", pos: (-50.41, 0.94, 30.13), yaw: 97.5),
+        (kind: "toy_track_support", pos: (-60.46, 0.98, -36.78), yaw: -119.7),
+        (kind: "toy_track_support", pos: (-51.81, 1.93, -45.32), yaw: -149.4),
+        (kind: "toy_track_support", pos: (-40.06, 2.33, -48.50), yaw: -179.4),
+        (kind: "toy_track_support", pos: (-28.30, 2.73, -45.39), yaw: 150.6),
+        (kind: "toy_track_support", pos: (-19.68, 3.13, -36.81), yaw: 120.6),
+        (kind: "toy_track_support", pos: (-30.88, 0.79, -30.19), yaw: -59.4),
+        (kind: "toy_track_support", pos: (-16.50, 3.53, -25.06), yaw: 90.6),
+        (kind: "toy_track_support", pos: (-29.50, 1.19, -24.94), yaw: -89.4),
+        (kind: "toy_track_support", pos: (-19.61, 3.93, -13.30), yaw: 60.6),
+        (kind: "toy_track_support", pos: (-30.94, 1.59, -19.70), yaw: -119.4),
+        (kind: "toy_track_support", pos: (-28.19, 4.33, -4.68), yaw: 30.6),
+        (kind: "toy_track_support", pos: (-34.81, 1.99, -15.88), yaw: -149.4),
+        (kind: "toy_track_support", pos: (-39.94, 4.73, -1.50), yaw: 0.6),
+        (kind: "toy_track_support", pos: (-40.06, 2.39, -14.50), yaw: -179.4),
+        (kind: "toy_track_support", pos: (-45.30, 2.79, -15.94), yaw: 150.6),
+        (kind: "toy_track_support", pos: (-49.12, 3.19, -19.81), yaw: 120.6),
+        (kind: "toy_track_support", pos: (-60.39, 6.33, -36.70), yaw: -119.4),
+        (kind: "toy_track_support", pos: (-49.06, 3.99, -30.30), yaw: 60.6),
+        (kind: "toy_track_support", pos: (-51.81, 6.73, -45.32), yaw: -149.4),
+        (kind: "toy_track_support", pos: (-45.19, 4.39, -34.12), yaw: 30.6),
+        (kind: "toy_track_support", pos: (-40.87, 6.04, -48.59), yaw: -172.5),
+        (kind: "toy_track_support", pos: (-39.13, 6.04, -35.41), yaw: 7.5),
+        (kind: "toy_track_support", pos: (-31.26, 6.08, -48.89), yaw: 178.5),
+        (kind: "toy_track_support", pos: (-22.00, 6.04, -48.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (-12.40, 5.97, -48.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (-12.40, 5.97, -35.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (-4.00, 6.04, -48.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (-4.00, 6.04, -35.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (14.00, 3.04, -48.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (14.00, 3.04, -35.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (24.56, 2.18, -48.65), yaw: 180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (24.56, 2.18, -35.35), yaw: -0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (34.00, 1.54, -48.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (34.00, 1.54, -35.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (42.87, 1.54, -48.59), yaw: 172.5),
+        (kind: "toy_track_support", pos: (41.13, 1.54, -35.41), yaw: -7.5),
+        (kind: "toy_track_support", pos: (53.13, 3.33, -45.27), yaw: 150.0),
+        (kind: "toy_track_support", pos: (61.27, 3.33, -37.12), yaw: 120.0),
+        (kind: "toy_track_support", pos: (64.59, 1.54, -26.87), yaw: 97.5),
+        (kind: "toy_track_support", pos: (51.41, 1.54, -25.13), yaw: -82.5),
+        (kind: "toy_track_support", pos: (64.59, 1.24, -19.13), yaw: 82.5),
+        (kind: "toy_track_support", pos: (51.41, 1.24, -20.87), yaw: -97.5),
+        (kind: "toy_track_support", pos: (61.68, 2.44, -9.77), yaw: 59.8),
+        (kind: "toy_track_support", pos: (54.15, 2.44, -2.28), yaw: 29.4),
+        (kind: "toy_track_support", pos: (23.00, 1.04, 0.65), yaw: -0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (23.00, 1.04, -12.65), yaw: 180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (15.00, 2.04, 0.65), yaw: 0.0),
+        (kind: "toy_track_support", pos: (15.00, 2.04, -12.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (7.88, 1.13, 0.65), yaw: 0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (7.88, 1.13, -12.65), yaw: -180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (-18.14, 2.44, -8.93), yaw: -150.7),
+        (kind: "toy_track_support", pos: (-27.88, 2.44, 0.79), yaw: -120.0),
+        (kind: "toy_track_support", pos: (-31.42, 2.44, 14.00), yaw: -90.0),
+        (kind: "toy_track_support", pos: (-27.88, 2.44, 27.21), yaw: -60.0),
+        (kind: "toy_track_support", pos: (-18.13, 2.44, 36.93), yaw: -29.2),
+        (kind: "toy_track_support", pos: (44.11, 0.68, 27.17), yaw: -178.9),
+        (kind: "toy_track_support", pos: (44.38, 0.68, 40.47), yaw: 1.1),
+        (kind: "toy_track_support", pos: (52.87, 0.99, 27.41), yaw: 172.5),
+        (kind: "toy_track_support", pos: (51.13, 0.99, 40.59), yaw: -7.5),
+        (kind: "toy_track_support", pos: (59.20, 2.44, 29.50), yaw: 150.2),
+        (kind: "toy_track_support", pos: (64.49, 2.44, 34.79), yaw: 120.0),
+        (kind: "toy_track_support", pos: (66.42, 2.44, 42.00), yaw: 90.0),
+        (kind: "toy_track_support", pos: (64.49, 2.44, 49.21), yaw: 60.0),
+        (kind: "toy_track_support", pos: (59.19, 2.44, 54.50), yaw: 29.8),
+        (kind: "toy_track_support", pos: (52.87, 0.99, 56.59), yaw: 7.5),
+        (kind: "toy_track_support", pos: (51.13, 0.99, 43.41), yaw: -172.5),
+        (kind: "toy_track_support", pos: (45.33, 0.57, 56.81), yaw: -1.2),
+        (kind: "toy_track_support", pos: (45.61, 0.57, 43.51), yaw: 178.8),
+        (kind: "toy_track_support", pos: (2.00, 6.54, -48.65), yaw: 180.0, dir: Rev),
+        (kind: "toy_track_support", pos: (2.00, 6.54, -35.35), yaw: -0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (24.23, 1.97, -48.65), yaw: 180.0, dir: Rev),
+        (kind: "toy_track_support", pos: (24.23, 1.97, -35.35), yaw: -0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (7.64, 0.89, 0.65), yaw: 0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (7.64, 0.89, -12.65), yaw: -180.0, dir: Rev),
+        // supports:end
     ],
 )
