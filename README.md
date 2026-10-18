@@ -120,6 +120,7 @@ cargo test -p rc_ai --test race -- --ignored every_layout   # AI races on every 
 - `docs/design/` — one design note per subsystem, the art bible, car dimensions
 - `docs/tech/` — verified API digests for Bevy 0.20, rapier, kira and bevy-react
 - `docs/tasks/` — task briefs, status board and backlog
+- `docs/upstream-notes.md` — issues found in bevy-react and Bevy, with our workarounds
 
 ## Credits & licences
 No licence has been chosen for the code and generated assets yet (the owner's decision). Font:

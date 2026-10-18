@@ -12,7 +12,7 @@ take B2, B4, B5, B8, B10–B13, B15–B17, B19, B23–B25, B27.
 | B4 | Unused deps: `serde`/`ron` in `rc_weather` and `rc_audio`, `bevy_rapier3d` in `rc_ai` (remove + `rc_pins` refresh) | manifests | T15, T09, T11 |
 | B5 | Lint for banked turns whose inner edge sinks below a floor (rule is documented in `rc_track.md` §A5) | rc_track | T16 toy |
 | B6 | Human listening pass for SFX and music (only measured so far) | audio | T09, T10 |
-| B7 | Upstream note: Bevy 0.20 atmosphere env-map probe panics every frame in our setup (worked around with a generated sky cubemap) | rc_render | T13a |
+| B7 | ~~DONE~~ (`docs/upstream-notes.md` U2) Upstream note: Bevy 0.20 atmosphere env-map probe panics every frame in our setup (worked around with a generated sky cubemap) | rc_render | T13a |
 | B8 | Credits screen content: list tools, generators, the Saira font licence | ui | T05 |
 | B9 | ~~DONE~~ Barrier styles for house, workshop and supermarket use the plain sweep — themed barrier blocks like toy/street | rc_render track_visuals | T13b |
 | B10 | Finished human keeps car control after crossing the line — hand to the AI (one `AiDriver` insert) | rc_race | T06 |
