@@ -20,7 +20,7 @@ digests: bevy §0 (WESL), §7, §9 (render layers), §16 (many small objects —
    beam, shock orb, EMP ring, goo bomb (pulsing, beeps visual), oil slick, spring pad, shield
    bubble, storm strike lightning bolt; Golden Battery sparkle.
 4. **Weather FX** per `GameCamera` on its own `RenderLayers`: rain streaks / snow around the camera
-   (density from `WeatherState` × quality), splashes on wet ground, lightning bolt in the sky.
+   (choose snow vs rain from `WeatherState.snowing`, not `kind`; density from `precipitation` × quality), splashes on wet ground, lightning bolt in the sky.
 5. **Per-camera 3D overlays**: opponent name tags (slot colours / rival colours) and rocket lock-on
    markers, billboarded per camera.
 6. Reduce-flashing variants for lightning, Storm Strike, EMP, explosions, boost flashes.

@@ -6,7 +6,7 @@
 | R2 | bevy-react usage digest | — | done (`docs/tech/bevy-react-notes.md`) |
 | GDD | GDD + architecture + practices, reviews 1–2 | R1, R2 | **approved** (v2.1) |
 | T01 | foundation / walking skeleton | GDD | done (53 tests; `rc_pins` build-hygiene crate added) |
-| T08 | art bible + 8 car models | GDD | in progress |
+| T08 | art bible + 8 car models | GDD | done (phantom wing follow-up running) |
 | T09a | SFX synthesis (phase 1 of T09) | GDD | done (73 files, `docs/design/sfx.md`) |
 | T10 | music | GDD | done (12 cues, `docs/design/music.md`) |
 | T02 | track system + test_oval + toy_town layout | T01 | in progress |
@@ -20,7 +20,7 @@
 | T12 | items | T02, T03 | todo |
 | T13 | graphics (render) | T02, T08 | todo |
 | T14 | VFX | T03 | todo |
-| T15 | weather | T01 | in progress |
+| T15 | weather | T01 | done (12 tests) |
 | T05b | race HUD | T05, T06 | todo |
 | T16+ | environments & track layouts (2 waves) | T02, T13, art bible | todo |
 | QA | playtests, soak, bench, DoD checks | all | todo |

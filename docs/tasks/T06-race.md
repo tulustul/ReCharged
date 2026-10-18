@@ -18,7 +18,8 @@
 2. Phases Intro (≈3 s; Confirm via `UiNav` skips; skipped on restart attempts) → Countdown
    (`RaceEvent::CountdownTick`/`Go`; perfect start / stall from throttle timing → `ApplyEffect`) →
    Racing → Finished.
-3. Progress (`SimSet::Race`): projection with continuity hints, ordered checkpoint validation,
+3. Progress (`SimSet::Race`): `total_distance` ≤ 0 for cars still behind the start line (rc_weather's
+   Dynamic trigger relies on it); projection with continuity hints, ordered checkpoint validation,
    lap timing in ticks, `LapCompleted`/`FinalLap`/`Finished`, standings (finished by time, then
    `total_distance`), wrong way (> 5 u/s against the track for 2 s), soft-lock guard (GDD §3.2) with
    `RaceEndsIn`, projected times; `RaceStatus`, `Standings`; `RaceResults` (+ ghost, geometry
