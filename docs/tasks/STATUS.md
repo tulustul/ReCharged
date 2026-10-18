@@ -16,10 +16,10 @@
 | T07 | game flow, progression, persistence | T01 | done (54 tests) |
 | T09b | rc_audio system (phase 2 of T09) | T01, T09a | done (in-race listen pending integration) |
 | T06 | race rules | T02, T03 | in progress |
-| T11 | AI drivers | T02, T03 | todo |
+| T11 | AI drivers | T02, T03 | in progress |
 | T12 | items | T02, T03 | in progress |
 | T13 | graphics (render) | T02, T08 | T13a + T13b in progress |
-| T14 | VFX | T03 | todo |
+| T14 | VFX | T03 | in progress |
 | T15 | weather | T01 | done (12 tests) |
 | T05b | race HUD | T05, T06 | todo |
 | T16 | environments & tracks (2 waves) | T02, art bible | wave 1 in progress (toy, house, street) |
