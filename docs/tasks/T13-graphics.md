@@ -37,6 +37,9 @@ materials/**, showroom/**}`, `assets/data/environments/*.ron`, `assets/textures/
    `MenuCamera` orbits that point). Camera decoration: add HDR/bloom/AA/etc. to `GameCamera` /
    `MenuCamera` via `On<Add<…>>` + settings changes (rc_camera adds no post-processing; the split
    overlay camera must stay untouched).
+   Insert the `rc_core::ShowroomReady` resource while the showroom actually renders the
+   `MenuBackdrop` car (loaded & visible) and remove it otherwise — the UI uses it to decide whether
+   to leave the screen centre to the 3D car.
 7. Registers & completes the `"visuals"` loading key for its preloads.
 
 ## T13b — content visuals

@@ -67,3 +67,4 @@ Lifecycle and pause behaviour: `crates/rc_testkit/tests/`, `crates/rc_game/tests
 | `CycleCamera { slot }` message | `input` | T04 | camera-mode cycle / spectate target change |
 | `SHOWROOM_FOCUS` const | `camera` | T04 | where rc_render builds the menu turntable (car faces −Z) |
 | `LoadingFailed { key, error }` message | `flow` | T01 | loader error → Unloading → Menu + error dialog |
+| `ShowroomReady` resource | `ui` | T05 | rc_render inserts it while the menu showroom renders the car; React leaves the centre to the 3D car |
