@@ -209,7 +209,9 @@ where a ground polygon lies under the centreline. Barriers (`wall_*`) stand at t
 ```
 - Primitives (prop space, u): `Box(half, offset, rot)`, `Ball(radius, offset)`,
   `Cylinder(radius, half_height, offset, rot)` (upright), `Wedge(half, offset, rot)` (a ramp rising
-  towards −Z, the front). `rot` is degrees (yaw, pitch, roll). One compound collider per prop.
+  towards −Z, the front). `rot: (x, y, z)` is degrees **about each axis — (pitch about X, yaw about Y, roll about Z)**, applied
+yaw → pitch → roll (`EulerRot::YXZ`). So a half turn is `rot: (0, 180, 0)`, not `(180, 0, 0)` (that
+flips the shape upside down). One compound collider per prop.
 - Static props are obstacles or (with `surface`) drivable; dynamic props are rigid bodies that
   start asleep, settle with light damping and are restored on every restart.
 - Mass is in vehicle units (cars weigh ≈ 1.5–4): blocks 0.35, crates 0.6.

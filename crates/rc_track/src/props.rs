@@ -69,7 +69,8 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    /// Centre and rotation in prop space.
+    /// Centre and rotation in prop space. `rot` is degrees about each axis (x = pitch, y = yaw,
+    /// z = roll), applied yaw → pitch → roll.
     pub fn pose(&self) -> (Vec3, Quat) {
         let (offset, rot) = match *self {
             Self::Box { offset, rot, .. }
