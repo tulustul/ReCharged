@@ -18,14 +18,15 @@
 | T06 | race rules | T02, T03 | done (27 tests) |
 | T11 | AI drivers | T02, T03 | done (52 tests; every layout passes) |
 | T12 | items | T02, T03 | done (40 tests) |
-| T13 | graphics (render) | T02, T08 | T13b done; T13a in progress |
+| T13 | graphics (render) | T02, T08 | done (T13a + T13b) |
 | T14 | VFX | T03 | done (37 tests) |
 | T15 | weather | T01 | done (12 tests) |
 | T05b | race HUD | T05, T06 | done |
 | T16 | environments & tracks (2 waves) | T02, art bible | all six done (toy, house, workshop, street, supermarket, garden) |
 | T17 | automation tools (input script, headless race, determinism, medals, bench) | T06, T11 | done |
-| T18 | QA playtests & bug triage | all | todo |
-| QA | playtests, soak, bench, DoD checks | all | todo |
+| T18 | QA playtests, soak, bench, DoD checks, bug triage | all | in progress |
+| T19a | backlog fixes — gameplay (race, items, AI, camera, lint, street data) | T18 parallel | in progress |
+| T19b | backlog fixes — presentation, UI, infrastructure | T18 parallel | in progress |
 
 Milestones: M1 walking skeleton (T01–T05 basics) → M2 vertical slice on Toy Town (+2P smoke test)
 → M3 systems complete → M4 content complete → M5 polish & QA.
