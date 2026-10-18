@@ -22,9 +22,12 @@ at `y = wheel radius`, `x = ±track/2`.
 | volt_gt | hypercar | 2.10 | 1.15 | 0.46 | 1.32 | 1.00 / 1.02 | 0.22 / 0.23 | 0.19 / 0.24 | 0.07 |
 | bolt | open-wheel formula | 2.20 | 1.15 | 0.42 | 1.40 | 1.04 / 1.06 | 0.22 / 0.24 | 0.18 / 0.26 | 0.06 |
 
-- Length/width/height are the body's bounding box (wheels included in width; antenna excluded).
+- Length / Width / Height are the **body's** bounding box **excluding wheels and antenna** (the
+  physics chassis collider lives inside it). Overall width = max(track) + wheel width; wheels of
+  open-wheel cars (bolt, volt_gt rear) may rise above the body height.
 - Ground clearance = lowest chassis point above the ground at rest.
-- The physics may use a simplified collider (box/convex hull) inside this envelope.
+- The physics may use a simplified collider (box/convex hull) inside the body envelope; wheels are
+  ray/shape casts, not colliders.
 
 `<car>.wheels.ron` written by the model generator:
 ```ron
