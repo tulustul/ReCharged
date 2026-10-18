@@ -1,0 +1,68 @@
+// Test Oval — hidden dev track (~300 u). Everyone tests on it: keep it simple and robust.
+// Format and conventions: docs/design/rc_track.md. Plot it:
+//   cargo run -p rc_track --example plot -- test_oval [--rev] [--mirror]
+// Clockwise from above (right-hand turns). Asphalt slab (top at y = 0.3) on a grass field.
+// Features: banked turn 1, a Fwd-only wooden jump on the back straight, a grass shortcut across
+// the inside of turn 2 (with the Golden Battery), 4 item rows, knockable crates.
+// Turns: radius 22, a point every 30°, straights get a point one arc step (11.5 u) from each turn.
+(
+    style: Asphalt,
+    start: 1,
+    kill_height: -10,
+    points: [
+        // Main straight, heading −Z. Outside wall on the left, open infield on the right.
+        (pos: (0, 0.3, 28.5), width: 12, surface: Asphalt, wall_left: true, wall_right: false, offroad_margin: 6),
+        (pos: (0, 0.3, 10)), // start / finish
+        (pos: (0, 0.3, -10)),
+        (pos: (0, 0.3, -28.5)),
+        // Turn 1 around (22, -40), banked 15° toward the inside.
+        (pos: (0, 0.3, -40)),
+        (pos: (2.947, 0.3, -51), bank_deg: 15),
+        (pos: (11, 0.3, -59.053), bank_deg: 15),
+        (pos: (22, 0.3, -62), bank_deg: 15),
+        (pos: (33, 0.3, -59.053), bank_deg: 15),
+        (pos: (41.053, 0.3, -51), bank_deg: 15),
+        (pos: (44, 0.3, -40)),
+        // Back straight, heading +Z: wooden ramp (8°), 8 u gap (forward only), landing slope.
+        (pos: (44, 0.3, -28.5), surface: Wood),
+        (pos: (44, 2.6, -12)), // lip
+        (pos: (44, 1.6, -4)), // landing
+        (pos: (44, 0.3, 8), surface: Asphalt),
+        (pos: (44, 0.3, 28.5)),
+        // Turn 2 around (22, 40); wider off-road margin for the grass shortcut.
+        (pos: (44, 0.3, 40), offroad_margin: 8),
+        (pos: (41.053, 0.3, 51)),
+        (pos: (33, 0.3, 59.053)),
+        (pos: (22, 0.3, 62)),
+        (pos: (11, 0.3, 59.053)),
+        (pos: (2.947, 0.3, 51)),
+        (pos: (0, 0.3, 40), offroad_margin: 6),
+    ],
+    gaps: [(from: 12, to: 13, dir: Fwd)],
+    ground: [
+        // The grass field everything stands on.
+        (surface: Grass, height: 0, points: [(-25, -85), (70, -85), (70, 85), (-25, 85)]),
+    ],
+    item_rows: [
+        (pos: (0, 0.3, -20)),
+        (pos: (22, 0.3, -62)),
+        (pos: (44, 0.3, 18)),
+        (pos: (22, 0.3, 62), count: 4),
+    ],
+    shortcuts: [
+        // A straight cut across the grass inside turn 2: shorter, but grass is slow.
+        (path: [(41.053, 0.3, 51), (22, 0, 51), (2.947, 0.3, 51)], width: 6, dir: Both),
+    ],
+    golden_battery: (pos: (22, 1.0, 51)),
+    props: [
+        // Knockable crate pyramid just inside the turn-1 apex.
+        (kind: "crate_small", pos: (20.2, 0, -51)),
+        (kind: "crate_small", pos: (22, 0, -51)),
+        (kind: "crate_small", pos: (23.8, 0, -51)),
+        (kind: "crate_small", pos: (21.1, 1.6, -51)),
+        (kind: "crate_small", pos: (22.9, 1.6, -51)),
+        (kind: "tyre_stack", pos: (12, 0, -20)),
+        // A kicker ramp in the infield for vehicle tests (not on the racing line).
+        (kind: "ramp_wedge", pos: (22, 0, 5), yaw: 0),
+    ],
+)

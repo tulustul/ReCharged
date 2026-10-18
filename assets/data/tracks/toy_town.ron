@@ -1,0 +1,142 @@
+// Toy Town — toy store / playroom (GDD §7.1, art bible §3.2). ~640 u, 3 laps, indoor ★.
+// Format and conventions: docs/design/rc_track.md. Plot it:
+//   cargo run -p rc_track --example plot -- toy_town [--rev] [--mirror]
+// Orange ToyTrack ribbon (top at y = 0.3) on a teal Carpet play-mat (y = 0.05) on a beech Wood
+// floor (y = 0). Forward = clockwise from above. Lap: start straight (west) → banked T1 → the
+// dollhouse drive-through (chokepoint) → 1¼-turn helix climbing 6 u → elevated north straight
+// → Fwd jump down to the mat → banked NE turn → infield straight with the Rev jump (a hump in
+// forward) → big banked U-turn with the toy-box shortcut (Golden Battery on the box, plank ramp
+// forward only) → exit straight → final hairpin.
+// Turns have a point every 30°; heights change on straights.
+(
+    style: ToyTrack,
+    start: 0,
+    kill_height: -5,
+    wall_height: 1.2,
+    bounds: (min: (-76, -62), max: (78, 68)),
+    points: [
+        // Start straight, heading west (−X).
+        (pos: (14, 0.3, 50), width: 10, surface: ToyTrack, wall_left: true, wall_right: true, offroad_margin: 6), // 0: start / finish
+        (pos: (-12, 0.3, 50)), // 1
+        (pos: (-38, 0.3, 50)), // 2
+        // T1: radius 19, banked 20°.
+        (pos: (-47.5, 0.3, 47.454), bank_deg: 20), // 3
+        (pos: (-54.454, 0.3, 40.5), bank_deg: 20), // 4
+        (pos: (-57, 0.3, 31)), // 5
+        // West straight, heading north: the dollhouse tunnel narrows the track to 7 u (its own
+        // walls replace the barriers there).
+        (pos: (-57, 0.3, 21), width: 10), // 6
+        (pos: (-57, 0.3, 13), width: 7, wall_left: false, wall_right: false), // 7: dollhouse
+        (pos: (-57, 0.3, 1), width: 7), // 8
+        (pos: (-57, 0.3, -7), width: 10, wall_left: true, wall_right: true), // 9
+        (pos: (-57, 0.3, -25)), // 10: helix entry
+        // Helix: radius 17 around the helix tower at (-40, -25), 1¼ turns, +6 u, banked 12°.
+        (pos: (-54.722, 0.7, -33.5), bank_deg: 12), // 11
+        (pos: (-48.5, 1.1, -39.722), bank_deg: 12), // 12
+        (pos: (-40, 1.5, -42), bank_deg: 12), // 13
+        (pos: (-31.5, 1.9, -39.722), bank_deg: 12), // 14
+        (pos: (-25.278, 2.3, -33.5), bank_deg: 12), // 15
+        (pos: (-23, 2.7, -25), bank_deg: 12), // 16
+        (pos: (-25.278, 3.1, -16.5), bank_deg: 12), // 17
+        (pos: (-31.5, 3.5, -10.278), bank_deg: 12), // 18
+        (pos: (-40, 3.9, -8), bank_deg: 12), // 19
+        (pos: (-48.5, 4.3, -10.278), bank_deg: 12), // 20
+        (pos: (-54.722, 4.7, -16.5), bank_deg: 12), // 21
+        (pos: (-57, 5.1, -25), bank_deg: 12), // 22
+        (pos: (-54.722, 5.5, -33.5), bank_deg: 12), // 23
+        (pos: (-48.5, 5.9, -39.722), bank_deg: 12), // 24
+        // Elevated north straight, heading east, then the forward jump: a 5° kicker, a 12 u
+        // gap and a 9° landing slope down to the mat (in reverse: a 16° climb, no gap).
+        (pos: (-40, 6.3, -42)), // 25: helix exit
+        (pos: (-22, 6.3, -42)), // 26
+        (pos: (-4, 6.3, -42)), // 27
+        (pos: (2, 6.8, -42)), // 28: Fwd jump lip
+        (pos: (14, 3.3, -42)), // 29: Fwd jump landing
+        (pos: (34, 0.3, -42)), // 30
+        (pos: (42, 0.3, -42)), // 31
+        // T3 (NE): radius 16, banked 20°.
+        (pos: (50, 0.3, -39.856), bank_deg: 20), // 32
+        (pos: (55.856, 0.3, -34), bank_deg: 20), // 33
+        (pos: (58, 0.3, -26)), // 34
+        (pos: (58, 0.3, -20)), // 35
+        // T5 into the infield: radius 14, banked 15°.
+        (pos: (56.124, 0.3, -13), bank_deg: 15), // 36
+        (pos: (51, 0.3, -7.876), bank_deg: 15), // 37
+        // Infield straight, heading west, with the reverse jump: in reverse the ramp (8°) climbs
+        // east to the lip at x = 15 and flies 8 u to the landing at x = 23.
+        (pos: (44, 0.3, -6)), // 38
+        (pos: (36, 0.3, -6)), // 39
+        (pos: (23, 1.3, -6)), // 40: Rev jump landing
+        (pos: (15, 2.3, -6)), // 41: Rev jump lip
+        (pos: (1, 0.3, -6)), // 42
+        // U-turn: radius 20 around the toy box at (-5, 14), banked 15° (left turn: negative).
+        // Openings in the inner barrier at both ends lead into the shortcut; the wide off-road
+        // margin keeps the whole interior legal.
+        (pos: (-5, 0.3, -6), wall_left: false, offroad_margin: 16), // 43: shortcut entry opening
+        (pos: (-15, 0.3, -3.321), bank_deg: -15, wall_left: true), // 44
+        (pos: (-22.321, 0.3, 4), bank_deg: -15), // 45
+        (pos: (-25, 0.3, 14), bank_deg: -15), // 46
+        (pos: (-22.321, 0.3, 24), bank_deg: -15), // 47
+        (pos: (-15, 0.3, 31.321), bank_deg: -15), // 48
+        (pos: (-5, 0.3, 34), wall_left: false), // 49: shortcut exit opening
+        // Exit straight, heading east.
+        (pos: (1, 0.3, 34), wall_left: true, offroad_margin: 6), // 50
+        (pos: (18, 0.3, 34)), // 51
+        (pos: (35, 0.3, 34)), // 52
+        (pos: (52, 0.3, 34)), // 53
+        // Final hairpin: radius 8, banked 15°.
+        (pos: (56, 0.3, 35.072), bank_deg: 15), // 54
+        (pos: (58.928, 0.3, 38), bank_deg: 15), // 55
+        (pos: (60, 0.3, 42), bank_deg: 15), // 56
+        (pos: (58.928, 0.3, 46), bank_deg: 15), // 57
+        (pos: (56, 0.3, 48.928), bank_deg: 15), // 58
+        (pos: (52, 0.3, 50)), // 59
+        (pos: (33, 0.3, 50)), // 60
+    ],
+    gaps: [
+        (from: 28, to: 29, dir: Fwd), // drop off the elevated straight
+        (from: 40, to: 41, dir: Rev), // infield hop, taken eastwards in reverse
+    ],
+    ground: [
+        // Beech floor of the playroom and the teal play-mat on it.
+        (surface: Wood, height: 0, points: [(-76, -62), (78, -62), (78, 68), (-76, 68)]),
+        (surface: Carpet, height: 0.05, points: [(-68, -54), (70, -54), (70, 60), (-68, 60)]),
+    ],
+    item_rows: [
+        (pos: (-20, 0.3, 50)), // start straight
+        (pos: (-57, 0.3, -15)), // between the dollhouse and the helix
+        (pos: (-22, 6.3, -42)), // elevated straight
+        (pos: (40, 0.3, -6)), // infield straight
+        (pos: (26, 0.3, 34)), // exit straight
+    ],
+    shortcuts: [
+        // Through the U-turn's interior, around the toy box (both directions).
+        (path: [(-5, 0.3, -6), (-12, 0.05, 2), (-14, 0.05, 14), (-12, 0.05, 26), (-5, 0.3, 34)], width: 6, dir: Both),
+    ],
+    // On the toy box's lid: reach it up the plank ramp (forward only), drop off the far side.
+    golden_battery: (pos: (-5, 3.6, 14)),
+    props: [
+        (kind: "toy_dollhouse", pos: (-57, 0.05, 7)),
+        (kind: "toy_helix_tower", pos: (-40, 0.05, -25)),
+        (kind: "toy_cardboard_box", pos: (-5, 0.05, 14)),
+        (kind: "toy_plank_ramp", pos: (-5, 0.05, 5.5), yaw: 180, dir: Fwd),
+        // Block tower A (2 × 2 × 3) east of the box.
+        (kind: "toy_block_cube", pos: (5.3, 0.05, 6.3)), (kind: "toy_block_cube", pos: (6.7, 0.05, 6.3)),
+        (kind: "toy_block_cube", pos: (5.3, 0.05, 7.7)), (kind: "toy_block_cube", pos: (6.7, 0.05, 7.7)),
+        (kind: "toy_block_cube", pos: (5.3, 1.45, 6.3)), (kind: "toy_block_cube", pos: (6.7, 1.45, 6.3)),
+        (kind: "toy_block_cube", pos: (5.3, 1.45, 7.7)), (kind: "toy_block_cube", pos: (6.7, 1.45, 7.7)),
+        (kind: "toy_block_cube", pos: (5.3, 2.85, 6.3)), (kind: "toy_block_cube", pos: (6.7, 2.85, 6.3)),
+        (kind: "toy_block_cube", pos: (5.3, 2.85, 7.7)), (kind: "toy_block_cube", pos: (6.7, 2.85, 7.7)),
+        // Block tower B (2 × 2 × 3).
+        (kind: "toy_block_cube", pos: (5.3, 0.05, 20.3)), (kind: "toy_block_cube", pos: (6.7, 0.05, 20.3)),
+        (kind: "toy_block_cube", pos: (5.3, 0.05, 21.7)), (kind: "toy_block_cube", pos: (6.7, 0.05, 21.7)),
+        (kind: "toy_block_cube", pos: (5.3, 1.45, 20.3)), (kind: "toy_block_cube", pos: (6.7, 1.45, 20.3)),
+        (kind: "toy_block_cube", pos: (5.3, 1.45, 21.7)), (kind: "toy_block_cube", pos: (6.7, 1.45, 21.7)),
+        (kind: "toy_block_cube", pos: (5.3, 2.85, 20.3)), (kind: "toy_block_cube", pos: (6.7, 2.85, 20.3)),
+        (kind: "toy_block_cube", pos: (5.3, 2.85, 21.7)), (kind: "toy_block_cube", pos: (6.7, 2.85, 21.7)),
+        // A pyramid (3 + 2 + 1) between them.
+        (kind: "toy_block_cube", pos: (9, 0.05, 12.6)), (kind: "toy_block_cube", pos: (9, 0.05, 14)),
+        (kind: "toy_block_cube", pos: (9, 0.05, 15.4)), (kind: "toy_block_cube", pos: (9, 1.45, 13.3)),
+        (kind: "toy_block_cube", pos: (9, 1.45, 14.7)), (kind: "toy_block_cube", pos: (9, 2.85, 14)),
+    ],
+)
