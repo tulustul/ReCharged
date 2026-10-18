@@ -10,7 +10,7 @@
 | T09a | SFX synthesis (phase 1 of T09) | GDD | done (73 files, `docs/design/sfx.md`) |
 | T10 | music | GDD | done (12 cues, `docs/design/music.md`) |
 | T02 | track system + test_oval + toy_town layout | T01 | done (39 tests) |
-| T03 | vehicle physics | T01 | in progress |
+| T03 | vehicle physics | T01 | done (58 tests, stars ±1 %) |
 | T04 | input + cameras (split-screen rig first) | T01 | done (rig B overlay; 67 tests) |
 | T05 | UI framework + menus | T01 | in progress |
 | T07 | game flow, progression, persistence | T01 | done (54 tests) |

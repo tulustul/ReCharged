@@ -27,6 +27,9 @@ in `crates/rc_core/src/ai.rs` (create it) only.
 7. **Steering assist** (`SimSet::Assist`): blend only `steer` toward the racing line for human
    racers with assist on; turn back toward the track after a crash/respawn.
 8. `ai.ron` (difficulty profiles, personalities) with dev hot reload.
+9. Use `rc_core::BOOST_MIN_CHARGE`, `top_speed_for_stars`/`zero_to_top_secs_for_stars` and
+   `VehicleTelemetry::charge_rate` (vehicle notes in `docs/design/rc_vehicle.md`: the drift servo,
+   air-control attitude targets, countdown hold).
 
 ## Tests
 Unit: pure-pursuit geometry, speed control, lane choice, item decision tables, reaction timers.

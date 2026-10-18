@@ -12,7 +12,8 @@ digests: bevy §0 (WESL), §7, §9 (render layers), §16 (many small objects —
 ## Deliverables
 1. **Particle system**: pooled, CPU-simulated, shared meshes/materials (batched), bounded by the
    particle-quality setting; runs only while `PauseState::Running`.
-2. **Driving FX** from telemetry & messages: drift sparks (colour **and** size by charge-gain rate),
+2. **Driving FX** from telemetry & messages: drift sparks (colour **and** size by
+   `VehicleTelemetry::charge_rate`),
    wheel debris by surface (dust, grass, mud, water splashes), boost flame + electric arcs, landing
    dust, impact sparks, skid marks (ribbon meshes on the ground, fading, capped), respawn
    materialise, finish confetti.
