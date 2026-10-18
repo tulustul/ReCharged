@@ -16,7 +16,7 @@
 | T07 | game flow, progression, persistence | T01 | done (54 tests) |
 | T09b | rc_audio system (phase 2 of T09) | T01, T09a | done (in-race listen pending integration) |
 | T06 | race rules | T02, T03 | done (27 tests) |
-| T11 | AI drivers | T02, T03 | in progress |
+| T11 | AI drivers | T02, T03 | done (52 tests; every layout passes) |
 | T12 | items | T02, T03 | done (40 tests) |
 | T13 | graphics (render) | T02, T08 | T13b done; T13a in progress |
 | T14 | VFX | T03 | done (37 tests) |
