@@ -63,16 +63,21 @@ pub(super) fn spawn(
             }
         };
     let Some(room) = &env.def.room else {
-        let reach = Vec3::new(OUTDOOR_REACH_U, 0.0, OUTDOOR_REACH_U);
+        // A ring at road level reaching to the horizon, plus an inner floor under the play area
+        // low enough that sunken ground (a storm-drain dish) shows through its opening.
+        for (lo, hi) in outdoor_ring(min, max, OUTDOOR_REACH_U) {
+            add(slab(lo, hi, 0.0), "outdoor ground", role("floor"), false);
+        }
+        let inner = inner_floor_top(track.ground().iter().map(|g| g.height));
         add(
-            slab(min - reach, max + reach),
-            "outdoor ground",
+            slab(min, max, inner),
+            "outdoor inner floor",
             role("floor"),
             false,
         );
         return;
     };
-    add(slab(min, max), "room floor", role("floor"), false);
+    add(slab(min, max, 0.0), "room floor", role("floor"), false);
     let [walls, trim] = room_meshes(min, max, room);
     add(walls, "room walls", role("wall"), true);
     add(trim, "room trim", role("trim"), true);
@@ -89,14 +94,30 @@ pub(super) fn spawn(
     add(ceiling, "room ceiling", role("ceiling"), false);
 }
 
-/// A thin floor slab over the x/z box with its top just below y = 0.
-fn slab(min: Vec3, max: Vec3) -> MeshData {
+/// A thin floor slab over the x/z box with its top just below `top`.
+fn slab(min: Vec3, max: Vec3, top: f32) -> MeshData {
     let centre = Vec3::new(
         (min.x + max.x) * 0.5,
-        -FLOOR_DROP_U - 0.05,
+        top - FLOOR_DROP_U - 0.05,
         (min.z + max.z) * 0.5,
     );
     chamfer_box(centre, ((max - min) * 0.5).with_y(0.05), 0.0)
+}
+
+/// Height of the outdoor inner floor: the lowest ground polygon, never above y = 0.
+fn inner_floor_top(heights: impl Iterator<Item = f32>) -> f32 {
+    heights.fold(0.0, f32::min)
+}
+
+/// Four x/z boxes framing `[min, max]` out to `reach` on every side (north, south, west, east).
+fn outdoor_ring(min: Vec3, max: Vec3, reach: f32) -> [(Vec3, Vec3); 4] {
+    let (x0, x1, z0, z1) = (min.x - reach, max.x + reach, min.z - reach, max.z + reach);
+    [
+        (Vec3::new(x0, 0.0, z0), Vec3::new(x1, 0.0, min.z)),
+        (Vec3::new(x0, 0.0, max.z), Vec3::new(x1, 0.0, z1)),
+        (Vec3::new(x0, 0.0, min.z), Vec3::new(min.x, 0.0, max.z)),
+        (Vec3::new(max.x, 0.0, min.z), Vec3::new(x1, 0.0, max.z)),
+    ]
 }
 
 /// One wall of the shell: where it starts, the direction along it, its length and the normal
@@ -286,6 +307,33 @@ fn room_meshes(min: Vec3, max: Vec3, room: &RoomDef) -> [MeshData; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn outdoor_ring_frames_the_bounds_without_covering_them() {
+        let (min, max) = (Vec3::new(-10.0, 0.0, -5.0), Vec3::new(20.0, 0.0, 15.0));
+        let ring = outdoor_ring(min, max, 100.0);
+        let area: f32 = ring
+            .iter()
+            .map(|(lo, hi)| (hi.x - lo.x) * (hi.z - lo.z))
+            .sum();
+        let outer = (30.0 + 200.0) * (20.0 + 200.0);
+        assert!(
+            (area - (outer - 30.0 * 20.0)).abs() < 1e-3,
+            "ring area {area}"
+        );
+        let centre = Vec3::new(5.0, 0.0, 5.0);
+        for (lo, hi) in ring {
+            let inside = (lo.x..hi.x).contains(&centre.x) && (lo.z..hi.z).contains(&centre.z);
+            assert!(!inside, "a ring piece covers the play area");
+        }
+    }
+
+    #[test]
+    fn inner_floor_follows_the_lowest_ground() {
+        assert_eq!(inner_floor_top([0.5, 0.0].into_iter()), 0.0);
+        assert_eq!(inner_floor_top([0.2, -2.05, 1.0].into_iter()), -2.05);
+        assert_eq!(inner_floor_top(std::iter::empty()), 0.0);
+    }
 
     fn area(pieces: &[Piece]) -> f32 {
         pieces
