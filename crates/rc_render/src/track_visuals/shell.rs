@@ -160,28 +160,28 @@ impl Wall {
     }
 }
 
-/// Openings of one wall as pieces `[a0, a1, sill, top]`, sorted, clamped inside the wall (a
-/// frame's width from its ends) and without overlaps (later ones are dropped with a warning).
-fn openings(windows: &[&WindowDef], length: f32, height: f32) -> Vec<Piece> {
-    let mut out: Vec<Piece> = windows
+/// Openings of one wall as pieces `[a0, a1, sill, top]` with their door flag, sorted, clamped
+/// inside the wall (a frame's width from its ends) and without overlaps (later ones are dropped
+/// with a warning).
+fn openings(windows: &[&WindowDef], length: f32, height: f32) -> Vec<(Piece, bool)> {
+    let mut out: Vec<(Piece, bool)> = windows
         .iter()
         .map(|w| {
             let half = (w.width * 0.5).min(length * 0.5 - FRAME_U * 2.0).max(0.0);
             let c = (w.center * length).clamp(half + FRAME_U, length - half - FRAME_U);
-            [
-                c - half,
-                c + half,
-                w.sill,
-                (w.sill + w.height).min(height - FRAME_U),
-            ]
+            let top = (w.sill + w.height).min(height - FRAME_U);
+            ([c - half, c + half, w.sill, top], w.door)
         })
-        .filter(|o| o[1] > o[0] && o[3] > o[2])
+        .filter(|(o, _)| o[1] > o[0] && o[3] > o[2])
         .collect();
-    out.sort_by(|a, b| a[0].total_cmp(&b[0]));
-    let mut kept: Vec<Piece> = Vec::new();
+    out.sort_by(|a, b| a.0[0].total_cmp(&b.0[0]));
+    let mut kept: Vec<(Piece, bool)> = Vec::new();
     for o in out {
-        if kept.last().is_some_and(|k| o[0] < k[1] + FRAME_U * 2.0) {
-            warn!("room: overlapping windows; one at {:.1} u is skipped", o[0]);
+        if kept.last().is_some_and(|k| o.0[0] < k.0[1] + FRAME_U * 2.0) {
+            warn!(
+                "room: overlapping windows; one at {:.1} u is skipped",
+                o.0[0]
+            );
             continue;
         }
         kept.push(o);
@@ -232,7 +232,8 @@ fn room_meshes(min: Vec3, max: Vec3, room: &RoomDef) -> [MeshData; 2] {
     ] {
         let wall = Wall::of(side, min, max);
         let windows: Vec<&WindowDef> = room.windows.iter().filter(|w| w.wall == side).collect();
-        let holes = openings(&windows, wall.length, h);
+        let openings = openings(&windows, wall.length, h);
+        let holes: Vec<Piece> = openings.iter().map(|(o, _)| *o).collect();
         for piece in wall_pieces(wall.length, h, &holes) {
             append(&mut walls, wall.block(piece, -WALL_U, 0.0));
         }
@@ -247,7 +248,7 @@ fn room_meshes(min: Vec3, max: Vec3, room: &RoomDef) -> [MeshData; 2] {
                 wall.block([a0, a1, 0.0, SKIRTING_HEIGHT_U], 0.0, SKIRTING_DEPTH_U),
             );
         }
-        for &[a0, a1, sill, top] in &holes {
+        for &([a0, a1, sill, top], door) in &openings {
             let f = FRAME_U;
             append(
                 &mut trim,
@@ -266,6 +267,9 @@ fn room_meshes(min: Vec3, max: Vec3, room: &RoomDef) -> [MeshData; 2] {
                     &mut trim,
                     wall.block([a0 - f, a1 + f, sill - f, sill], -f, SILL_DEPTH_U),
                 );
+            }
+            if door {
+                continue; // an open door: frame only
             }
             let panes = ((a1 - a0) / MAX_PANE_U).ceil().max(1.0) as usize;
             for i in 1..panes {
@@ -369,13 +373,14 @@ mod tests {
             width,
             height: 8.0,
             sill: 4.0,
+            door: false,
         };
         let windows = [w(0.0, 10.0), w(0.5, 10.0), w(0.52, 10.0)];
         let refs: Vec<&WindowDef> = windows.iter().collect();
         let holes = openings(&refs, 60.0, 16.0);
         assert_eq!(holes.len(), 2, "the overlapping third window is dropped");
         assert!(
-            holes[0][0] >= FRAME_U - 1e-4,
+            holes[0].0[0] >= FRAME_U - 1e-4,
             "clamped away from the corner: {holes:?}"
         );
     }
@@ -390,6 +395,7 @@ mod tests {
                 width: 20.0,
                 height: 9.0,
                 sill: 5.0,
+                door: false,
             }],
             lamps: None,
         };

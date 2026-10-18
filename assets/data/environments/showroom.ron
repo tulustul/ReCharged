@@ -1,0 +1,78 @@
+// Menu showroom: a night-time garage corner (rc_render showroom/). Its spots, neon strips and
+// LED ring are part of the set (showroom/diorama.rs); this file sets the camera look, the
+// moonlight through the side-wall window (the key light) and the room's image-based lighting.
+// Every time of day looks the same.
+(
+    name: "Showroom",
+    indoor: true,
+    room: Some((height: 16.0)),
+    shadow_distance: 40.0,
+    morning: (
+        sun: (elevation: 30.0, azimuth: 90.0, lux: 750.0, color: (0.55, 0.7, 1.0)),
+        exposure: 8.0,
+        env_light: 380.0,
+        room: (
+            floor: (0.07, 0.065, 0.06),
+            walls: (0.04, 0.05, 0.075),
+            ceiling: (0.015, 0.02, 0.035),
+            window: (0.06, 0.09, 0.16),
+            lamp: (0.0, 0.0, 0.0),
+        ),
+        fog_color: (0.02, 0.03, 0.05),
+        fog_visibility: 140.0,
+        grading: (temperature: -0.02, saturation: 1.08, contrast: 1.06, lift: 0.004),
+        bloom: 0.2,
+        window: (0.1, 0.17, 0.38),
+    ),
+    noon: (
+        sun: (elevation: 30.0, azimuth: 90.0, lux: 750.0, color: (0.55, 0.7, 1.0)),
+        exposure: 8.0,
+        env_light: 380.0,
+        room: (
+            floor: (0.07, 0.065, 0.06),
+            walls: (0.04, 0.05, 0.075),
+            ceiling: (0.015, 0.02, 0.035),
+            window: (0.06, 0.09, 0.16),
+            lamp: (0.0, 0.0, 0.0),
+        ),
+        fog_color: (0.02, 0.03, 0.05),
+        fog_visibility: 140.0,
+        grading: (temperature: -0.02, saturation: 1.08, contrast: 1.06, lift: 0.004),
+        bloom: 0.2,
+        window: (0.1, 0.17, 0.38),
+    ),
+    sunset: (
+        sun: (elevation: 30.0, azimuth: 90.0, lux: 750.0, color: (0.55, 0.7, 1.0)),
+        exposure: 8.0,
+        env_light: 380.0,
+        room: (
+            floor: (0.07, 0.065, 0.06),
+            walls: (0.04, 0.05, 0.075),
+            ceiling: (0.015, 0.02, 0.035),
+            window: (0.06, 0.09, 0.16),
+            lamp: (0.0, 0.0, 0.0),
+        ),
+        fog_color: (0.02, 0.03, 0.05),
+        fog_visibility: 140.0,
+        grading: (temperature: -0.02, saturation: 1.08, contrast: 1.06, lift: 0.004),
+        bloom: 0.2,
+        window: (0.1, 0.17, 0.38),
+    ),
+    night: (
+        sun: (elevation: 30.0, azimuth: 90.0, lux: 750.0, color: (0.55, 0.7, 1.0)),
+        exposure: 8.0,
+        env_light: 380.0,
+        room: (
+            floor: (0.07, 0.065, 0.06),
+            walls: (0.04, 0.05, 0.075),
+            ceiling: (0.015, 0.02, 0.035),
+            window: (0.06, 0.09, 0.16),
+            lamp: (0.0, 0.0, 0.0),
+        ),
+        fog_color: (0.02, 0.03, 0.05),
+        fog_visibility: 140.0,
+        grading: (temperature: -0.02, saturation: 1.08, contrast: 1.06, lift: 0.004),
+        bloom: 0.2,
+        window: (0.1, 0.17, 0.38),
+    ),
+)

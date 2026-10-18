@@ -1,18 +1,18 @@
 # rc_render — rendering core (design note, T13a)
 
-T13a owns proxies, quality, lighting/sky/weather visuals, materials and the showroom. Track, prop
-and car visuals and captures are T13b's (`docs/design/rc_render_content.md`). One crate, module
-ownership: `lib.rs` registers both.
+Proxies, quality, lighting/sky/weather visuals, materials and the showroom (T13a). Track, prop and
+car visuals and captures are described in `docs/design/rc_render_content.md` (written by T13b, same
+crate; `lib.rs` registers both).
 
 ## Module map
 | Module | What |
 |---|---|
 | `proxy.rs` | one `VisualOf` proxy per `Interpolated` entity (queued after the sim spawn), posed in `InterpolateSet` by `PoseHistory::interpolate(overstep)` |
-| `quality/` | `view_quality` / `shadow_tier` (pure), camera decoration, display settings, `--bench` frame times |
+| `quality/` | `view_quality` / `shadow_tier` (pure), camera decoration, display settings |
 | `lighting/` | `ActiveEnvironment` lifecycle, env RON (`env.rs`), key/fill/flash lights, cascades, camera look, generated env maps + room lamps + window glass, headlights, volumetric fog, pipeline warm-up, `"visuals"` key |
 | `sky/` | sun direction maths, atmosphere entity, star cubemap, sky radiance model, cloud dome |
 | `weather_fx.rs` | the frame's `Look` = env time look × `WeatherState`; surface wetness/snow |
-| `materials/` | `MaterialLibrary`, `SurfaceMaterial` (world-space extension), car paints, `with_world_uvs` |
+| `materials/` | `MaterialLibrary`, `SurfaceMaterial` (world-space extension), car paints, `with_world_uvs`, Bevy clear-coat fix (`coat_fix.rs`) |
 | `showroom/` | menu garage set, turntable, `CarModel` swap without gaps, `ShowroomReady` |
 
 Shaders (WESL, `assets/shaders/render/`): `surface.wesl` (macro variation, wetness/puddles, snow),
@@ -26,9 +26,12 @@ Shaders (WESL, `assets/shaders/render/`): `surface.wesl` (macro variation, wetne
   with an error log), library rebuilt for it, lights/atmosphere/clouds spawned
   (`DespawnOnExit(RaceSession)`). `"visuals"` completes when textures are loaded **and** the pipeline
   warm-up is over: once every other loader is done, a hidden `WarmupCamera` (a `QualityCamera` under
-  the loading screen, looking down on the track; T13b parents one `CarModel` per racer to it) renders
-  ≥ 3 frames and the render world's pipeline queue stays empty for 2 frames (20 s timeout; frame
-  counts stay low because the driver throttles an occluded window to 1 frame/s).
+  the loading screen, looking down on the track; the content visuals parent one `CarModel` per
+  racer to it) renders ≥ 3 frames, its scene is complete (cars instanced, generated environment
+  map attached — both change pipeline keys; finishing earlier left ≈ 2 s of compiles for the
+  Intro) and for 3 frames the render world has neither queued nor created a pipeline (20 s
+  timeout; frame counts stay low because the driver throttles an occluded window to 1 frame/s).
+  Still compiled in the Intro: pickups/effects spawned in `Setup` (transparent PBR variants, ≈ 1 s).
 - `OnEnter(Unloading)`: `ActiveEnvironment` removed; `Look` disappears with it.
 
 ## Quality (GDD §15, ARCH §5.8, §9)
@@ -47,7 +50,8 @@ instead), then per `view_quality(settings, views)`:
 
 Leaving TAA removes `TemporalJitter`/`MipBias` too (they would keep jittering); prepasses this
 module added are removed when no effect needs them. The split overlay camera is never touched.
-Window: mode/vsync on every settings change, size only when the setting changes and never with
+Window: mode/vsync on every settings change (vsync never in automated runs: the binary presents
+them unsynced), size only when the setting changes and never with
 `--window` (fixed-size screenshot runs).
 
 ## Light units and the look
@@ -65,11 +69,18 @@ indirect light ≈ 15 % of the key. Screenshots are sRGB: 0.18 linear shows as 1
 - **Indoor:** key = sun through windows/skylights (the room shell's ceiling casts no shadows, walls
   do), fill = soft sky bounce, a generated room cubemap (walls/floor/ceiling, window band toward the
   key, lamp spots at night) for IBL, ceiling lamp grid over `Track::bounds()` at the env's
-  `room.height`, window glass panes on the wall centre plane (frames/openings are T13b's).
+  `room.height`, window glass panes on the wall centre plane (`door: true` openings: no mullions,
+  no rain on the pane; frames/openings in `track_visuals/shell.rs`). Extra env `lights` (point or
+  spot, `times` filter, real-world lumens) for display spots and practicals.
 - **Emissives** are not scaled by exposure (`emissive_exposure_weight = 0`), so art-bible values
   read the same in every environment. Clear-coated paints reflect the environment map: keep
-  `env_light` consistent with the actual room brightness or paints wash out (measured: night env
-  22 → paints white; 2.5 → correct).
+  `env_light` consistent with the actual room brightness.
+- **Clear-coat fix** (`materials/coat_fix.rs`): Bevy 0.20 leaves `clearcoat_N = vec3(0)` when the
+  PBR fragment loads prepass normals (SSAO on, MSAA off — always the case here); the coat's Fresnel
+  goes to ≈ 1 and every coated material (paints, `KHR_materials_clearcoat` props) mirrors the
+  environment and reads white. The embedded `pbr_fragment.wesl` is patched once at startup to set
+  the coat normal to the geometric normal (warns if Bevy's source changes). `ponytail:` remove when
+  Bevy fixes it upstream.
 
 ## Weather (`weather_fx.rs`, tested)
 `overcast = smoothstep(0.15, 1, cloudiness)`: sun × (1 − 0.9·overcast), exposure −1.6·overcast EV,
@@ -103,11 +114,11 @@ cans, cyan/volt neon strips, a warm work lamp. EV 8.
 ## Verify
 - `cargo test -p rc_render` (quality mapping incl. AA rules, shadow tiers, sun angles, sky model,
   cubemap orientation, half floats, weather maths, flash filter, room maps, lamp grid, window glass
-  placement, materials, paint, env files, proxies, warm-up, bench percentiles).
+  placement, materials, paint, env files, proxies, warm-up, coat fix, barrier materials).
 - Screenshots: `recharged --user-data-dir target/agent-data/<id> --window 1600x900 --quick-race
   test_oval|toy_town --time <t> --weather <w> --screenshot-at 12 --screenshot <png> --exit-after 14`;
   the menu without `--quick-race`.
-- Frame times: `--bench <name>` logs p50/p95/p99 at exit (run with `vsync: false` in settings).
+- Frame times: the binary's `--bench <track>_<n>p` (JSON; default settings, vsync off).
 - Textures: `python3 tools/textures/gen_textures.py [--only a,b] [--preview DIR]`.
 
 ## Known limitations

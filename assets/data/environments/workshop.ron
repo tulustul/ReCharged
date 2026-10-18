@@ -1,0 +1,87 @@
+// Wrench Works — auto-repair workshop (art bible §3.6): gritty but readable; warm sodium work
+// lights (always on) against cool daylight from two roller doors on the north wall and one behind
+// the wash bay; light painted-block walls; oil stains. Layout bounds x −88..88, z −60..60.
+(
+    name: "Workshop",
+    indoor: true,
+    shadow_distance: 120.0,
+    room: Some((
+        height: 24.0,
+        windows: [
+            // Roller doors (open): no mullions, no rain on the "glass".
+            (wall: North, center: 0.534, width: 18.0, height: 18.0, sill: 0.0, door: true),
+            (wall: North, center: 0.682, width: 18.0, height: 18.0, sill: 0.0, door: true),
+            (wall: South, center: 0.653, width: 16.0, height: 16.0, sill: 0.0, door: true),
+            // High window on the east wall.
+            (wall: East, center: 0.5, width: 24.0, height: 7.0, sill: 10.0),
+        ],
+        lamps: Some((spacing: 36.0, color: (1.0, 0.72, 0.42), lumens: 70000.0, range: 95.0, spot_angle: Some(72.0), fixture: 16.0)),
+    )),
+    materials: {
+        // Stained concrete #8D8A84.
+        "floor": (set: Some("concrete"), color: (0.98, 0.97, 0.95), variation: 0.22),
+        // Ribbed rubber mats #2A2A2A.
+        "rubber_mat": (set: Some("rubber"), color: (1.0, 1.0, 1.0)),
+        // Plywood ramps #C8A46E.
+        "plywood": (set: Some("plywood"), color: (0.97, 0.95, 0.9)),
+        // Light painted block walls, grey-cream.
+        "wall": (set: Some("concrete"), color: (0.85, 0.84, 0.8), roughness: 0.95, variation: 0.08),
+        "ceiling": (set: Some("metal"), color: (0.72, 0.72, 0.7), roughness: 1.6),
+        // Hazard-yellow kerbs #F2B705 and black rubber tyre-wall blocks.
+        "trim": (color: (0.95, 0.72, 0.02), roughness: 0.6, variation: 0.08),
+        "barrier": (set: Some("rubber"), color: (0.9, 0.9, 0.9)),
+        "ribbon_side": (set: Some("metal"), color: (0.35, 0.36, 0.38)),
+    },
+    surfaces: { Asphalt: "floor", Carpet: "rubber_mat", Wood: "plywood" },
+    morning: (
+        sun: (elevation: 24.0, azimuth: 20.0, lux: 3200.0, color: (0.8, 0.88, 1.0)),
+        fill: Some((elevation: 75.0, azimuth: 0.0, lux: 550.0, color: (0.82, 0.88, 1.0), shadows: false)),
+        exposure: 8.6,
+        env_light: 150.0,
+        room: (floor: (0.38, 0.36, 0.33), walls: (0.6, 0.6, 0.57), ceiling: (0.45, 0.45, 0.45), window: (3.5, 4.2, 5.5), lamp: (4.0, 2.8, 1.6)),
+        fog_color: (0.62, 0.58, 0.52),
+        fog_visibility: 900.0,
+        grading: (temperature: 0.0, saturation: 1.0, contrast: 1.06),
+        bloom: 0.12,
+        lamps: true,
+        window: (1.4, 1.55, 1.8),
+    ),
+    noon: (
+        sun: (elevation: 48.0, azimuth: 350.0, lux: 3600.0, color: (0.84, 0.9, 1.0)),
+        fill: Some((elevation: 80.0, azimuth: 0.0, lux: 650.0, color: (0.85, 0.9, 1.0), shadows: false)),
+        exposure: 8.8,
+        env_light: 170.0,
+        room: (floor: (0.38, 0.36, 0.33), walls: (0.62, 0.62, 0.59), ceiling: (0.48, 0.48, 0.48), window: (4.0, 4.6, 5.8), lamp: (4.0, 2.8, 1.6)),
+        fog_color: (0.62, 0.6, 0.55),
+        fog_visibility: 900.0,
+        grading: (saturation: 1.0, contrast: 1.06),
+        bloom: 0.12,
+        lamps: true,
+        window: (1.5, 1.65, 1.9),
+    ),
+    sunset: (
+        sun: (elevation: 9.0, azimuth: 300.0, lux: 3000.0, color: (1.0, 0.66, 0.42)),
+        fill: Some((elevation: 75.0, azimuth: 320.0, lux: 300.0, color: (0.75, 0.8, 1.0), shadows: false)),
+        exposure: 8.0,
+        env_light: 90.0,
+        room: (floor: (0.36, 0.32, 0.27), walls: (0.5, 0.47, 0.44), ceiling: (0.34, 0.33, 0.32), window: (4.5, 2.6, 1.4), lamp: (4.0, 2.8, 1.6)),
+        fog_color: (0.6, 0.46, 0.34),
+        fog_visibility: 800.0,
+        grading: (temperature: 0.04, saturation: 1.04, contrast: 1.08),
+        bloom: 0.13,
+        lamps: true,
+        window: (1.5, 0.85, 0.5),
+    ),
+    night: (
+        sun: (elevation: 45.0, azimuth: 10.0, lux: 10.0, color: (0.58, 0.7, 1.0)),
+        exposure: 5.6,
+        env_light: 7.0,
+        room: (floor: (0.35, 0.32, 0.28), walls: (0.42, 0.4, 0.38), ceiling: (0.22, 0.21, 0.2), window: (0.2, 0.3, 0.65), lamp: (6.0, 4.2, 2.4)),
+        fog_color: (0.14, 0.1, 0.06),
+        fog_visibility: 800.0,
+        grading: (temperature: 0.03, saturation: 0.98, contrast: 1.1),
+        bloom: 0.16,
+        lamps: true,
+        window: (0.04, 0.06, 0.13),
+    ),
+)

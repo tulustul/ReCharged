@@ -1,8 +1,9 @@
 # rc_render — content visuals (T13b design note)
 
 Track, prop and car visuals and the capture tools of `rc_render` (`content.rs`,
-`track_visuals/`, `props/`, `cars/`, `capture/`). The rendering core (proxies, quality, lighting,
-sky, weather, `MaterialLibrary`, showroom) is T13a's; see `docs/design/rc_render.md`.
+`track_visuals/`, `props/`, `cars/`, `capture/`), written by T13b and since maintained with the
+rest of the crate. The rendering core (proxies, quality, lighting, sky, weather, `MaterialLibrary`,
+showroom) is described in `docs/design/rc_render.md`.
 
 ## Loading
 `ContentVisualsPlugin` registers the `"content"` key. During `Loading` it waits for `Track`,
@@ -39,13 +40,19 @@ cached for the app's lifetime, so restarts and next races reuse them.
   | `test` | 1.5 u, no gaps | `plastic_red`, `plastic_white` (kart barrier) |
   | `street` | 4 u, 0.05 gaps | role `barrier` (kerb stones) |
   | `garden` | 1.2 u, 0.06 gaps | role `barrier` (brick edging) |
+  | `workshop` | 2 u, 0.04 gaps | roles `trim`, `barrier` (hazard-yellow kerbs, black rubber) |
+  | `house` | 0.6 u, 0.02 gaps | `book_red/cream/green/blue/mustard/cream` (book rows; env materials) |
+  | `supermarket` | 2.4 u, 0.05 gaps | `barrier`, `crate_blue`, `barrier`, `crate_green` (kick plates, crates) |
   | others | the collider sweep | role `barrier` |
 - **Room shell** (`shell.rs`): wall inner faces stand exactly on `Track::bounds()` (the collider
   shell), 1 u thick; ceiling at `ActiveEnvironment.def.room.height`. Window openings from
   `room.windows` are cut by splitting each wall into solid pieces (`wall_pieces`, tested); frames
   sit from 0.35 u inside the inner face to 0.2 u into the room, mullions every ≤ 7 u plus a mid
   transom in the first 0.3 u, so the shadowed window light draws pane patterns on the floor.
-  T13a glazes the openings (pane on the wall's centre plane).
+  Openings with `door: true` (roller doors, patio doors) get the frame only — no mullions or
+  transom — and their "glass" shows the outside light without rain. The lighting glazes every
+  opening (pane on the wall's centre plane). A test checks that every material a block style
+  names exists in its environment.
 
 ## Props (`props/`)
 - Static props: a session-scoped model entity at the prop's pose (the `Prop` entity is
@@ -122,9 +129,9 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
   --screenshot-at 8 --screenshot <png> --exit-after 10`; tours as above.
 
 ## Known limitations
-- The first seconds of a session freeze while Bevy compiles new pipelines (≈ 250 ms per variant,
-  serialized; measured 0.8–2.7 s frames); a warm-up during Loading belongs to the rendering core.
-- Barrier styles are a code table; book rows (house), tyre walls (workshop) and shelf kick-plates
-  (supermarket) use the plain sweep until an environment asks for them (`ponytail`).
+- Pipelines compile during Loading (the rendering core's warm-up camera, with one car per racer
+  parented to it); variants first needed later (a weather change, a new effect) still hitch once.
+- Barrier styles are a code table (`ponytail`: move into the environment files when artists need
+  more than one style per environment).
 - Prop glbs that fail to parse stay invisible (no fallback swap); a missing file uses the fallback.
 - One preview per track (forward layout, the time given on the command line).

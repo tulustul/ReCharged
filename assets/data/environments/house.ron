@@ -1,0 +1,88 @@
+// Sofa Circuit — family house ground floor (art bible §3.3): cosy and lived-in; warm afternoon
+// window light through the south patio windows, cool shadows; lamps at night.
+(
+    name: "House",
+    indoor: true,
+    shadow_distance: 100.0,
+    room: Some((
+        height: 11.5,
+        windows: [
+            (wall: South, center: 0.3, width: 22.0, height: 8.0, sill: 1.0),
+            (wall: South, center: 0.7, width: 22.0, height: 8.0, sill: 1.0),
+            (wall: West, center: 0.22, width: 16.0, height: 6.5, sill: 3.5),
+            (wall: East, center: 0.4, width: 18.0, height: 6.5, sill: 3.5),
+        ],
+        lamps: Some((spacing: 34.0, color: (1.0, 0.82, 0.6), lumens: 1800.0, range: 50.0, fixture: 10.0)),
+    )),
+    materials: {
+        // Varnished oak boards #A9784A, plank 0.67 u.
+        "floor": (set: Some("wood_planks"), color: (0.9, 0.86, 0.78), variation: 0.1),
+        // Wool rug, terracotta #B5553C.
+        "rug": (set: Some("carpet"), color: (0.88, 0.43, 0.31), variation: 0.06),
+        // Glazed kitchen tile, cream #E6DFCF.
+        "kitchen_tile": (set: Some("tile"), color: (0.99, 0.98, 0.97)),
+        // Greige walls #CFC5B4.
+        "wall": (set: Some("plaster"), color: (0.88, 0.84, 0.79)),
+        "ceiling": (set: Some("plaster"), color: (0.98, 0.97, 0.95)),
+        // White painted skirting and book-row barriers in muted cloth.
+        "trim": (set: Some("plywood"), color: (0.95, 0.94, 0.92), roughness: 0.75),
+        "barrier": (set: Some("cardboard"), color: (0.72, 0.62, 0.62), roughness: 0.95),
+        "ribbon_side": (set: Some("carpet"), color: (0.75, 0.37, 0.27)),
+        // Book rows (barrier blocks): cloth and paper spines in muted colours.
+        "book_red": (color: (0.56, 0.2, 0.17), roughness: 0.8, variation: 0.06),
+        "book_cream": (color: (0.86, 0.81, 0.69), roughness: 0.85, variation: 0.06),
+        "book_green": (color: (0.27, 0.4, 0.3), roughness: 0.8, variation: 0.06),
+        "book_blue": (color: (0.22, 0.29, 0.44), roughness: 0.8, variation: 0.06),
+        "book_mustard": (color: (0.8, 0.62, 0.24), roughness: 0.8, variation: 0.06),
+    },
+    surfaces: { Wood: "floor", Carpet: "rug", Tile: "kitchen_tile" },
+    morning: (
+        sun: (elevation: 18.0, azimuth: 100.0, lux: 5000.0, color: (1.0, 0.92, 0.8)),
+        fill: Some((elevation: 75.0, azimuth: 150.0, lux: 500.0, color: (0.9, 0.94, 1.0), shadows: false)),
+        exposure: 9.6,
+        env_light: 120.0,
+        room: (floor: (0.45, 0.32, 0.2), walls: (0.55, 0.52, 0.47), ceiling: (0.65, 0.64, 0.62), window: (5.0, 4.7, 4.2), lamp: (0.0, 0.0, 0.0)),
+        fog_color: (0.82, 0.78, 0.72),
+        fog_visibility: 1200.0,
+        grading: (temperature: 0.02, saturation: 1.04, contrast: 1.04),
+        bloom: 0.1,
+        window: (1.65, 1.6, 1.5),
+    ),
+    noon: (
+        sun: (elevation: 50.0, azimuth: 175.0, lux: 5500.0, color: (1.0, 0.97, 0.92)),
+        fill: Some((elevation: 80.0, azimuth: 180.0, lux: 600.0, color: (0.93, 0.96, 1.0), shadows: false)),
+        exposure: 9.9,
+        env_light: 140.0,
+        room: (floor: (0.45, 0.32, 0.2), walls: (0.58, 0.55, 0.5), ceiling: (0.68, 0.67, 0.65), window: (5.5, 5.5, 5.6), lamp: (0.0, 0.0, 0.0)),
+        fog_color: (0.84, 0.81, 0.76),
+        fog_visibility: 1200.0,
+        grading: (saturation: 1.04, contrast: 1.04),
+        bloom: 0.1,
+        window: (1.8, 1.8, 1.85),
+    ),
+    sunset: (
+        sun: (elevation: 10.0, azimuth: 225.0, lux: 5500.0, color: (1.0, 0.68, 0.42)),
+        fill: Some((elevation: 70.0, azimuth: 220.0, lux: 280.0, color: (0.85, 0.82, 0.95), shadows: false)),
+        exposure: 8.6,
+        env_light: 65.0,
+        room: (floor: (0.42, 0.28, 0.17), walls: (0.5, 0.42, 0.36), ceiling: (0.45, 0.4, 0.4), window: (5.0, 2.9, 1.5), lamp: (3.0, 2.2, 1.4)),
+        fog_color: (0.75, 0.6, 0.48),
+        fog_visibility: 1100.0,
+        grading: (temperature: 0.06, saturation: 1.08, contrast: 1.05),
+        bloom: 0.12,
+        lamps: true,
+        window: (1.6, 0.92, 0.5),
+    ),
+    night: (
+        sun: (elevation: 50.0, azimuth: 190.0, lux: 12.0, color: (0.62, 0.74, 1.0)),
+        exposure: 4.6,
+        env_light: 5.0,
+        room: (floor: (0.42, 0.3, 0.19), walls: (0.4, 0.36, 0.32), ceiling: (0.28, 0.25, 0.23), window: (0.35, 0.5, 0.95), lamp: (6.0, 4.4, 2.8)),
+        fog_color: (0.08, 0.06, 0.05),
+        fog_visibility: 1100.0,
+        grading: (temperature: 0.04, saturation: 1.0, contrast: 1.06),
+        bloom: 0.15,
+        lamps: true,
+        window: (0.05, 0.08, 0.16),
+    ),
+)

@@ -1,0 +1,57 @@
+// Neutral test grounds (test_oval): asphalt ribbon over a lawn, physically based sky.
+// Outdoor: the sun's lux is "top of atmosphere" (the atmosphere attenuates and tints it); at
+// Night the key light is the moon (exaggerated, so the track stays readable).
+(
+    name: "Test grounds",
+    indoor: false,
+    sky: (ground_albedo: (0.25, 0.3, 0.22), stars: 40.0),
+    shadow_distance: 140.0,
+    materials: {
+        "floor": (set: Some("grass"), color: (1.0, 1.0, 1.0)),
+        "wall": (set: Some("concrete"), color: (0.85, 0.85, 0.85)),
+        "barrier": (set: None, color: (0.88, 0.88, 0.86), roughness: 0.45, variation: 0.0),
+        "trim": (set: Some("concrete"), color: (0.95, 0.95, 0.93)),
+    },
+    morning: (
+        sun: (elevation: 13.0, azimuth: 100.0, lux: 128000.0),
+        env_light: 7000.0,
+        exposure: 13.1,
+        fog_color: (0.72, 0.7, 0.68),
+        fog_visibility: 2500.0,
+        grading: (temperature: 0.03, saturation: 1.05, contrast: 1.04),
+        bloom: 0.1,
+        clouds: (lit: (1.0, 0.85, 0.7), shade: (0.42, 0.45, 0.56)),
+    ),
+    noon: (
+        sun: (elevation: 58.0, azimuth: 165.0, lux: 128000.0),
+        env_light: 9000.0,
+        exposure: 14.7,
+        fog_color: (0.68, 0.74, 0.82),
+        fog_visibility: 2500.0,
+        grading: (saturation: 1.06, contrast: 1.05),
+        bloom: 0.1,
+        clouds: (lit: (1.0, 0.99, 0.97), shade: (0.55, 0.6, 0.68)),
+    ),
+    sunset: (
+        sun: (elevation: 7.0, azimuth: 262.0, lux: 128000.0),
+        env_light: 7000.0,
+        exposure: 11.3,
+        fog_color: (0.75, 0.6, 0.5),
+        fog_visibility: 2200.0,
+        grading: (temperature: 0.05, saturation: 1.1, contrast: 1.05),
+        bloom: 0.14,
+        clouds: (lit: (1.0, 0.62, 0.4), shade: (0.32, 0.28, 0.4)),
+    ),
+    night: (
+        sun: (elevation: 40.0, azimuth: 210.0, lux: 18.0, color: (0.75, 0.84, 1.0)),
+        env_light: 40.0,
+        exposure: 2.6,
+        ambient: 1.5,
+        ambient_color: (0.5, 0.6, 0.85),
+        fog_color: (0.02, 0.03, 0.05),
+        fog_visibility: 1600.0,
+        grading: (temperature: -0.06, saturation: 0.85, contrast: 1.08),
+        bloom: 0.18,
+        clouds: (lit: (0.06, 0.075, 0.11), shade: (0.015, 0.02, 0.03)),
+    ),
+)

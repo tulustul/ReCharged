@@ -1,8 +1,10 @@
 //! Barriers in the environment's style (GDD §7.3, art bible §3): where rc_track has a barrier,
 //! a row of chamfered blocks — foam blocks in the toy store, red/white kart blocks on the test
-//! grounds, kerb stones on the street, edging stones in the garden — occupying exactly the
-//! collider's box (same frames, inner face, thickness, depth and height as rc_track's sweep).
-//! Environments without a block style draw the collider sweep in their `barrier` material.
+//! grounds, kerb stones on the street, edging stones in the garden, book rows in the house,
+//! crates and kick plates in the supermarket, hazard-yellow and rubber blocks in the workshop —
+//! occupying exactly the collider's box (same frames, inner face, thickness, depth and height as
+//! rc_track's sweep). Environments without a block style draw the collider sweep in their
+//! `barrier` material.
 
 use bevy::math::{Mat3, Quat, Vec3};
 use rc_track::{MeshData, RibbonStyle, Track, WALL_THICKNESS_U};
@@ -47,6 +49,27 @@ pub(crate) fn block_style(environment: &str) -> Option<BlockStyle> {
         // Kerb stones and brick edging in the environment's own barrier material.
         "street" => style(4.0, 0.05, &["barrier"][..]),
         "garden" => style(1.2, 0.06, &["barrier"][..]),
+        // Hazard-yellow kerbs alternating with black rubber blocks.
+        "workshop" => style(2.0, 0.04, &["trim", "barrier"][..]),
+        // Book rows: spines in muted cloth colours (environment materials `book_*`).
+        "house" => style(
+            0.6,
+            0.02,
+            &[
+                "book_red",
+                "book_cream",
+                "book_green",
+                "book_blue",
+                "book_mustard",
+                "book_cream",
+            ][..],
+        ),
+        // Painted kick plates and plastic crates.
+        "supermarket" => style(
+            2.4,
+            0.05,
+            &["barrier", "crate_blue", "barrier", "crate_green"][..],
+        ),
         _ => None,
     }
 }
@@ -191,6 +214,33 @@ mod tests {
         assert!(runs(4, |_| false).is_empty());
         let split = [true, false, true, false];
         assert_eq!(runs(4, |i| split[i]), vec![(0, 1), (2, 1)]);
+    }
+
+    /// Every material a block style cycles through exists in that environment.
+    #[test]
+    fn block_style_materials_exist_in_their_environment() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let builtins: Vec<String> = crate::materials::builtin_materials()
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect();
+        for env in [
+            "toy_store",
+            "test",
+            "street",
+            "garden",
+            "workshop",
+            "house",
+            "supermarket",
+        ] {
+            let style = block_style(env).expect("a style");
+            let def = crate::lighting::EnvironmentDef::load(&assets, env)
+                .unwrap_or_else(|e| panic!("{e}"));
+            for name in style.materials {
+                let known = builtins.iter().any(|b| b == name) || def.materials.contains_key(*name);
+                assert!(known, "{env}: barrier material '{name}' is not defined");
+            }
+        }
     }
 
     /// The blocks stand where rc_track's barrier colliders are: every block's inner bottom edge

@@ -1,0 +1,87 @@
+// Toy Town — toy store / playroom (art bible §3.2): bright and cheerful on a calm warm-white base,
+// soft window light by day (shop windows on the east and west walls), warm ceiling spots at night.
+// Light units: lux / real-world lumens (rc_render::lamp_lumens), EV100; colours sRGB 0–1.
+(
+    name: "Toy store",
+    indoor: true,
+    shadow_distance: 110.0,
+    // Display spots on the hero props (toy_town: castle inside the helix, dollhouse).
+    lights: [
+        (pos: (-26.0, 15.2, -11.0), target: Some((-40.0, 5.0, -25.0)), angle: 26.0, color: (1.0, 0.86, 0.66), lumens: 16000.0, range: 60.0, times: [Sunset, Night]),
+        (pos: (-41.0, 15.2, 18.0), target: Some((-57.0, 6.0, 7.0)), angle: 28.0, color: (1.0, 0.86, 0.66), lumens: 16000.0, range: 60.0, times: [Sunset, Night]),
+        (pos: (-40.0, 3.5, -25.0), color: (1.0, 0.9, 0.78), lumens: 2500.0, range: 26.0, times: [Night]),
+    ],
+    room: Some((
+        height: 16.0,
+        windows: [
+            (wall: East, center: 0.22, width: 26.0, height: 9.0, sill: 3.5),
+            (wall: East, center: 0.5, width: 26.0, height: 9.0, sill: 3.5),
+            (wall: East, center: 0.78, width: 26.0, height: 9.0, sill: 3.5),
+            (wall: West, center: 0.3, width: 26.0, height: 9.0, sill: 3.5),
+            (wall: West, center: 0.7, width: 26.0, height: 9.0, sill: 3.5),
+        ],
+        lamps: Some((spacing: 30.0, color: (1.0, 0.85, 0.66), lumens: 12000.0, range: 70.0, spot_angle: Some(70.0), fixture: 14.0)),
+    )),
+    materials: {
+        // Beech floor and shelves (the wood texture is beech-toned).
+        "floor": (set: Some("wood_planks"), color: (1.0, 0.97, 0.93), variation: 0.1),
+        // Felt play-mat, play-mat teal #2E9C9A.
+        "play_mat": (set: Some("carpet"), color: (0.24, 0.78, 0.79), variation: 0.08),
+        "wall": (set: Some("plaster"), color: (1.0, 0.97, 0.94)),
+        "ceiling": (set: Some("plaster"), color: (1.0, 1.0, 0.98)),
+        "trim": (set: Some("wood_planks"), color: (0.95, 0.9, 0.85)),
+        // Foam block borders and toy-track walls: glossy orange plastic.
+        "barrier": (color: (0.94, 0.48, 0.12), roughness: 0.25, variation: 0.03),
+        "ribbon_side": (color: (0.85, 0.42, 0.1), roughness: 0.3, variation: 0.02),
+    },
+    surfaces: { Carpet: "play_mat", Wood: "floor" },
+    morning: (
+        sun: (elevation: 20.0, azimuth: 95.0, lux: 5500.0, color: (1.0, 0.93, 0.82)),
+        fill: Some((elevation: 75.0, azimuth: 120.0, lux: 950.0, color: (0.93, 0.96, 1.0), shadows: false)),
+        exposure: 9.8,
+        env_light: 175.0,
+        room: (floor: (0.55, 0.42, 0.3), walls: (0.62, 0.6, 0.56), ceiling: (0.7, 0.7, 0.68), window: (5.0, 4.8, 4.4), lamp: (0.0, 0.0, 0.0)),
+        fog_color: (0.85, 0.82, 0.78),
+        fog_visibility: 1600.0,
+        grading: (temperature: 0.02, saturation: 1.06, contrast: 1.03),
+        bloom: 0.1,
+        window: (1.7, 1.65, 1.55),
+    ),
+    noon: (
+        sun: (elevation: 52.0, azimuth: 120.0, lux: 5800.0, color: (1.0, 0.98, 0.94)),
+        fill: Some((elevation: 80.0, azimuth: 160.0, lux: 1050.0, color: (0.95, 0.97, 1.0), shadows: false)),
+        exposure: 10.0,
+        env_light: 195.0,
+        room: (floor: (0.55, 0.42, 0.3), walls: (0.64, 0.62, 0.58), ceiling: (0.72, 0.72, 0.7), window: (5.5, 5.6, 5.8), lamp: (0.0, 0.0, 0.0)),
+        fog_color: (0.86, 0.84, 0.82),
+        fog_visibility: 1600.0,
+        grading: (saturation: 1.06, contrast: 1.04),
+        bloom: 0.1,
+        window: (1.8, 1.85, 1.9),
+    ),
+    sunset: (
+        sun: (elevation: 9.0, azimuth: 262.0, lux: 5200.0, color: (1.0, 0.7, 0.45)),
+        fill: Some((elevation: 70.0, azimuth: 250.0, lux: 480.0, color: (0.85, 0.8, 0.9), shadows: false)),
+        exposure: 8.6,
+        env_light: 95.0,
+        room: (floor: (0.5, 0.36, 0.25), walls: (0.55, 0.48, 0.44), ceiling: (0.5, 0.47, 0.48), window: (5.0, 3.0, 1.6), lamp: (3.0, 2.3, 1.5)),
+        fog_color: (0.8, 0.66, 0.55),
+        fog_visibility: 1400.0,
+        grading: (temperature: 0.05, saturation: 1.08, contrast: 1.04),
+        bloom: 0.12,
+        lamps: true,
+        window: (1.6, 0.95, 0.55),
+    ),
+    night: (
+        sun: (elevation: 55.0, azimuth: 100.0, lux: 15.0, color: (0.62, 0.74, 1.0)),
+        exposure: 5.3,
+        env_light: 6.0,
+        room: (floor: (0.5, 0.38, 0.27), walls: (0.45, 0.42, 0.4), ceiling: (0.3, 0.28, 0.27), window: (0.4, 0.55, 1.0), lamp: (6.0, 4.6, 3.0)),
+        fog_color: (0.1, 0.08, 0.07),
+        fog_visibility: 1400.0,
+        grading: (temperature: 0.03, saturation: 1.0, contrast: 1.06),
+        bloom: 0.15,
+        lamps: true,
+        window: (0.06, 0.09, 0.17),
+    ),
+)
