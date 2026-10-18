@@ -32,6 +32,9 @@ Read this **before** writing code.
   - the workspace `Cargo.toml`, `Cargo.lock`, `.cargo/`, `tools/ci.sh`;
   - `ui/src/bevy.ts` (generated — only the rc_ui owner regenerates it), `ui/package.json`;
   - `assets/CREDITS.md` and `assets/data/catalog.ron` — put credits/catalog changes in your report.
+- New files in a shared directory (e.g. `tools/blender/lib/`) carry your area prefix
+  (`<env>_*.py`, `<crate>_*`); check that a path does not exist before creating it, and never
+  overwrite a file you did not create.
 - UI strings live in `ui/src/strings/<area>.ts`, one file per area/owner.
 - Never run commands that touch files you do not own (`cargo fmt` without `-p`, mass
   search-and-replace, `git checkout/reset/stash/clean`).
