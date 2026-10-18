@@ -84,6 +84,15 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
                 custom_layer: rc_game::session_log_layer,
                 ..default()
             })
+            // Automated runs exit within seconds; exiting while pipelines still compile on
+            // Bevy's async threads drops the GPU device on a worker thread and crashes the NVIDIA
+            // driver (exit 139). Synchronous compilation removes that window.
+            // ponytail: a human closing the window mid-compile can still hit it; defer AppExit
+            // until the pipeline cache is idle if that ever shows up.
+            .set(bevy::render::RenderPlugin {
+                synchronous_pipeline_compilation: config.is_automated(),
+                ..default()
+            })
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     title: "ReCharged".into(),
