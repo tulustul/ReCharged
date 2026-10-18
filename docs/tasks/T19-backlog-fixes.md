@@ -12,12 +12,11 @@ notes of those crates; `docs/tasks/BACKLOG.md`.
 **Owned:** `crates/rc_race/**`, `crates/rc_items/**`, `assets/data/items.ron`, `crates/rc_ai/**`,
 `assets/data/ai.ron`, `crates/rc_camera/**`, `crates/rc_track/**` (lint only),
 `tools/blender/props/street/**` + `assets/data/{props/street.ron,tracks/maple_street.ron,decor/maple_street.ron}`
-(B19 data fixes only), additive edits in `crates/rc_core/src/race.rs` (a new `RaceEventKind` variant
-for B15).
+(B19 data fixes only).
 - **B10** a finished human's car is handed to the AI (insert `AiDriver`) so it keeps driving sensibly
   while spectating/waiting.
-- **B15** emit a `RaceEvent` when a racer misses a checkpoint gate (passes its `s` outside the gate) —
-  e.g. `MissedCheckpoint` — once per gate pass; the UI agent (T19b) shows it.
+- **B15** emit `RaceEvent { kind: RaceEventKind::MissedCheckpoint }` (already in rc_core) when a racer
+  passes a checkpoint's `s` outside its gate — once per missed pass; the UI agent (T19b) shows it.
 - **B11/B17** items: rockets may re-acquire a lock after losing one (same cone/range rules);
   explosions/EMP/storm check line of sight to walls (no hits through solid walls); the Shock Orb
   bounces off the barrier colliders' edge (or the drivable edge incl. walls) rather than the racing
@@ -48,12 +47,12 @@ for B15).
   idle (cap ~3 s), so quitting mid-compile can't hit the NVIDIA teardown crash.
 - **B8** Credits screen content: team (orchestrated AI agents), tools (Bevy, bevy-react, rapier,
   kira, Blender, numpy), generators, the Saira OFL font notice; data from a small strings file.
-- **B15 (UI side)** show a short "Missed checkpoint — go back" notice when rc_race emits the new
-  event (T19a adds it to rc_core; coordinate via SendMessage to `main` if it isn't there yet).
+- **B15 (UI side)** show a short "Missed checkpoint — go back" notice for
+  `RaceEventKind::MissedCheckpoint` (replace the placeholder arm in `rc_ui/src/hud/view.rs`; T19a
+  emits it from rc_race; the HUD demo fixture can show it before that lands).
 - **B24** debounce `race.start` (one Confirm must send it once).
 - **B27** remove `RECHARGED_UI_SCRIPT`'s `nav`/`pause` verbs (superseded by `--input-script`); keep
   the fixture verbs.
 - **B4** remove unused deps (`serde`/`ron` in rc_weather and rc_audio, `bevy_rapier3d` in rc_ai),
-  then regenerate `rc_pins` (`python3 crates/rc_pins/update.py`, with no other build running —
-  coordinate the timing: tell `main` before and after).
+  then regenerate `rc_pins` (`python3 crates/rc_pins/update.py`) — do it last, in one go.
 - After all changes: `./tools/ci.sh` passes.
