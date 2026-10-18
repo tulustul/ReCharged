@@ -148,6 +148,7 @@ you how much); no checkpoint is placed inside a shortcut span (+ 2 u); it must g
 | Points | one every 20–30° in turns; on a straight, a point one turn-step (≈ R·30° in radians) before and after each turn; change heights and widths on straights | plot (speed ripple, edge bulges) |
 | Jumps | land at 0.8× and 1.0× the target speed; 0.6–1.2 s air (GDD §5.1) | lint + plot |
 | Items | 4–6 rows; never over gaps | tests / load error |
+| Banked turns on a floor | banking tilts around the centreline, so the inner lip and barrier sink: keep the ribbon at y ≥ floor + (hw + 0.35)·sin(bank) − 0.25·cos(bank) + 0.15 (hw = half width); change heights on the straights | plot (side view: inner edge) — not linted yet |
 | Dynamic props | ≤ 40 per layout | load error |
 
 Catmull-Rom tips: a straight segment between collinear points is perfectly straight; a lone
