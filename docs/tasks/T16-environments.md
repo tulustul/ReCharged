@@ -13,7 +13,9 @@ reuse it); an existing layout for reference: `assets/data/tracks/toy_town.ron` +
 
 ## Owned paths (replace `<env>` / `<track>`)
 `tools/blender/props/<env>/**`, `assets/models/props/<env>/**`, `assets/data/props/<env>.ron`,
-`assets/data/tracks/<track>.ron`, `docs/design/env-<env>.md`. You may **add new modules** under
+`assets/data/tracks/<track>.ron`, `assets/data/decor/<track>.ron` (physics-free dressing — format at
+the top of `crates/rc_render/src/props/decor.rs`; anything a car can touch stays in the prop catalog),
+`docs/design/env-<env>.md`. You may **add new modules** under
 `tools/blender/lib/` named **`<env>_*.py`** (prefix with your env id so parallel agents never collide;
 never edit or overwrite existing modules — other agents use them; check a file doesn't exist before
 writing it). `assets/data/props/common.ron`
