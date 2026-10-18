@@ -18,8 +18,12 @@ use crate::ghost::GhostRun;
 /// A crossing counts only this close to the gate plane along the track (u): a car moves < 1 u
 /// per tick, so this rejects projection jumps.
 const GATE_DEPTH_U: f32 = 4.0;
-/// …and this close to the surface (u): never from another level or high in the air.
-const GATE_HEIGHT_U: f32 = 4.0;
+/// …at most this far above the surface (u): generous, so cars flying over a gate after a jump
+/// (boosted cars reach ~5 u) still count — the hinted projection already keeps them on this
+/// stretch of track…
+const GATE_ABOVE_U: f32 = 12.0;
+/// …and at most this far below it (u): never from a lower level passing under the gate.
+const GATE_BELOW_U: f32 = 3.0;
 /// Wrong way: moving against the track faster than this (u/s, GDD §7.3)…
 const WRONG_WAY_SPEED_UPS: f32 = 5.0;
 /// …for this long (ticks, 2 s) turns the warning on…
@@ -112,7 +116,7 @@ pub(crate) fn in_gate(c: &TrackFrame, pos: Vec3) -> bool {
     let d = pos - c.position;
     d.dot(c.right).abs() <= c.half_width + c.offroad_margin
         && d.dot(c.forward).abs() <= GATE_DEPTH_U
-        && d.dot(c.up).abs() <= GATE_HEIGHT_U
+        && (-GATE_BELOW_U..=GATE_ABOVE_U).contains(&d.dot(c.up))
 }
 
 impl Tracker {
@@ -283,6 +287,32 @@ pub(crate) mod tests {
     use std::path::PathBuf;
 
     use super::*;
+
+    #[test]
+    fn gate_counts_cars_flying_over_it_but_not_from_below() {
+        let gate = TrackFrame {
+            s: 0.0,
+            position: Vec3::ZERO,
+            forward: Vec3::NEG_Z,
+            right: Vec3::X,
+            up: Vec3::Y,
+            half_width: 5.0,
+            bank: 0.0,
+            surface: SurfaceKind::Asphalt,
+            offroad_margin: 6.0,
+            in_gap: false,
+        };
+        assert!(in_gate(&gate, Vec3::new(1.0, 0.5, 0.0)), "on the surface");
+        assert!(
+            in_gate(&gate, Vec3::new(1.0, 6.0, 0.0)),
+            "boosted jump over the gate"
+        );
+        assert!(!in_gate(&gate, Vec3::new(1.0, 15.0, 0.0)), "far above");
+        assert!(
+            !in_gate(&gate, Vec3::new(1.0, -4.0, 0.0)),
+            "lower level under the gate"
+        );
+    }
 
     pub(crate) fn track(reverse: bool) -> Track {
         let assets = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets");
