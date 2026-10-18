@@ -169,13 +169,19 @@ pub(crate) fn step(
     rig.focus_vel = v;
     rig.snap = false;
 
+    // The fly-by and the finish orbit circle the car, so they get the same obstruction pull-in as
+    // the chase boom (a wall between the car and the eye pulls the camera in front of it).
+    let around = |pose: Transform| {
+        let pivot = car.translation + Vec3::Y * CHASE.look_height;
+        (pose, Some((pivot, pose.translation.distance(pivot))))
+    };
     if frame.phase == Some(RacePhase::Intro) && rig.view == View::Follow {
-        return (flyby_pose(car.translation, car_yaw, frame.intro_t), None);
+        return around(flyby_pose(car.translation, car_yaw, frame.intro_t));
     }
     match (rig.view, rig.mode) {
         (View::Orbit, _) => {
             rig.orbit += ORBIT_RATE * dt;
-            (orbit_pose(car.translation, car_yaw + rig.orbit), None)
+            around(orbit_pose(car.translation, car_yaw + rig.orbit))
         }
         (View::Follow, CameraMode::Hood) => (hood_pose(car, look_back), None),
         _ => {
@@ -405,6 +411,18 @@ mod tests {
         );
         let (hood, _) = step(&mut Rig::new(CameraMode::Hood), back, &frame(1.0 / 60.0));
         assert!(hood.forward().z > 0.9);
+    }
+
+    #[test]
+    fn intro_flyby_is_obstruction_checked() {
+        let car = subject_at(Transform::default());
+        let mut rig = Rig::new(CameraMode::Chase);
+        let mut f = frame(1.0 / 60.0);
+        f.phase = Some(RacePhase::Intro);
+        f.intro_t = 0.2;
+        let (pose, boom) = step(&mut rig, car, &f);
+        let (pivot, len) = boom.expect("the fly-by can be pulled in by walls");
+        assert!((pose.translation.distance(pivot) - len).abs() < 1e-4);
     }
 
     #[test]
