@@ -152,7 +152,6 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
 /// Flags parsed but not wired to anything yet (logged once at startup).
 pub fn pending_flags(cfg: &AutomationConfig) -> Vec<&'static str> {
     [
-        (cfg.autopilot, "--autopilot"),
         (cfg.input_script.is_some(), "--input-script"),
         (cfg.headless_race, "--headless-race"),
         (cfg.bench.is_some(), "--bench"),
@@ -371,7 +370,7 @@ mod tests {
         assert_eq!(cfg.soak_seed, Some(42));
         assert_eq!(ok(&["--window", "1280x720"]).window, Some((1280, 720)));
         assert!(err(&["--window", "big"]).contains("--window"));
-        assert_eq!(pending_flags(&cfg).len(), 7);
+        assert_eq!(pending_flags(&cfg).len(), 6);
         assert!(ok(&[]) == AutomationConfig::default() && !ok(&[]).is_automated());
     }
 
