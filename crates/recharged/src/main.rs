@@ -101,6 +101,9 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
                         .map_or(WindowResolution::new(1600, 900), |(w, h)| {
                             WindowResolution::new(w, h)
                         }),
+                    // A fixed-size window makes tiling window managers float it at the requested
+                    // size, so `--window` screenshots really have that resolution.
+                    resizable: config.window.is_none(),
                     ..default()
                 }),
                 ..default()
