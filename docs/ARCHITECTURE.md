@@ -390,7 +390,7 @@ Each subsystem owns its crate, its data files and a short note `docs/design/<cra
 - **Runtime:** `Track` resource with `project(pos, hint_s)`, `frame_at`, `racing_line_at`,
   `target_speed_at`, `respawn_before(s, last_valid_checkpoint)`, `checkpoint_of`, `length`,
   `is_on_drivable(pos)`; writes `TrackSummary`. Spawns colliders (ribbon runs and ground areas
-  tagged `Surface`, walls, room shell), props from `assets/data/props.ron` (primitive colliders,
+  tagged `Surface`, walls, room shell), props from `assets/data/props/*.ron` (primitive colliders,
   static or dynamic, ≤ 40 dynamic, sleeping, reset on Setup).
 - **Tools:** `cargo run -p rc_track --example plot -- <track> [--rev] [--mirror]` → top-down SVG
   and side-elevation SVG (height & bank vs s, jump arcs at target speed).
@@ -627,7 +627,7 @@ telemetry & contacts → race → weather → (FixedLast) pose snapshots`; then 
 | `assets/data/vehicles/<car>.ron` | vehicle | physics tuning |
 | `assets/data/tracks/<track>.ron` | track designers | layout, surfaces, ground areas, props, items, features with `dir` |
 | `assets/data/environments/<env>.ron` | render | lighting/sky per time of day, materials, ambience ids, windows |
-| `assets/data/props.ron` | track + render | prop kind → model path, collider primitives, mass, surface, light attachments |
+| `assets/data/props/<env>.ron` (+ `common.ron`) | track (format) + environment designers (content) | prop kind → model path, collider primitives, mass, surface, light attachments; all files merged, duplicate kinds rejected |
 | `assets/data/items.ron` | items | odds table, item tuning |
 | `assets/data/ai.ron` | ai | difficulty profiles, personalities |
 | `assets/models/cars/<car>.glb` + `<car>.wheels.ron` | art | model (nodes `body`, `wheel_fl/fr/rl/rr`; materials `paint`, `paint_accent`, `light_head`, `light_tail`, `light_brake`) + wheel metadata |

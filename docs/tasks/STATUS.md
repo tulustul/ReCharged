@@ -13,7 +13,7 @@
 | T03 | vehicle physics | T01 | in progress |
 | T04 | input + cameras (split-screen rig first) | T01 | done (rig B overlay; 67 tests) |
 | T05 | UI framework + menus | T01 | in progress |
-| T07 | game flow, progression, persistence | T01 | in progress |
+| T07 | game flow, progression, persistence | T01 | done (54 tests) |
 | T09b | rc_audio system (phase 2 of T09) | T01, T09a | done (in-race listen pending integration) |
 | T06 | race rules | T02, T03 | todo |
 | T11 | AI drivers | T02, T03 | todo |
