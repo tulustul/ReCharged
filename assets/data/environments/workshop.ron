@@ -15,7 +15,7 @@
             // High window on the east wall.
             (wall: East, center: 0.5, width: 24.0, height: 7.0, sill: 10.0),
         ],
-        lamps: Some((spacing: 36.0, color: (1.0, 0.72, 0.42), lumens: 70000.0, range: 95.0, spot_angle: Some(72.0), fixture: 16.0)),
+        lamps: Some((spacing: 36.0, color: (1.0, 0.78, 0.54), lumens: 70000.0, range: 95.0, spot_angle: Some(72.0), fixture: 16.0)),
     )),
     materials: {
         // Stained concrete #8D8A84.
@@ -34,7 +34,8 @@
     },
     surfaces: { Asphalt: "floor", Carpet: "rubber_mat", Wood: "plywood" },
     morning: (
-        sun: (elevation: 24.0, azimuth: 20.0, lux: 3200.0, color: (0.8, 0.88, 1.0)),
+        // Low warm sun through the high east window: a light shaft on the floor.
+        sun: (elevation: 18.0, azimuth: 95.0, lux: 4200.0, color: (1.0, 0.84, 0.62)),
         fill: Some((elevation: 75.0, azimuth: 0.0, lux: 550.0, color: (0.82, 0.88, 1.0), shadows: false)),
         exposure: 8.6,
         env_light: 150.0,
@@ -43,7 +44,7 @@
         fog_visibility: 900.0,
         grading: (temperature: 0.0, saturation: 1.0, contrast: 1.06),
         bloom: 0.12,
-        lamps: true,
+        lamps: 1.0,
         window: (1.4, 1.55, 1.8),
     ),
     noon: (
@@ -56,7 +57,7 @@
         fog_visibility: 900.0,
         grading: (saturation: 1.0, contrast: 1.06),
         bloom: 0.12,
-        lamps: true,
+        lamps: 1.0,
         window: (1.5, 1.65, 1.9),
     ),
     sunset: (
@@ -69,19 +70,21 @@
         fog_visibility: 800.0,
         grading: (temperature: 0.04, saturation: 1.04, contrast: 1.08),
         bloom: 0.13,
-        lamps: true,
+        lamps: 1.0,
         window: (1.5, 0.85, 0.5),
     ),
     night: (
-        sun: (elevation: 45.0, azimuth: 10.0, lux: 10.0, color: (0.58, 0.7, 1.0)),
+        // Cool moonlight through the doors and a cool sky bounce against the sodium lamps.
+        sun: (elevation: 45.0, azimuth: 10.0, lux: 20.0, color: (0.58, 0.7, 1.0)),
+        fill: Some((elevation: 70.0, azimuth: 0.0, lux: 45.0, color: (0.62, 0.72, 1.0), shadows: false)),
         exposure: 5.6,
         env_light: 7.0,
-        room: (floor: (0.35, 0.32, 0.28), walls: (0.42, 0.4, 0.38), ceiling: (0.22, 0.21, 0.2), window: (0.2, 0.3, 0.65), lamp: (6.0, 4.2, 2.4)),
-        fog_color: (0.14, 0.1, 0.06),
+        room: (floor: (0.33, 0.32, 0.3), walls: (0.4, 0.4, 0.4), ceiling: (0.22, 0.22, 0.22), window: (0.25, 0.36, 0.75), lamp: (5.6, 4.4, 3.0)),
+        fog_color: (0.1, 0.09, 0.08),
         fog_visibility: 800.0,
-        grading: (temperature: 0.03, saturation: 0.98, contrast: 1.1),
+        grading: (temperature: -0.05, saturation: 0.94, contrast: 1.1),
         bloom: 0.16,
-        lamps: true,
-        window: (0.04, 0.06, 0.13),
+        lamps: 1.0,
+        window: (0.06, 0.09, 0.2),
     ),
 )

@@ -12,20 +12,20 @@
             (wall: South, center: 0.5, width: 34.0, height: 15.0, sill: 1.0),
             (wall: South, center: 0.8, width: 34.0, height: 15.0, sill: 1.0),
         ],
-        lamps: Some((spacing: 38.0, color: (0.9, 0.96, 1.0), lumens: 12000.0, range: 80.0, spot_angle: Some(75.0), fixture: 9.0)),
+        // The decor's ceiling tube rows are the visible fixtures (fixture 0).
+        lamps: Some((spacing: 38.0, color: (0.9, 0.96, 1.0), lumens: 12000.0, range: 80.0, spot_angle: Some(75.0), fixture: 0.0)),
     )),
+    // Decor ceiling tubes follow the store lamps (lit by day, 15 % at night).
+    fixture_materials: ["tube_on"],
     materials: {
         // Polished vinyl tile, off-white #D9D6CC.
         "floor": (set: Some("vinyl"), color: (1.0, 1.0, 1.0), variation: 0.06),
         "wall": (set: Some("plaster"), color: (0.82, 0.84, 0.86)),
         "ceiling": (set: Some("plaster"), color: (0.9, 0.9, 0.9)),
-        // Rubber skirting; painted-steel shelf kick-plates #8E959C.
+        // Rubber skirting; painted-steel shelf kick plates #8E959C (the barrier blocks).
         "trim": (set: Some("rubber"), color: (0.8, 0.8, 0.8)),
-        "barrier": (set: Some("metal"), color: (0.58, 0.6, 0.63), roughness: 1.2, variation: 0.03),
+        "barrier": (color: (0.557, 0.584, 0.612), roughness: 0.45, variation: 0.04),
         "ribbon_side": (set: Some("metal"), color: (0.5, 0.52, 0.55)),
-        // Plastic crates between the kick plates (barrier blocks).
-        "crate_blue": (color: (0.16, 0.36, 0.7), roughness: 0.45, variation: 0.05),
-        "crate_green": (color: (0.22, 0.55, 0.3), roughness: 0.45, variation: 0.05),
     },
     surfaces: { Tile: "floor" },
     morning: (
@@ -38,7 +38,7 @@
         fog_visibility: 1400.0,
         grading: (temperature: -0.02, saturation: 1.02, contrast: 1.04),
         bloom: 0.1,
-        lamps: true,
+        lamps: 1.0,
         window: (1.6, 1.6, 1.6),
     ),
     noon: (
@@ -51,7 +51,7 @@
         fog_visibility: 1400.0,
         grading: (temperature: -0.02, saturation: 1.02, contrast: 1.04),
         bloom: 0.1,
-        lamps: true,
+        lamps: 1.0,
         window: (1.8, 1.8, 1.85),
     ),
     sunset: (
@@ -64,19 +64,19 @@
         fog_visibility: 1300.0,
         grading: (temperature: 0.02, saturation: 1.06, contrast: 1.08),
         bloom: 0.14,
-        lamps: true,
+        lamps: 0.5,
         window: (1.7, 0.9, 0.45),
     ),
     night: (
         sun: (elevation: 50.0, azimuth: 180.0, lux: 10.0, color: (0.58, 0.7, 1.0)),
-        exposure: 4.4,
-        env_light: 4.0,
-        room: (floor: (0.5, 0.5, 0.48), walls: (0.35, 0.37, 0.4), ceiling: (0.22, 0.23, 0.25), window: (0.25, 0.35, 0.7), lamp: (6.0, 6.5, 7.0)),
-        fog_color: (0.05, 0.06, 0.08),
+        exposure: 5.0,
+        env_light: 8.0,
+        room: (floor: (0.5, 0.5, 0.48), walls: (0.36, 0.36, 0.38), ceiling: (0.22, 0.22, 0.23), window: (0.25, 0.35, 0.7), lamp: (5.0, 5.2, 5.4)),
+        fog_color: (0.05, 0.05, 0.06),
         fog_visibility: 1300.0,
-        grading: (temperature: -0.06, saturation: 0.95, contrast: 1.1),
+        grading: (temperature: -0.01, tint: 0.02, saturation: 0.95, contrast: 1.1),
         bloom: 0.16,
-        lamps: true,
+        lamps: 0.15,
         window: (0.05, 0.07, 0.14),
     ),
 )

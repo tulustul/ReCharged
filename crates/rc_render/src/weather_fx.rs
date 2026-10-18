@@ -74,7 +74,7 @@ pub(crate) struct Look {
     pub fog_glow: Color,
     pub grading: ColorGrading,
     pub bloom: f32,
-    pub lamps: bool,
+    pub lamps: f32,
     pub clouds: CloudLook,
     pub window: [f32; 3],
     pub rain_on_glass: f32,

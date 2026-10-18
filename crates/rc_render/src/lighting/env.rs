@@ -48,6 +48,11 @@ pub struct EnvironmentDef {
     /// Fixed lights of this environment's track (display spots, local fills), in world units.
     #[serde(default)]
     pub lights: Vec<EnvLightDef>,
+    /// glTF material names of prop/decor light fixtures that belong to the room lamps: their
+    /// emission follows the time look's `lamps` level (supermarket ceiling tubes: lit by day,
+    /// off at night). Props' own `lamp*` bulbs follow `practicals` instead.
+    #[serde(default)]
+    pub fixture_materials: Vec<String>,
     /// Look at Morning.
     pub morning: TimeLook,
     /// Look at Noon.
@@ -67,6 +72,13 @@ impl EnvironmentDef {
             TimeOfDay::Sunset => &self.sunset,
             TimeOfDay::Night => &self.night,
         }
+    }
+
+    /// Level 0–1 of the props' lamps at `time` (`practicals`; default on at Night only).
+    pub fn practicals(&self, time: TimeOfDay) -> f32 {
+        self.look(time)
+            .practicals
+            .unwrap_or(if time == TimeOfDay::Night { 1.0 } else { 0.0 })
     }
 
     /// Reads and validates `<assets>/data/environments/<id>.ron`.
@@ -144,6 +156,10 @@ impl EnvironmentDef {
             }
             if look.fog_visibility <= 0.0 {
                 return Err(format!("{t}.fog_visibility must be > 0"));
+            }
+            let levels = std::iter::once(look.lamps).chain(look.practicals);
+            if levels.into_iter().any(|l| !(0.0..=1.0).contains(&l)) {
+                return Err(format!("{t}: lamps/practicals levels must be 0–1"));
             }
         }
         Ok(())
@@ -230,7 +246,7 @@ pub struct WindowDef {
     pub door: bool,
 }
 
-/// A grid of ceiling lamps over the room (on when the time's `lamps` is set).
+/// A grid of ceiling lamps over the room (at the time look's `lamps` level).
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LampGrid {
@@ -331,8 +347,11 @@ pub struct TimeLook {
     pub grading: GradingDef,
     /// Bloom intensity (emissives bloom above ≈ 1.0 after exposure).
     pub bloom: f32,
-    /// Room lamps (indoor) on.
-    pub lamps: bool,
+    /// Room lamp level 0–1 (indoor ceiling grid and `fixture_materials`).
+    pub lamps: f32,
+    /// Level 0–1 of the props' lamps (their real lights and `lamp*` bulbs); default 1 at Night,
+    /// 0 otherwise (street porch lights at sunset: 0.2).
+    pub practicals: Option<f32>,
     /// Cloud colours (display-referred: 1 ≈ a bright sky).
     pub clouds: CloudColors,
     /// Window glass emissive colour (indoor; display-referred).
@@ -353,7 +372,8 @@ impl Default for TimeLook {
             fog_visibility: 2000.0,
             grading: GradingDef::default(),
             bloom: 0.12,
-            lamps: false,
+            lamps: 0.0,
+            practicals: None,
             clouds: CloudColors::default(),
             window: [1.4, 1.5, 1.7],
         }

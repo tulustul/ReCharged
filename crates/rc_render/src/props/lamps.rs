@@ -1,6 +1,8 @@
 //! Lamp props (art bible §3.1 "every visible lamp has a matching real light"): rc_render's
-//! `lights` field of a prop kind in `props/*.ron` (rc_track ignores it) becomes real lights at
-//! Night, and the prop glb's `lamp*` bulb materials barely glow by day.
+//! `lights` field of a prop kind in `props/*.ron` (rc_track ignores it) becomes real lights at the
+//! environment's `practicals` level (default: Night only), and the prop glb's `lamp*` bulb
+//! materials glow at that level (barely when off). Materials the environment lists as
+//! `fixture_materials` (decor fixtures of the room lamps) glow at the room lamps' level.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -13,13 +15,13 @@ use rc_track::PROPS_DIR;
 use serde::Deserialize;
 
 use super::PropModel;
-use crate::content::is_night;
 use crate::lighting::{ActiveEnvironment, lamp_lumens};
 
-/// Bulb materials (`lamp*`) by day, relative to their authored "on" emission.
-const LAMP_DAY: f32 = 0.05;
+/// Bulb materials (`lamp*`) with the lamps off, relative to their authored "on" emission.
+const LAMP_OFF: f32 = 0.05;
 
-/// A real light of a lamp prop, switched on at Night (`lights: [...]` of a prop kind).
+/// A real light of a lamp prop, on at the environment's `practicals` level (`lights: [...]` of
+/// a prop kind).
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PropLight {
@@ -132,11 +134,11 @@ pub(super) fn read_lamps(
     }
 }
 
-/// A prop lamp's real light under `root`.
-pub(super) fn spawn_lamp(commands: &mut Commands, root: Entity, light: &PropLight) {
+/// A prop lamp's real light under `root`, at `level` (0–1) of its rating.
+pub(super) fn spawn_lamp(commands: &mut Commands, root: Entity, light: &PropLight, level: f32) {
     let [r, g, b] = light.color;
     let color = Color::linear_rgb(r, g, b);
-    let intensity = lamp_lumens(light.lumens);
+    let intensity = lamp_lumens(light.lumens) * level;
     let mut at = Transform::from_translation(light.offset);
     let mut e = commands.spawn((Name::new("prop lamp"), ChildOf(root)));
     if light.spot_deg <= 0.0 {
@@ -173,7 +175,23 @@ pub(super) fn spawn_lamp(commands: &mut Commands, root: Entity, light: &PropLigh
     ));
 }
 
-/// A prop scene is instanced: by day its `lamp*` bulb materials barely glow.
+/// Emission scale of a glTF material in `env` at its time of day: `lamp*` bulbs at the
+/// `practicals` level (barely glowing when off), `fixture_materials` at the room lamps' level;
+/// `None` = leave it as authored.
+pub(crate) fn emission_scale(name: &str, env: &ActiveEnvironment) -> Option<f32> {
+    let scale = if env.def.fixture_materials.iter().any(|f| f == name) {
+        env.def.look(env.time).lamps
+    } else if name.starts_with("lamp") {
+        env.def.practicals(env.time).max(LAMP_OFF)
+    } else {
+        return None;
+    };
+    (scale < 1.0).then_some(scale)
+}
+
+/// A prop or decor scene is instanced: dims its lamp materials to the time of day. Dimmed copies
+/// are shared by every instance (`Local` cache), so instances keep batching.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(super) fn dim_bulbs(
     ready: On<WorldInstanceReady>,
     roots: Query<(), With<PropModel>>,
@@ -182,27 +200,31 @@ pub(super) fn dim_bulbs(
     bulbs: Query<(&GltfMaterialName, &MeshMaterial3d<StandardMaterial>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
+    mut dimmed: Local<HashMap<(AssetId<StandardMaterial>, u32), Handle<StandardMaterial>>>,
 ) {
-    if roots.get(ready.entity).is_err() || is_night(env.as_deref()) {
+    let Some(env) = env else {
+        return;
+    };
+    if roots.get(ready.entity).is_err() {
         return;
     }
-    let mut dimmed: HashMap<AssetId<StandardMaterial>, Handle<StandardMaterial>> = HashMap::new();
     for entity in children.iter_descendants(ready.entity) {
         let Ok((name, current)) = bulbs.get(entity) else {
             continue;
         };
-        if !name.starts_with("lamp") {
+        let Some(scale) = emission_scale(&name.0, &env) else {
             continue;
-        }
-        let handle = match dimmed.get(&current.id()) {
+        };
+        let key = (current.id(), scale.to_bits());
+        let handle = match dimmed.get(&key) {
             Some(h) => h.clone(),
             None => {
                 let Some(mut m) = materials.get(&current.0).cloned() else {
                     continue;
                 };
-                m.emissive *= LAMP_DAY;
+                m.emissive *= scale;
                 let h = materials.add(m);
-                dimmed.insert(current.id(), h.clone());
+                dimmed.insert(key, h.clone());
                 h
             }
         };
@@ -242,8 +264,8 @@ mod tests {
             ..spot.clone()
         };
         let mut commands = world.commands();
-        spawn_lamp(&mut commands, root, &spot);
-        spawn_lamp(&mut commands, root, &point);
+        spawn_lamp(&mut commands, root, &spot, 1.0);
+        spawn_lamp(&mut commands, root, &point, 0.5);
         world.flush();
         let (s, t) = world
             .query::<(&SpotLight, &Transform)>()
@@ -255,7 +277,43 @@ mod tests {
         );
         assert!((s.intensity - lamp_lumens(60_000.0)).abs() < 1.0);
         assert!(t.forward().y < -0.95, "points down");
-        assert_eq!(world.query::<&PointLight>().iter(&world).count(), 1);
+        let p = world
+            .query::<&PointLight>()
+            .single(&world)
+            .expect("one point");
+        assert!(
+            (p.intensity - lamp_lumens(30_000.0)).abs() < 1.0,
+            "at half level"
+        );
+    }
+
+    /// Bulbs follow the practicals, listed fixtures the room lamps; other materials stay.
+    #[test]
+    fn lamp_materials_follow_their_levels() {
+        let mut def =
+            crate::lighting::EnvironmentDef::load(&assets(), "supermarket").expect("loads");
+        def.fixture_materials = vec!["tube_on".into()];
+        def.night.lamps = 0.1;
+        def.sunset.practicals = Some(0.2);
+        let env = |time| ActiveEnvironment {
+            id: "supermarket".into(),
+            def: def.clone(),
+            time,
+        };
+        let night = env(TimeOfDay::Night);
+        assert_eq!(emission_scale("tube_on", &night), Some(0.1));
+        assert_eq!(
+            emission_scale("lamp_sodium", &night),
+            None,
+            "bulbs on at night"
+        );
+        assert_eq!(emission_scale("signs_glow", &night), None);
+        let noon = env(TimeOfDay::Noon);
+        assert_eq!(emission_scale("lamp_sodium", &noon), Some(LAMP_OFF));
+        assert_eq!(
+            emission_scale("lamp_sodium", &env(TimeOfDay::Sunset)),
+            Some(0.2)
+        );
     }
 
     #[test]

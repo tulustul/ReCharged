@@ -33,6 +33,9 @@ const TOUR_STEP_U: f32 = 25.0;
 /// Tour eye height above the racing line, and how far ahead it looks (u).
 const TOUR_EYE_U: f32 = 1.6;
 const TOUR_AHEAD_U: f32 = 8.0;
+/// Tour poses keep this far (arc length, u) from item rows: closer, the eye sits inside the
+/// Volt Cubes' translucent volumes and the shot is washed out.
+const TOUR_ITEM_CLEARANCE_U: f32 = 3.0;
 /// Vertical field of view of tour shots: the game's default 90° horizontal at 16:9.
 const TOUR_FOV_DEG: f32 = 58.7;
 /// Size of every capture (px).
@@ -50,10 +53,19 @@ const ROOM_CLEARANCE_U: f32 = 1.5;
 /// Indoors the preview aims this far below the track centre per unit of horizontal distance,
 /// so the low camera shows the floor rather than the ceiling.
 const INDOOR_AIM_DROP: f32 = 0.25;
+/// An indoor preview that overfills the frame by more than this switches to a cutaway.
+const CUTAWAY_SLACK: f32 = 1.1;
+/// Highest cutaway eye, relative to the ceiling height.
+const CUTAWAY_HEIGHT: f32 = 2.2;
 
 /// The camera of the capture tools.
 #[derive(Component, Debug, Clone, Copy)]
 struct CaptureCamera;
+
+/// Room ceiling and lamp fixtures: hidden for cutaway previews of low rooms (they cast no
+/// shadows, so the lighting stays the same).
+#[derive(Component, Debug, Clone, Copy)]
+pub(crate) struct Overhead;
 
 /// One image to take.
 #[derive(Debug, Clone)]
@@ -106,13 +118,14 @@ fn frame_extent(pose: &Transform, points: &[Vec3]) -> f32 {
 }
 
 /// Where the preview camera stands: across the track's long axis on the start line's side,
-/// pitched down at the centre, as close as framing the whole outline allows; indoors kept under
-/// the ceiling and inside the walls.
+/// pitched down at the centre, as close as framing the whole outline allows; indoors kept inside
+/// the walls and under the ceiling (above it with `cutaway`: the ceiling is hidden).
 pub(crate) fn preview_pose(
     outline: &[Vec2],
     start: Vec3,
     bounds: (Vec3, Vec3),
     ceiling: Option<f32>,
+    cutaway: bool,
 ) -> Transform {
     let lo = outline.iter().copied().fold(Vec2::MAX, Vec2::min);
     let hi = outline.iter().copied().fold(Vec2::MIN, Vec2::max);
@@ -138,7 +151,14 @@ pub(crate) fn preview_pose(
             let c = ROOM_CLEARANCE_U;
             eye.x = eye.x.clamp(min.x + c, max.x - c);
             eye.z = eye.z.clamp(min.z + c, max.z - c);
-            eye.y = eye.y.min(ceiling - c);
+            // A cutaway looks in from just above the hidden ceiling, close enough that the
+            // walls frame the view (higher, the room floats in the void).
+            let top = if cutaway {
+                ceiling * CUTAWAY_HEIGHT
+            } else {
+                ceiling - c
+            };
+            eye.y = eye.y.min(top);
             aim.y -= INDOOR_AIM_DROP * eye.xz().distance(target.xz());
         }
         Transform::from_translation(eye).looking_at(aim, Vec3::Y)
@@ -157,13 +177,25 @@ pub(crate) fn preview_pose(
     pose_at(far)
 }
 
-/// Tour camera at arc length `s` (moved past a jump's gap): above the racing line, looking
-/// along it.
-fn tour_pose(track: &Track, s: f32) -> Transform {
+/// Arc length of the tour shot planned at `s`: moved forward past jump gaps and item rows.
+fn tour_s(track: &Track, s: f32) -> f32 {
+    let len = track.length();
+    let near_items = |s: f32| {
+        track.item_rows().iter().any(|row| {
+            let d = (s - row.s).rem_euclid(len);
+            d.min(len - d) < TOUR_ITEM_CLEARANCE_U
+        })
+    };
     let mut s = s;
-    while track.frame_at(s).in_gap && s < track.length() * 2.0 {
+    while (track.frame_at(s).in_gap || near_items(s)) && s < len * 2.0 {
         s += 1.0;
     }
+    s
+}
+
+/// Tour camera at arc length `s` (see [`tour_s`]): above the racing line, looking along it.
+fn tour_pose(track: &Track, s: f32) -> Transform {
+    let s = tour_s(track, s);
     let eye = track.racing_line_at(s) + track.frame_at(s).up * TOUR_EYE_U;
     let ahead = track.racing_line_at(s + TOUR_AHEAD_U) + Vec3::Y * (TOUR_EYE_U * 0.4);
     Transform::from_translation(eye).looking_at(ahead, Vec3::Y)
@@ -180,6 +212,7 @@ fn plan_captures(
     paths: Option<Res<UserPaths>>,
     mut images: ResMut<Assets<Image>>,
     existing: Option<Res<CaptureRun>>,
+    overhead: Query<Entity, With<Overhead>>,
 ) {
     let (Some(automation), Some(track), Some(paths)) = (automation, track, paths) else {
         return;
@@ -200,12 +233,19 @@ fn plan_captures(
                     .as_ref()
                     .and_then(|e| e.def.room.as_ref())
                     .map(|r| r.height);
-                let pose = preview_pose(
-                    &track.outline_2d(),
-                    track.frame_at(0.0).position,
-                    track.bounds(),
-                    ceiling,
-                );
+                let outline = track.outline_2d();
+                let start = track.frame_at(0.0).position;
+                let mut pose = preview_pose(&outline, start, track.bounds(), ceiling, false);
+                // A low room cannot frame its track from under the ceiling: look in from above.
+                let points: Vec<Vec3> = outline.iter().map(|p| Vec3::new(p.x, 0.0, p.y)).collect();
+                if ceiling.is_some() && frame_extent(&pose, &points) > PREVIEW_FILL * CUTAWAY_SLACK
+                {
+                    pose = preview_pose(&outline, start, track.bounds(), ceiling, true);
+                    for entity in &overhead {
+                        commands.entity(entity).insert(Visibility::Hidden);
+                    }
+                    info!("capture: cutaway preview (ceiling hidden)");
+                }
                 info!(
                     "capture: preview from {:.1} looking {:.2}",
                     pose.translation,
@@ -363,6 +403,27 @@ fn frame_stats(frames: &mut [f32]) -> (f32, f32, f32) {
 mod tests {
     use super::*;
 
+    /// Tour shots never stand in a jump gap or inside an item row's cubes.
+    #[test]
+    fn tour_shots_keep_clear_of_gaps_and_item_rows() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let variant = rc_core::TrackVariant::forward("toy_town");
+        let track = Track::load(&assets, &variant).unwrap_or_else(|e| panic!("{e}"));
+        assert!(!track.item_rows().is_empty(), "toy_town has item rows");
+        let len = track.length();
+        for i in 0..(len / TOUR_STEP_U) as usize {
+            let s = tour_s(&track, i as f32 * TOUR_STEP_U);
+            assert!(!track.frame_at(s).in_gap, "shot {i} in a gap");
+            for row in track.item_rows() {
+                let d = (s - row.s).rem_euclid(len);
+                assert!(
+                    d.min(len - d) >= TOUR_ITEM_CLEARANCE_U,
+                    "shot {i} at an item row"
+                );
+            }
+        }
+    }
+
     #[test]
     fn frame_stats_pick_percentiles() {
         let mut frames: Vec<f32> = (1..=100).map(|i| i as f32 / 1000.0).collect();
@@ -393,6 +454,7 @@ mod tests {
             Vec3::new(-25.0, 0.3, 10.0),
             (Vec3::splat(-500.0), Vec3::splat(500.0)),
             None,
+            false,
         );
         let points: Vec<Vec3> = oval.iter().map(|p| Vec3::new(p.x, 0.0, p.y)).collect();
         let extent = frame_extent(&pose, &points);
@@ -413,6 +475,7 @@ mod tests {
             Vec3::new(10.0, 0.3, 50.0),
             (Vec3::splat(-200.0), Vec3::splat(200.0)),
             None,
+            false,
         );
         let eye = pose.translation;
         assert!(eye.x > 0.0 && eye.z > 0.0, "on the start's side: {eye}");
@@ -425,12 +488,9 @@ mod tests {
     #[test]
     fn indoor_previews_stay_inside_the_room() {
         let bounds = (Vec3::new(-60.0, -10.0, -50.0), Vec3::new(60.0, 40.0, 50.0));
-        let pose = preview_pose(
-            &square(45.0),
-            Vec3::new(-10.0, 0.3, -40.0),
-            bounds,
-            Some(16.0),
-        );
+        let outline = square(45.0);
+        let start = Vec3::new(-10.0, 0.3, -40.0);
+        let pose = preview_pose(&outline, start, bounds, Some(16.0), false);
         let eye = pose.translation;
         assert!(
             eye.y <= 16.0 - ROOM_CLEARANCE_U + 1e-4,
@@ -440,5 +500,14 @@ mod tests {
             eye.x >= -60.0 + ROOM_CLEARANCE_U - 1e-4 && eye.z >= -50.0 + ROOM_CLEARANCE_U - 1e-4
         );
         assert!(pose.forward().y < 0.0, "still looking down");
+        // The cutaway (ceiling hidden) rises above the ceiling, not far, still inside the walls.
+        let cut = preview_pose(&outline, start, bounds, Some(16.0), true).translation;
+        assert!(
+            cut.y > 16.0 && cut.y <= 16.0 * CUTAWAY_HEIGHT + 1e-4,
+            "{cut}"
+        );
+        assert!(
+            cut.x >= -60.0 + ROOM_CLEARANCE_U - 1e-4 && cut.z >= -50.0 + ROOM_CLEARANCE_U - 1e-4
+        );
     }
 }

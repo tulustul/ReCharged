@@ -331,6 +331,8 @@ fn apply_shadows(
     mut commands: Commands,
     env: Option<Res<ActiveEnvironment>>,
     settings: Option<Res<Settings>>,
+    state: Option<Res<State<AppState>>>,
+    config: Option<Res<RaceConfig>>,
     game: Query<(), With<GameCamera>>,
     keys: Query<(Entity, &EnvLight)>,
     added: Query<(), Added<EnvLight>>,
@@ -341,7 +343,11 @@ fn apply_shadows(
         return;
     };
     let graphics = settings.map(|s| s.graphics.clone()).unwrap_or_default();
-    let tier = shadow_tier(&graphics, game.iter().count().max(1));
+    let players = crate::quality::loading_players(state.as_deref(), config.as_deref());
+    let tier = shadow_tier(
+        &graphics,
+        crate::quality::views(game.iter().count(), players),
+    );
     let distance = env.def.shadow_distance * tier.distance_scale;
     if *last == Some((tier, distance)) && added.is_empty() {
         return;

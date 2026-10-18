@@ -22,7 +22,8 @@ pub type SurfaceMaterial = ExtendedMaterial<StandardMaterial, SurfaceExtension>;
 /// Shader parameters of a [`SurfaceMaterial`].
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
 pub struct SurfaceExtension {
-    /// x: albedo variation strength, y: noise frequency (1/u), z: roughness variation strength.
+    /// x: albedo variation strength, y: noise frequency (1/u), z: roughness variation strength,
+    /// w: hue drift (patches turn drier: yellower, lighter).
     #[uniform(100)]
     pub variation: Vec4,
     /// x: wetness 0–1, y: puddle amount 0–1, z: snow cover 0–1, w: 1 = receives weather.
@@ -31,14 +32,15 @@ pub struct SurfaceExtension {
 }
 
 impl SurfaceExtension {
-    /// Variation `strength` (0–1); `weather` = the surface reacts to wetness and snow.
-    pub fn new(strength: f32, weather: bool) -> Self {
+    /// Variation `strength` and `hue` drift (0–1); `weather` = the surface reacts to wetness and
+    /// snow.
+    pub fn new(strength: f32, hue: f32, weather: bool) -> Self {
         Self {
             variation: Vec4::new(
                 strength,
                 VARIATION_FREQ,
                 strength * ROUGHNESS_VARIATION,
-                0.0,
+                hue,
             ),
             weather: Vec4::new(0.0, 0.0, 0.0, if weather { 1.0 } else { 0.0 }),
         }
@@ -69,11 +71,11 @@ mod tests {
 
     #[test]
     fn weather_updates_report_changes_only() {
-        let mut ext = SurfaceExtension::new(0.2, true);
+        let mut ext = SurfaceExtension::new(0.2, 0.0, true);
         assert!(!ext.set_weather(0.0, 0.0, 0.0), "already dry");
         assert!(ext.set_weather(0.5, 0.3, 0.0));
         assert!(!ext.set_weather(0.5, 0.3, 0.0));
         assert_eq!(ext.weather.w, 1.0, "the opt-in flag survives updates");
-        assert_eq!(SurfaceExtension::new(0.2, false).weather.w, 0.0);
+        assert_eq!(SurfaceExtension::new(0.2, 0.0, false).weather.w, 0.0);
     }
 }

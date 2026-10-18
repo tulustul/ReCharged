@@ -76,7 +76,7 @@ pub(super) fn build(app: &mut App) {
 pub(crate) fn room_radiance(
     colors: &super::RoomColors,
     toward_key: Vec3,
-    lamps: bool,
+    lamps: f32,
     dir: Vec3,
 ) -> [f32; 3] {
     let up = dir.y;
@@ -102,10 +102,10 @@ pub(crate) fn room_radiance(
         *ch += w * band * mullions;
     }
     // Lamps: a grid of warm spots on the ceiling.
-    if lamps && up > 0.35 {
+    if lamps > 0.0 && up > 0.35 {
         let p = Vec2::new(dir.x, dir.z) / up * 1.6;
         let f = Vec2::new(p.x - p.x.round(), p.y - p.y.round()).length();
-        let spot = smooth(0.18, 0.05, f) * smooth(0.35, 0.6, up);
+        let spot = smooth(0.18, 0.05, f) * smooth(0.35, 0.6, up) * lamps;
         for (ch, l) in c.iter_mut().zip(colors.lamp) {
             *ch += l * spot;
         }
@@ -275,6 +275,7 @@ fn spawn_lamps(
                 MeshMaterial3d(fixture.clone()),
                 Transform::from_xyz(0.0, FIXTURE_DEPTH_U * 0.5, 0.0),
                 NotShadowCaster,
+                crate::capture::Overhead,
             )],
         ));
         match grid.spot_angle {
@@ -319,17 +320,16 @@ fn switch_lamps(
     mut points: Query<(&Lamp, &mut PointLight)>,
     mut spots: Query<(&Lamp, &mut SpotLight)>,
     fresh: Query<(), Added<Lamp>>,
-    mut last: Local<Option<bool>>,
+    mut last: Local<Option<f32>>,
 ) {
     let Some(look) = look else {
         return;
     };
-    let on = look.lamps;
-    if *last == Some(on) && fresh.is_empty() {
+    let scale = look.lamps;
+    if *last == Some(scale) && fresh.is_empty() {
         return;
     }
-    *last = Some(on);
-    let scale = if on { 1.0 } else { 0.0 };
+    *last = Some(scale);
     for (lamp, mut light) in &mut points {
         light.intensity = lamp.lumens * scale;
     }
@@ -355,10 +355,10 @@ mod tests {
         let key = sun_direction(25.0, 90.0);
         let toward_window = sun_direction(20.0, 90.0);
         let away = sun_direction(20.0, 270.0);
-        let w = room_radiance(&colors, key, false, toward_window);
-        let a = room_radiance(&colors, key, false, away);
+        let w = room_radiance(&colors, key, 0.0, toward_window);
+        let a = room_radiance(&colors, key, 0.0, away);
         assert!(w[0] > a[0] * 3.0, "window {w:?} vs back wall {a:?}");
-        let floor = room_radiance(&colors, key, false, Vec3::NEG_Y);
+        let floor = room_radiance(&colors, key, 0.0, Vec3::NEG_Y);
         assert!((floor[1] - colors.floor[1]).abs() < 1e-4);
     }
 
@@ -366,8 +366,8 @@ mod tests {
     fn lamps_add_ceiling_spots_only_when_on() {
         let colors = RoomColors::default();
         let key = sun_direction(25.0, 90.0);
-        let off = room_radiance(&colors, key, false, Vec3::Y);
-        let on = room_radiance(&colors, key, true, Vec3::Y);
+        let off = room_radiance(&colors, key, 0.0, Vec3::Y);
+        let on = room_radiance(&colors, key, 1.0, Vec3::Y);
         assert!(on[0] > off[0] + 1.0);
     }
 

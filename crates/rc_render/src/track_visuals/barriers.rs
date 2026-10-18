@@ -1,7 +1,8 @@
 //! Barriers in the environment's style (GDD §7.3, art bible §3): where rc_track has a barrier,
 //! a row of chamfered blocks — foam blocks in the toy store, red/white kart blocks on the test
-//! grounds, kerb stones on the street, edging stones in the garden, book rows in the house,
-//! crates and kick plates in the supermarket, hazard-yellow and rubber blocks in the workshop —
+//! grounds, a low sandstone garden wall on the street, edging stones in the garden, book rows in
+//! the house, painted-steel kick plates in the supermarket, hazard-yellow and rubber blocks in the
+//! workshop —
 //! occupying exactly the collider's box (same frames, inner face, thickness, depth and height as
 //! rc_track's sweep). Environments without a block style draw the collider sweep in their
 //! `barrier` material.
@@ -46,8 +47,18 @@ pub(crate) fn block_style(environment: &str) -> Option<BlockStyle> {
             ][..],
         ),
         "test" => style(1.5, 0.0, &["plastic_red", "plastic_white"][..]),
-        // Kerb stones and brick edging in the environment's own barrier material.
-        "street" => style(4.0, 0.05, &["barrier"][..]),
+        // A low garden wall of two sandstone tones (street); brick edging (garden).
+        "street" => style(
+            2.4,
+            0.06,
+            &[
+                "garden_wall",
+                "garden_wall_b",
+                "garden_wall",
+                "garden_wall",
+                "garden_wall_b",
+            ][..],
+        ),
         "garden" => style(1.2, 0.06, &["barrier"][..]),
         // Hazard-yellow kerbs alternating with black rubber blocks.
         "workshop" => style(2.0, 0.04, &["trim", "barrier"][..]),
@@ -64,12 +75,8 @@ pub(crate) fn block_style(environment: &str) -> Option<BlockStyle> {
                 "book_cream",
             ][..],
         ),
-        // Painted kick plates and plastic crates.
-        "supermarket" => style(
-            2.4,
-            0.05,
-            &["barrier", "crate_blue", "barrier", "crate_green"][..],
-        ),
+        // One continuous painted-steel kick plate (joints every 6 u).
+        "supermarket" => style(6.0, 0.0, &["barrier"][..]),
         _ => None,
     }
 }

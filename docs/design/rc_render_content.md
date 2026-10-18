@@ -111,12 +111,17 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
 0.6 s, and the app quits once every PNG is written, logging frame-time p50/p95/max of the run.
 - `--capture-previews`: `TrackInfo.preview` (e.g. `assets/ui/tracks/toy_town.png`), forward
   layout only. The camera looks across the track's long axis from the start line's side, as close
-  as framing the whole outline allows (bisection on the projected outline); indoors it stays under
-  the ceiling and inside the walls and aims lower so the floor fills the frame. All tracks:
+  as framing the whole outline allows (bisection on the projected outline); indoors it stays
+  inside the walls and aims lower so the floor fills the frame. When a room is too low to frame
+  its track from under the ceiling (every shipped indoor track), the preview is a **cutaway**:
+  the ceiling and lamp fixtures (`Overhead`; they cast no shadows, so the light is unchanged) are
+  hidden and the eye rises to ≤ 2.2× the ceiling height. All tracks (previews of 2026-10-19):
   ```sh
-  for t in toy_town maple_street test_oval; do cargo run -p recharged -- --user-data-dir \
-      target/agent-data/T13b --unlock-all --quick-race $t --time noon --weather clear \
-      --capture-previews --exit-after 60; done
+  for s in toy_town:noon sofa_circuit:noon backyard_bash:noon aisle_rush:sunset \
+      wrench_works:noon maple_street:noon test_oval:noon; do
+    cargo run -p recharged -- --user-data-dir target/agent-data/T13a --unlock-all \
+      --quick-race ${s%%:*} --time ${s##*:} --weather clear --capture-previews --exit-after 90
+  done
   ```
 - `--track-tour <track>`: a shot every 25 u along the racing line (moved forward past jump gaps
   and ≥ 3 u away from item rows, so the eye is never inside the Volt Cubes), eye 1.6 u above it, looking

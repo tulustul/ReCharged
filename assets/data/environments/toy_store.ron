@@ -69,7 +69,7 @@
         fog_visibility: 1400.0,
         grading: (temperature: 0.05, saturation: 1.08, contrast: 1.04),
         bloom: 0.12,
-        lamps: true,
+        lamps: 1.0,
         window: (1.6, 0.95, 0.55),
     ),
     night: (
@@ -81,7 +81,7 @@
         fog_visibility: 1400.0,
         grading: (temperature: 0.03, saturation: 1.0, contrast: 1.06),
         bloom: 0.15,
-        lamps: true,
+        lamps: 1.0,
         window: (0.06, 0.09, 0.17),
     ),
 )

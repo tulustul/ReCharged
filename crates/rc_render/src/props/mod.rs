@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use rc_core::prelude::*;
 use rc_track::{PropDef, Track};
 
-use crate::content::{ContentLoad, is_night, mesh_from_data};
+use crate::content::{ContentLoad, mesh_from_data};
 use crate::lighting::ActiveEnvironment;
 use crate::materials::{MaterialLibrary, SurfaceMaterial};
 use lamps::PropLamps;
@@ -111,7 +111,7 @@ fn dress_props(
     if library.environment() != Some(env.id.as_str()) {
         return;
     }
-    let night = is_night(Some(&env));
+    let practicals = env.def.practicals(env.time);
     let (mut waiting, mut dressed, mut lit) = (false, 0, 0);
     for (entity, prop, transform, visual) in &props {
         let Some(def) = track.prop_def(&prop.kind) else {
@@ -180,9 +180,11 @@ fn dress_props(
                 ));
             }
         }
-        if night && let Some(lights) = lamp_lights.get(&prop.kind) {
+        if practicals > 0.0
+            && let Some(lights) = lamp_lights.get(&prop.kind)
+        {
             for light in lights {
-                lamps::spawn_lamp(&mut commands, root, light);
+                lamps::spawn_lamp(&mut commands, root, light, practicals);
                 lit += 1;
             }
         }

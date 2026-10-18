@@ -9,6 +9,7 @@ use bevy::light::NotShadowCaster;
 use bevy::prelude::*;
 use rc_track::{MeshData, Track};
 
+use crate::capture::Overhead;
 use crate::content::mesh_from_data;
 use crate::lighting::{ActiveEnvironment, RoomDef, WindowDef, WindowWall};
 use crate::materials::{MaterialLibrary, SurfaceMaterial};
@@ -49,9 +50,7 @@ pub(super) fn spawn(
     let role = |name: &str| library.named(name).unwrap_or_default();
     let mut add =
         |data: MeshData, name: &'static str, material: Handle<SurfaceMaterial>, casts: bool| {
-            let Some(mesh) = mesh_from_data(&data) else {
-                return;
-            };
+            let mesh = mesh_from_data(&data)?;
             let mut e = commands.spawn((
                 Name::new(name),
                 Mesh3d(meshes.add(mesh)),
@@ -61,6 +60,7 @@ pub(super) fn spawn(
             if !casts {
                 e.insert(NotShadowCaster);
             }
+            Some(e.id())
         };
     let Some(room) = &env.def.room else {
         // A ring at road level reaching to the horizon, plus an inner floor under the play area
@@ -91,7 +91,9 @@ pub(super) fn spawn(
         ((max - min) * 0.5 + lid).with_y(WALL_U * 0.5),
         0.0,
     );
-    add(ceiling, "room ceiling", role("ceiling"), false);
+    if let Some(e) = add(ceiling, "room ceiling", role("ceiling"), false) {
+        commands.entity(e).insert(Overhead);
+    }
 }
 
 /// A thin floor slab over the x/z box with its top just below `top`.

@@ -57,19 +57,42 @@ fn decorate(add: On<Add<QualityCamera>>, mut commands: Commands) {
         .insert((Hdr, Tonemapping::TonyMcMapface, Msaa::Off));
 }
 
-/// Number of player views: game cameras on screen (menus: 1).
-fn views(game_cameras: usize) -> usize {
-    game_cameras.max(1)
+/// Number of player views: game cameras on screen (menus: 1). While Loading, before the game
+/// cameras exist, the race's local players: the warm-up camera must compile the split-screen
+/// variants the race will use.
+pub(crate) fn views(game_cameras: usize, loading_players: Option<usize>) -> usize {
+    match loading_players {
+        Some(players) if game_cameras == 0 => players.clamp(1, 4),
+        _ => game_cameras.max(1),
+    }
+}
+
+/// Local players of the race being loaded (`None` outside `Loading`).
+pub(crate) fn loading_players(
+    state: Option<&State<AppState>>,
+    config: Option<&RaceConfig>,
+) -> Option<usize> {
+    let loading = state.is_some_and(|s| *s.get() == AppState::Loading);
+    let humans = |c: &RaceConfig| {
+        c.racers
+            .iter()
+            .filter(|r| matches!(r.controller, Controller::Human { .. }))
+            .count()
+    };
+    loading.then(|| config.map_or(1, humans))
 }
 
 fn apply_quality(
     mut commands: Commands,
     settings: Option<Res<Settings>>,
+    state: Option<Res<State<AppState>>>,
+    config: Option<Res<RaceConfig>>,
     cameras: Query<(Entity, Option<&Applied>), With<QualityCamera>>,
     game: Query<(), With<GameCamera>>,
 ) {
     let graphics = settings.map(|s| s.graphics.clone()).unwrap_or_default();
-    let quality = view_quality(&graphics, views(game.iter().count()));
+    let players = loading_players(state.as_deref(), config.as_deref());
+    let quality = view_quality(&graphics, views(game.iter().count(), players));
     for (entity, applied) in &cameras {
         let old = applied.map(|a| a.0);
         if old == Some(quality) {
@@ -198,7 +221,10 @@ mod tests {
 
     #[test]
     fn menus_count_as_one_view() {
-        assert_eq!(views(0), 1);
-        assert_eq!(views(3), 3);
+        assert_eq!(views(0, None), 1);
+        assert_eq!(views(3, None), 3);
+        assert_eq!(views(0, Some(2)), 2, "warm-up of a 2-player race");
+        assert_eq!(views(2, Some(2)), 2);
+        assert_eq!(views(0, Some(0)), 1);
     }
 }

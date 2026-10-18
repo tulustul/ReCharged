@@ -34,52 +34,82 @@ pub(super) fn build(app: &mut App) {
     );
 }
 
-/// Which environment's static parts (sky, IBL source, stars) a camera carries.
+/// Which environment's static parts (sky, filtered IBL maps, stars) a camera carries.
 #[derive(Component, Debug, Clone, PartialEq)]
 struct CameraEnv {
     id: String,
     time: TimeOfDay,
-    env_map: Option<Handle<Image>>,
+    maps: Option<(AssetId<Image>, AssetId<Image>)>,
 }
+
+/// The one entity Bevy filters the environment map on (every frame); cameras share its filtered
+/// maps instead of each filtering a copy (four player views did the work four times).
+#[derive(Component, Debug)]
+struct EnvProbe;
 
 /// The star field, made once.
 #[derive(Resource, Debug)]
 struct StarMap(Handle<Image>);
 
-/// Switches a camera's sky / IBL source when the environment (or its room map) changes.
+/// Switches a camera's sky / IBL maps when the environment (or its room map) changes. The
+/// environment map is filtered once, on the [`EnvProbe`].
+#[allow(clippy::too_many_arguments)]
 fn apply_environment(
     mut commands: Commands,
     env: Option<Res<ActiveEnvironment>>,
     env_map: Option<Res<EnvMap>>,
     stars: Option<Res<StarMap>>,
     mut images: ResMut<Assets<Image>>,
+    probes: Query<
+        (
+            Entity,
+            &GeneratedEnvironmentMapLight,
+            Option<&EnvironmentMapLight>,
+        ),
+        With<EnvProbe>,
+    >,
     cameras: Query<(Entity, Option<&CameraEnv>), With<QualityCamera>>,
 ) {
     let Some(env) = env else {
         return;
     };
     let map = env_map.filter(|m| m.env == env.id).map(|m| m.image.clone());
+    // Point the probe at the current map (its filtered targets are refilled every frame).
+    let probe = probes.single().ok();
+    if let Some(map) = &map {
+        let source = GeneratedEnvironmentMapLight {
+            environment_map: map.clone(),
+            ..default()
+        };
+        match probe {
+            None => {
+                commands.spawn((Name::new("Environment map probe"), EnvProbe, source));
+            }
+            Some((entity, current, _)) if current.environment_map != *map => {
+                commands.entity(entity).insert(source);
+            }
+            Some(_) => {}
+        }
+    }
+    // The filtered targets stay the same when the source changes (no frame without IBL).
+    let filtered = probe.and_then(|(_, _, light)| light).cloned();
     let wanted = CameraEnv {
         id: env.id.clone(),
         time: env.time,
-        env_map: map.clone(),
+        maps: filtered
+            .as_ref()
+            .map(|l| (l.diffuse_map.id(), l.specular_map.id())),
     };
     for (entity, current) in &cameras {
         if current == Some(&wanted) {
             continue;
         }
         let mut camera = commands.entity(entity);
-        camera.remove::<(
-            AtmosphereSettings,
-            GeneratedEnvironmentMapLight,
-            EnvironmentMapLight,
-            Skybox,
-        )>();
-        if let Some(map) = &map {
-            camera.insert(GeneratedEnvironmentMapLight {
-                environment_map: map.clone(),
+        camera.remove::<(AtmosphereSettings, EnvironmentMapLight, Skybox)>();
+        if let Some(light) = &filtered {
+            camera.insert(EnvironmentMapLight {
                 intensity: 0.0,
-                ..default()
+                ..light.clone()
             });
         }
         if !env.def.indoor {

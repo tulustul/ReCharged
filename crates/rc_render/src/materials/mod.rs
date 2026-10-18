@@ -70,6 +70,8 @@ pub struct MaterialDef {
     pub tile_u: f32,
     /// Macro variation (breaks tiling): albedo modulation strength 0–1.
     pub variation: f32,
+    /// Hue drift 0–1: macro patches turn drier — yellower and lighter (lawns, soil).
+    pub hue_variation: f32,
     /// Clear coat 0–1 (varnish, glaze) and its roughness.
     pub clearcoat: f32,
     /// Roughness of the clear coat.
@@ -87,6 +89,7 @@ impl Default for MaterialDef {
             metallic: 0.0,
             tile_u: 0.0,
             variation: 0.15,
+            hue_variation: 0.0,
             clearcoat: 0.0,
             clearcoat_roughness: 0.1,
             weather: true,
@@ -128,7 +131,11 @@ pub fn default_surface(kind: SurfaceKind) -> MaterialDef {
         SurfaceKind::Tile => MaterialDef::textured("tile", [1.0; 3], 1.0),
         SurfaceKind::Carpet => MaterialDef::textured("carpet", [0.71, 0.33, 0.24], 1.0),
         SurfaceKind::Cardboard => MaterialDef::textured("cardboard", [1.0; 3], 1.0),
-        SurfaceKind::Grass => MaterialDef::textured("grass", [1.0; 3], 1.0),
+        SurfaceKind::Grass => MaterialDef {
+            variation: 0.3,
+            hue_variation: 0.7,
+            ..MaterialDef::textured("grass", [1.0; 3], 1.0)
+        },
         SurfaceKind::Dirt => MaterialDef::textured("dirt", [1.0; 3], 1.0),
         SurfaceKind::Ice => MaterialDef {
             clearcoat: 0.6,
@@ -140,7 +147,12 @@ pub fn default_surface(kind: SurfaceKind) -> MaterialDef {
             clearcoat_roughness: 0.04,
             ..MaterialDef::flat([0.045, 0.04, 0.035], 0.25)
         },
-        SurfaceKind::Water => MaterialDef::flat([0.07, 0.08, 0.09], 0.04),
+        // Shallow muddy water: the bottom shows through, the coat mirrors the sky.
+        SurfaceKind::Water => MaterialDef {
+            clearcoat: 1.0,
+            clearcoat_roughness: 0.03,
+            ..MaterialDef::flat([0.3, 0.3, 0.28], 0.2)
+        },
     }
 }
 
@@ -300,7 +312,7 @@ impl MaterialLibrary {
         };
         SurfaceMaterial {
             base,
-            extension: SurfaceExtension::new(def.variation, def.weather),
+            extension: SurfaceExtension::new(def.variation, def.hue_variation, def.weather),
         }
     }
 

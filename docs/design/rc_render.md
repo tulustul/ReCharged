@@ -31,7 +31,9 @@ Shaders (WESL, `assets/shaders/render/`): `surface.wesl` (macro variation, wetne
   map attached — both change pipeline keys; finishing earlier left ≈ 2 s of compiles for the
   Intro) and for 3 frames the render world has neither queued nor created a pipeline (20 s
   timeout; frame counts stay low because the driver throttles an occluded window to 1 frame/s).
-  Still compiled in the Intro: pickups/effects spawned in `Setup` (transparent PBR variants, ≈ 1 s).
+  While Loading, quality and shadow tiers count the race's local players as views, so the
+  warm-up compiles the split-screen variants (2 players: Loading → Intro 4.7 s → 3.2 s). Still
+  compiled in the Intro: pickups/effects spawned in `Setup` (transparent PBR variants, ≈ 1 s).
 - `OnEnter(Unloading)`: `ActiveEnvironment` removed; `Look` disappears with it.
 
 ## Quality (GDD §15, ARCH §5.8, §9)
@@ -58,7 +60,9 @@ them unsynced), size only when the setting changes and never with
 Physical units everywhere: sun/window/moon in lux, lamps in **real-world lumens × 4.44²**
 (`lamp_lumens`; falloff is inverse-square in u), EV100 exposure per time of day. Rule of thumb used
 for tuning: `EV ≈ log2(0.191 × key lux)` puts an 18 % grey under the key light at ≈ 0.25 linear;
-indirect light ≈ 15 % of the key. Screenshots are sRGB: 0.18 linear shows as 118/255.
+indirect light ≈ 15 % of the key (physical; `test`). The garden and street day looks use ≈ 3× the
+physical sky fill (`env_light` 15–32 k) so shade under trees, fences and parked cars stays readable
+(≈ 0.3 of the sunlit ground, art review). Screenshots are sRGB: 0.18 linear shows as 118/255.
 
 - **Outdoor:** Bevy atmosphere for the visible sky (`AtmosphereSettings`), sun `lux` is top of
   atmosphere (the atmosphere attenuates/reddens it), `SunDisk` (also the moon at night), star
@@ -74,7 +78,7 @@ indirect light ≈ 15 % of the key. Screenshots are sRGB: 0.18 linear shows as 1
   `room.height`, window glass panes on the wall centre plane (`door: true` openings: no mullions,
   no rain on the pane; frames/openings in `track_visuals/shell.rs`). Extra env `lights` (point or
   spot, `times` filter, real-world lumens) for display spots and practicals. Per time of day:
-  `lamps` = room lamp level 0–1 (supermarket night 0.12), `practicals` = props' lamp level
+  `lamps` = room lamp level 0–1 (supermarket night 0.15), `practicals` = props' lamp level
   (default on at Night only); `fixture_materials` names decor fixtures that follow `lamps`.
 - **Emissives** are not scaled by exposure (`emissive_exposure_weight = 0`), so art-bible values
   read the same in every environment. Clear-coated paints reflect the environment map: keep
@@ -120,7 +124,8 @@ cans, cyan/volt neon strips, a warm work lamp. EV 8.
 ## Verify
 - `cargo test -p rc_render` (quality mapping incl. AA rules, shadow tiers, sun angles, sky model,
   cubemap orientation, half floats, weather maths, flash filter, room maps, lamp grid, window glass
-  placement, materials, paint, env files, proxies, warm-up, coat fix, barrier materials).
+  placement, materials, paint, env files, lamp/fixture levels, proxies, warm-up, coat fix,
+  barrier materials, tour clearance, cutaway previews).
 - Screenshots: `recharged --user-data-dir target/agent-data/<id> --window 1600x900 --quick-race
   test_oval|toy_town --time <t> --weather <w> --screenshot-at 12 --screenshot <png> --exit-after 14`;
   the menu without `--quick-race`.

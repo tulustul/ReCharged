@@ -7,7 +7,7 @@
     shadow_distance: 130.0,
     materials: {
         // Lawn #5E9A3A.
-        "floor": (set: Some("grass"), color: (1.0, 1.0, 1.0), variation: 0.18),
+        "floor": (set: Some("grass"), color: (1.0, 1.0, 1.0), variation: 0.3, hue_variation: 0.7),
         // Decking #8A6142.
         "deck": (set: Some("wood_planks"), color: (0.76, 0.72, 0.7), roughness: 1.6),
         // Brick edging and low fence boards.
@@ -19,8 +19,9 @@
     surfaces: { Wood: "deck" },
     morning: (
         sun: (elevation: 14.0, azimuth: 95.0, lux: 128000.0),
-        env_light: 7000.0,
-        exposure: 13.1,
+        // Sky fill ≈ 3× physical so shadowed fences and the shed read (art review).
+        env_light: 20000.0,
+        exposure: 12.7,
         fog_color: (0.72, 0.72, 0.7),
         fog_visibility: 2400.0,
         grading: (temperature: 0.03, saturation: 1.08, contrast: 1.04),
@@ -29,8 +30,8 @@
     ),
     noon: (
         sun: (elevation: 60.0, azimuth: 170.0, lux: 128000.0),
-        env_light: 9000.0,
-        exposure: 14.8,
+        env_light: 26000.0,
+        exposure: 14.55,
         fog_color: (0.68, 0.75, 0.84),
         fog_visibility: 2400.0,
         grading: (saturation: 1.1, contrast: 1.05),
@@ -39,8 +40,8 @@
     ),
     sunset: (
         sun: (elevation: 7.0, azimuth: 265.0, lux: 128000.0),
-        env_light: 7000.0,
-        exposure: 11.3,
+        env_light: 16000.0,
+        exposure: 11.1,
         fog_color: (0.78, 0.6, 0.48),
         fog_visibility: 2000.0,
         grading: (temperature: 0.06, saturation: 1.12, contrast: 1.06),
@@ -48,10 +49,10 @@
         clouds: (lit: (1.0, 0.6, 0.38), shade: (0.32, 0.27, 0.38)),
     ),
     night: (
-        sun: (elevation: 38.0, azimuth: 200.0, lux: 18.0, color: (0.72, 0.82, 1.0)),
-        env_light: 40.0,
+        sun: (elevation: 38.0, azimuth: 200.0, lux: 25.0, color: (0.72, 0.82, 1.0)),
+        env_light: 55.0,
         exposure: 2.6,
-        ambient: 1.5,
+        ambient: 2.0,
         ambient_color: (0.5, 0.6, 0.85),
         fog_color: (0.02, 0.03, 0.05),
         fog_visibility: 1600.0,

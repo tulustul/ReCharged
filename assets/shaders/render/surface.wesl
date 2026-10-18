@@ -65,6 +65,9 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let m = fbm(p * variation.y) * 2.0 - 1.0;
     let m2 = value_noise(p * variation.y * 2.7 + vec2<f32>(31.7, 11.3)) * 2.0 - 1.0;
     var color = pbr_input.material.base_color.rgb * max(1.0 + variation.x * m, 0.0);
+    // Hue drift (w; lawns, soil): other, larger patches turn drier — yellower and lighter.
+    let h = fbm(p * variation.y * 0.55 + vec2<f32>(23.9, 7.7));
+    color = mix(color, color * vec3<f32>(1.3, 1.12, 0.55), variation.w * smoothstep(0.42, 0.72, h));
     var rough = pbr_input.material.perceptual_roughness * max(1.0 + variation.z * m2, 0.05);
 
     let receives = weather.w;
