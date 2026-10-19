@@ -3,8 +3,10 @@
 //! a warm key spot, a cool rim light and giant workshop props ([`diorama`]). rc_camera's
 //! `MenuCamera` drifts around it. The car itself is a [`CarModel`] (glb, paint, idle lamps).
 //!
-//! `ShowroomReady` is present exactly while the backdrop car is instanced, painted and visible:
-//! a car swap keeps the previous car until the new one is ready, so it does not flicker.
+//! `ShowroomReady` is present exactly while the backdrop car is instanced and painted (the 3D
+//! showroom renders): a car swap keeps the previous car until the new one is ready, so it does not
+//! flicker. `BackdropFocus::Room` hides the car (screens that cover the turntable: Garage grid,
+//! Credits roll, Cup-end podium); the room stays.
 
 mod diorama;
 
@@ -22,7 +24,7 @@ pub(crate) fn build(app: &mut App) {
     app.add_systems(OnEnter(AppState::Menu), diorama::spawn)
         .add_systems(
             Update,
-            (turn, choose_car, signal_ready)
+            (turn, choose_car, show_car, signal_ready)
                 .chain()
                 .in_set(VisualSet)
                 .run_if(in_state(AppState::Menu)),
@@ -112,9 +114,18 @@ fn choose_car(
     commands.entity(*table).add_child(car);
 }
 
+/// How a ready car shows under the backdrop's framing.
+fn car_visibility(backdrop: Option<&MenuBackdrop>) -> Visibility {
+    match backdrop.map(|b| b.focus) {
+        Some(BackdropFocus::Room) => Visibility::Hidden,
+        _ => Visibility::Inherited,
+    }
+}
+
 /// A car is instanced and painted: show it, retire the older ones, signal the UI.
 fn car_ready(
     ready: On<Add<CarModelReady>>,
+    backdrop: Option<Res<MenuBackdrop>>,
     mut commands: Commands,
     mut cars: Query<(Entity, &ShowroomCar, &mut Visibility)>,
 ) {
@@ -122,13 +133,27 @@ fn car_ready(
         return;
     };
     let serial = shown.serial;
-    *visibility = Visibility::Inherited;
+    *visibility = car_visibility(backdrop.as_deref());
     for (entity, other, _) in &cars {
         if other.serial < serial {
             commands.entity(entity).despawn();
         }
     }
     commands.insert_resource(ReadyIn(READY_AFTER_FRAMES));
+}
+
+/// Hides or shows the ready car when the backdrop's framing changes.
+fn show_car(
+    backdrop: Option<Res<MenuBackdrop>>,
+    mut cars: Query<&mut Visibility, (With<ShowroomCar>, With<CarModelReady>)>,
+) {
+    let Some(backdrop) = backdrop.filter(|b| b.is_changed()) else {
+        return;
+    };
+    let wanted = car_visibility(Some(&backdrop));
+    for mut visibility in &mut cars {
+        visibility.set_if_neq(wanted);
+    }
 }
 
 /// Counts down after a car became visible; once it has been drawn, the UI may rely on it.
@@ -178,6 +203,20 @@ mod tests {
         let model = wanted_car(Some(&MenuBackdrop::default()), &catalog).expect("fallback");
         assert_eq!((model.car.as_str(), model.paint), ("sparky", PaintId(0)));
         assert!(wanted_car(None, &Catalog::default()).is_none());
+    }
+
+    #[test]
+    fn the_room_framing_hides_the_car() {
+        let room = MenuBackdrop {
+            focus: BackdropFocus::Room,
+            ..default()
+        };
+        assert_eq!(car_visibility(Some(&room)), Visibility::Hidden);
+        assert_eq!(
+            car_visibility(Some(&MenuBackdrop::default())),
+            Visibility::Inherited
+        );
+        assert_eq!(car_visibility(None), Visibility::Inherited);
     }
 
     #[test]

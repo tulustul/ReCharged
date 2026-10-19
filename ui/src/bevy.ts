@@ -248,7 +248,43 @@ device: UiDeviceKind,
  */
 repeat: boolean, };
 export type NextRace = null;
-export type NextTrack = UiTrackVariant;
+export type NextTrack = { 
+/**
+ * Track id.
+ */
+track: string, 
+/**
+ * Reverse layout.
+ */
+reverse: boolean, 
+/**
+ * Mirrored.
+ */
+mirror: boolean, 
+/**
+ * AI opponents (default: as before).
+ */
+ai?: number, 
+/**
+ * AI difficulty.
+ */
+difficulty?: UiDifficulty, 
+/**
+ * Laps.
+ */
+laps?: number, 
+/**
+ * Weather.
+ */
+weather?: UiWeatherChoice, 
+/**
+ * Time of day.
+ */
+time?: UiTimeOfDay, 
+/**
+ * Items on/off.
+ */
+items?: boolean, };
 export type OpenLobby = null;
 export type OutlineParams = { width: number | string, color: string, softness: number | string, };
 export type PinchParams = { 
@@ -346,9 +382,14 @@ action: UiDriveAction,
  */
 binding: UiBinding | null, 
 /**
- * An action that already used it.
+ * An action that already used it: the two swapped.
  */
-conflict: UiConflict | null, };
+conflict: UiConflict | null, 
+/**
+ * The binding the conflicting action received (the rebound action's previous one); `null`
+ * with a conflict = that action lost the captured binding (it may be unbound now).
+ */
+previous: UiBinding | null, };
 export type Rematch = null;
 export type ResetBindings = { 
 /**
@@ -433,7 +474,7 @@ bindings: Array<UiBinding>, };
 export type UiAntiAliasing = "off" | "fxaa" | "smaa" | "taa";
 export type UiAppState = "boot" | "menu" | "loading" | "inRace" | "unloading";
 export type UiAudio = { master: number, music: number, sfx: number, engines: number, ui: number, ambience: number, muteUnfocused: boolean, };
-export type UiBackdropFocus = "wide" | "car";
+export type UiBackdropFocus = "wide" | "car" | "room";
 export type UiBinding = { "kind": "key", 
 /**
  * `KeyCode` variant (same names as the web's `KeyboardEvent.code`).
@@ -665,7 +706,11 @@ minimap: boolean,
 /**
  * Reduce flashing: no pulsing warnings or flashing meters.
  */
-reduceFlashing: boolean, };
+reduceFlashing: boolean, 
+/**
+ * Colour-blind markers: racer shapes on the minimap and in the standings.
+ */
+colorblindMarkers: boolean, };
 export type UiHudSnapshot = { 
 /**
  * As `race.setup`.
@@ -748,6 +793,16 @@ slot: number,
  * Device family it uses (join glyph).
  */
 device: UiDeviceKind, };
+export type UiMarker = { "kind": "player", 
+/**
+ * Slot 0–3.
+ */
+slot: number, } | { "kind": "shape", 
+/**
+ * The shape.
+ */
+shape: UiMarkerShape, };
+export type UiMarkerShape = "circle" | "triangle" | "square" | "diamond" | "star" | "cross" | "pentagon" | "hexagon";
 export type UiMedal = "bronze" | "silver" | "gold" | "platinum";
 export type UiMode = { "kind": "quickRace" } | { "kind": "timeTrial" } | { "kind": "versus" } | { "kind": "championship", 
 /**
@@ -1163,6 +1218,10 @@ time: UiTimeOfDay,
  */
 items: boolean, 
 /**
+ * The rivals' difficulty (`null` without rivals).
+ */
+difficulty: UiDifficulty | null, 
+/**
  * Racers in grid order.
  */
 racers: Array<UiRacer>, };
@@ -1182,7 +1241,11 @@ slot: number | null,
 /**
  * Racer colour, sRGB 0–1.
  */
-color: [number, number, number], };
+color: [number, number, number], 
+/**
+ * Colour-blind marker (shown when the setting is on).
+ */
+marker: UiMarker, };
 export type UiReady = null;
 export type UiRecordTime = { 
 /**
@@ -1245,8 +1308,9 @@ timeMs: number,
  */
 bestLapMs: number | null, 
 /**
- * Points this race gave (cup: everyone; Versus: players; `null` until processed / other
- * modes).
+ * Points this race gave (cup: everyone; Versus: players; `null` until processed, for AI in
+ * Versus and in Quick Race / Time Trial — the PTS column shows only when some line has
+ * points).
  */
 points: number | null, };
 export type UiResults = { 
@@ -1289,6 +1353,11 @@ wins: number,
  * The AI took over this player's car.
  */
 dropped: boolean, };
+export type UiScreen = { 
+/**
+ * Screen id.
+ */
+screen: string, };
 export type UiSettings = { 
 /**
  * Gameplay tab.
@@ -1431,19 +1500,6 @@ weather: Array<UiWeatherKind>,
  * Unlock rule of the forward layout.
  */
 unlock: UiUnlockRule, };
-export type UiTrackVariant = { 
-/**
- * Track id.
- */
-track: string, 
-/**
- * Reverse layout.
- */
-reverse: boolean, 
-/**
- * Mirrored.
- */
-mirror: boolean, };
 export type UiTrophy = "bronze" | "silver" | "gold";
 export type UiUnlock = { 
 /**
@@ -1600,6 +1656,7 @@ export interface ReactMessages {
   "settings.apply": ApplySettings;
   "ui.error": UiError;
   "ui.ready": UiReady;
+  "ui.screen": UiScreen;
   "ui.sound": PlayCue;
   "ui.stinger": PlayStinger;
 }
@@ -1946,6 +2003,7 @@ export const bevy = {
   ui: {
     error(value: UiError): void { emit("ui.error", value); },
     ready(value: UiReady): void { emit("ui.ready", value); },
+    screen(value: UiScreen): void { emit("ui.screen", value); },
     sound(value: PlayCue): void { emit("ui.sound", value); },
     stinger(value: PlayStinger): void { emit("ui.stinger", value); },
   },

@@ -37,9 +37,18 @@ function sampleOutline(): number[] {
   return points;
 }
 
+/** Marker shapes by grid index (sample data; the real ones come from rc_core via rc_ui). */
+const SHAPES = ["circle", "triangle", "square", "diamond", "star", "cross", "pentagon", "hexagon"] as const;
+
 function sampleRacers(slots: number[]): UiRacer[] {
-  const humans = slots.map((slot) => ({ name: `P${slot + 1}`, car: "zip", slot, color: hexRgb(slotColor[slot] ?? slotColor[0]) }));
-  const rivals = RIVALS.slice(0, 8 - humans.length).map((name, i) => ({ name, car: "sparky", slot: null, color: RIVAL_COLORS[i] }));
+  const humans: UiRacer[] = slots.map((slot) => ({ name: `P${slot + 1}`, car: "zip", slot, color: hexRgb(slotColor[slot] ?? slotColor[0]), marker: { kind: "player", slot } }));
+  const rivals: UiRacer[] = RIVALS.slice(0, 8 - humans.length).map((name, i) => ({
+    name,
+    car: "sparky",
+    slot: null,
+    color: RIVAL_COLORS[i],
+    marker: { kind: "shape", shape: SHAPES[(humans.length + i) % SHAPES.length] },
+  }));
   return [...humans, ...rivals];
 }
 
@@ -138,6 +147,7 @@ export function demoHud(arg: string): "racing" | "countdown" {
     hudScale: base?.hudScale ?? 1,
     minimap: true,
     reduceFlashing: base?.reduceFlashing ?? false,
+    colorblindMarkers: words.includes("markers") || (base?.colorblindMarkers ?? false),
   };
   const index = (slot: number) => Math.max(0, setup.racers.findIndex((r) => r.slot === slot));
   const tick: UiHudTick = {

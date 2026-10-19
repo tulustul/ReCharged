@@ -14,7 +14,9 @@
 //!   components, item entities, `RaceEvent`, `HitEvent`, `TrackSummary`, `PlayerViewports`); rc_game's `Profile`, `CupRun`, `VersusSession`,
 //!   `RaceOutcome`, `GameNotice`; `AutomationConfig`, `UserPaths`.
 //! - **Outputs:** React events, `GameCommand`s, `UiSound`, `MusicStinger`, `RebindRequest`,
-//!   `MenuBackdrop` (sole writer), `UiScale` (sole writer), [`UiStatus`], the HUD's shared values.
+//!   `MenuBackdrop` (sole writer), `UiScale` (sole writer), the primary window's `CursorOptions`
+//!   (sole writer: hidden after keyboard/pad input until the mouse moves), [`UiStatus`], the HUD's
+//!   shared values.
 //! - **Must never:** send events per frame (state changes and ≤ 10 Hz batches only), leave a
 //!   request unanswered, hold gameplay logic, or write `Settings` (rc_game applies them).
 //!
@@ -99,6 +101,7 @@ impl Plugin for GameUiPlugin {
                     fit_ui_scale,
                     app::push_state,
                     ui::forward_nav,
+                    ui::cursor_visibility,
                     ui::forward_notices,
                     ui::watchdog,
                     input::forward_devices,

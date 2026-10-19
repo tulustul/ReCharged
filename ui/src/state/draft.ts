@@ -1,10 +1,12 @@
 // The race being set up in the menus (mode → track & options → car), and the option rules for a
 // track (GDD §3, §7.2). Pure apart from the store; Rust validates again on `race.start`.
 import type {
+  NextTrack,
   StartRace,
   UiDifficulty,
   UiPlayerChoice,
   UiProfile,
+  UiRaceSetup,
   UiTimeOfDay,
   UiTrack,
   UiWeatherChoice,
@@ -90,6 +92,24 @@ export function withTrack(d: RaceDraft, track: UiTrack, profile: UiProfile | nul
   return normalize({ ...d, laps: track.defaultLaps }, track, profile, players);
 }
 
+/** The draft "Change track" / "Next track" opens with after a race: the session's mode, layout and
+ * options (the menus' choices may differ, e.g. after `--quick-race`). */
+export function draftFromSetup(d: RaceDraft, setup: UiRaceSetup): RaceDraft {
+  return {
+    ...d,
+    mode: setup.mode.kind === "championship" ? "quickRace" : setup.mode.kind,
+    track: setup.track,
+    reverse: setup.reverse,
+    mirror: setup.mirror,
+    laps: setup.laps,
+    ai: setup.racers.filter((r) => r.slot === null).length,
+    difficulty: setup.difficulty ?? d.difficulty,
+    items: setup.items,
+    weather: setup.weather,
+    time: setup.time,
+  };
+}
+
 /** One Confirm starts one race: further `race.start`s within this window are dropped (ms). */
 export const START_REPEAT_MS = 1500;
 
@@ -114,13 +134,16 @@ export function startMessage(d: RaceDraft, players: UiPlayerChoice[]): StartRace
     // The cup decides layout, laps, field, weather and difficulty.
     return { mode, track: d.track, reverse: false, mirror: false, players };
   }
-  const tt = mode.kind === "timeTrial";
+  return { mode, players, ...nextTrackMessage(d) };
+}
+
+/** The `race.nextTrack` message of a draft: after a race, its layout with its options. */
+export function nextTrackMessage(d: RaceDraft): NextTrack {
+  const tt = d.mode === "timeTrial";
   return {
-    mode,
     track: d.track,
     reverse: d.reverse,
     mirror: d.mirror,
-    players,
     laps: tt ? TIME_TRIAL_LAPS : d.laps,
     ai: tt ? 0 : d.ai,
     difficulty: d.difficulty,

@@ -2,8 +2,8 @@
 //! both keyboard schemes and buttons/sticks of virtual gamepads in `ButtonInput<KeyCode>` /
 //! `Gamepad` — the layer real devices feed — right before `InputSet::Collect`, so bindings, the
 //! roster (lobby joins), latching and `UiNav` suppression apply exactly as for a player. The host
-//! (the binary) loads the file ([`InputScript::load`]), sets [`InputScript::ui_ready`], saves
-//! [`ScriptShot`]s and honours [`InputScript::exit_requested`].
+//! (the binary) loads the file ([`InputScript::load`]), sets [`InputScript::ui_ready`] and
+//! [`InputScript::screen`], saves [`ScriptShot`]s and honours [`InputScript::exit_requested`].
 //!
 //! One step per line, `#` starts a comment:
 //! ```text
@@ -11,6 +11,9 @@
 //! when     <secs> after the previous step (wall clock, default 0) | @<tick> once the race clock
 //!          (RaceStatus.race_ticks) reaches <tick>
 //! wait     ui | menu | loading | race | intro | countdown | racing | finished | paused | running
+//!          | screen <name>   (the screen React reports: a menu route such as `title`, `main`,
+//!          `trackSelect`, or `loading`, `race`, `pause`, `results`, `standings`, `score`,
+//!          `changeTrack`)
 //! nav      <device> up|down|left|right|confirm|back|prevTab|nextTab    tap the fixed menu key
 //!          (≥ 4 frames after the previous step, so React keeps up at low frame rates)
 //! hold     <device> <control> <value>   until changed: steer -1…1, the others 0…1
@@ -62,12 +65,14 @@ enum Control {
     Steer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Cond {
     Ui,
     App(AppState),
     Phase(RacePhase),
     Pause(PauseState),
+    /// React shows this screen.
+    Screen(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,6 +126,8 @@ pub struct InputScript {
     pads: Vec<Entity>,
     /// The host's UI is ready for input (`wait ui`). Written by the host.
     pub ui_ready: bool,
+    /// The screen the UI shows (`wait screen <name>`). Written by the host.
+    pub screen: String,
     exit: bool,
 }
 
@@ -155,10 +162,18 @@ impl InputScript {
         self.next >= self.steps.len()
     }
 
-    /// The step the script is at (`line N: <step>`), if any.
+    /// The step the script is at (`line N: <step> (screen: <name>)`), if any.
     pub fn pending(&self) -> Option<String> {
         let step = self.steps.get(self.next)?;
-        Some(format!("line {}: {}", step.line, step.text))
+        let screen = if self.screen.is_empty() {
+            "none reported"
+        } else {
+            &self.screen
+        };
+        Some(format!(
+            "line {}: {} (screen: {screen})",
+            step.line, step.text
+        ))
     }
 
     /// An `exit` step ran.
@@ -207,9 +222,9 @@ impl InputScript {
     }
 }
 
-fn lookup<T: Copy>(table: &[(&str, T)], word: &str, what: &str) -> Result<T, String> {
+fn lookup<T: Clone>(table: &[(&str, T)], word: &str, what: &str) -> Result<T, String> {
     let names = || table.iter().map(|e| e.0).collect::<Vec<_>>().join(" ");
-    let found = table.iter().find(|e| e.0 == word).map(|e| e.1);
+    let found = table.iter().find(|e| e.0 == word).map(|e| e.1.clone());
     found.ok_or_else(|| format!("unknown {what} `{word}` (one of: {})", names()))
 }
 
@@ -260,7 +275,7 @@ const CONDS: [(&str, Cond); 10] = [
 ];
 
 const USAGE: [(&str, &str); 7] = [
-    ("wait", "wait <condition>"),
+    ("wait", "wait <condition> | wait screen <name>"),
     ("nav", "nav <device> <action>"),
     ("hold", "hold <device> <control> <value>"),
     ("tap", "tap <device> <control>"),
@@ -283,6 +298,8 @@ fn parse_step(line: &str) -> Result<(When, Action), String> {
         },
     };
     let action = match rest {
+        ["wait", "screen", name] => Action::Wait(Cond::Screen((*name).to_owned())),
+        ["wait", "screen"] => return Err("usage: wait screen <name>".into()),
         ["wait", c] => Action::Wait(lookup(&CONDS, c, "condition")?),
         ["nav", d, a] => Action::Nav(
             lookup(&DEVICES, d, "device")?,
@@ -375,12 +392,13 @@ pub(crate) struct Moment<'w> {
 }
 
 impl Moment<'_> {
-    fn holds(&self, cond: Cond, ui_ready: bool) -> bool {
+    fn holds(&self, cond: &Cond, script: &InputScript) -> bool {
         match cond {
-            Cond::Ui => ui_ready,
-            Cond::App(s) => self.app.as_ref().is_some_and(|a| *a.get() == s),
-            Cond::Phase(p) => self.phase.as_ref().is_some_and(|a| *a.get() == p),
-            Cond::Pause(p) => self.pause.as_ref().is_some_and(|a| *a.get() == p),
+            Cond::Ui => script.ui_ready,
+            Cond::App(s) => self.app.as_ref().is_some_and(|a| a.get() == s),
+            Cond::Phase(p) => self.phase.as_ref().is_some_and(|a| a.get() == p),
+            Cond::Pause(p) => self.pause.as_ref().is_some_and(|a| a.get() == p),
+            Cond::Screen(name) => script.screen == *name,
         }
     }
 
@@ -440,7 +458,7 @@ fn play(
     script.frames = script.frames.saturating_add(1);
     let mut last = *script.last.get_or_insert(now);
     while let Some(step) = script.steps.get(script.next) {
-        let waiting = matches!(step.action, Action::Wait(c) if !moment.holds(c, script.ui_ready));
+        let waiting = matches!(&step.action, Action::Wait(c) if !moment.holds(c, script));
         let early = matches!(step.action, Action::Nav(..)) && script.frames < NAV_GAP_FRAMES;
         if !moment.due(step.when, last) || waiting || early {
             break;
@@ -525,11 +543,15 @@ mod tests {
     fn scripts_parse_with_times_ticks_and_comments() {
         let script = InputScript::parse(
             "# title\nwait ui\n1.5 nav keyboardA confirm  # go\n@120 hold gamepad2 steer -0.5\n\
-             tap keyboardB item\nrelease gamepad\nshot menu\n0.5 exit\n",
+             tap keyboardB item\nrelease gamepad\nshot menu\n0.5 exit\nwait screen trackSelect\n",
         )
         .expect("valid");
         let s = &script.steps;
-        assert_eq!(s.len(), 7);
+        assert_eq!(s.len(), 8);
+        assert_eq!(
+            s[7].action,
+            Action::Wait(Cond::Screen("trackSelect".into()))
+        );
         assert_eq!((s[0].line, &s[0].action), (2, &Action::Wait(Cond::Ui)));
         assert_eq!(s[1].when, When::After(1.5));
         assert_eq!(
@@ -545,7 +567,10 @@ mod tests {
             s[3].action,
             Action::Tap(Device::KeyboardB, DriveAction::UseItem)
         );
-        assert_eq!(script.pending().as_deref(), Some("line 2: wait ui"));
+        assert_eq!(
+            script.pending().as_deref(),
+            Some("line 2: wait ui (screen: none reported)")
+        );
     }
 
     #[test]
@@ -560,6 +585,7 @@ mod tests {
         assert!(err("jump").contains("unknown step `jump`"));
         assert!(err("2").contains("needs a step"));
         assert!(err("wait lunch").contains("one of: ui menu"));
+        assert!(err("wait screen").contains("usage: wait screen <name>"));
     }
 
     #[test]
@@ -591,6 +617,43 @@ mod tests {
     ) {
         seen.0.extend(nav.read().copied());
         seen.1.extend(shots.read().cloned());
+    }
+
+    #[test]
+    fn wait_screen_holds_the_script_until_the_ui_shows_that_screen() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, StatesPlugin, InputPlugin, CorePlugin))
+            .add_plugins(crate::GameInputPlugin)
+            .insert_resource(TimeUpdateStrategy::FixedTimesteps(1))
+            .insert_resource(
+                InputScript::parse("wait screen title\nnav keyboardA confirm").expect("valid"),
+            )
+            .init_resource::<Seen>()
+            .add_systems(Last, record);
+        app.finish();
+        app.cleanup();
+        for _ in 0..10 {
+            app.update();
+        }
+        assert!(
+            app.world().resource::<Seen>().0.is_empty(),
+            "still on the splash"
+        );
+        let pending = app.world().resource::<InputScript>().pending();
+        assert_eq!(
+            pending.as_deref(),
+            Some("line 1: wait screen title (screen: none reported)")
+        );
+        app.world_mut().resource_mut::<InputScript>().screen = "title".into();
+        for _ in 0..10 {
+            app.update();
+        }
+        assert_eq!(
+            app.world().resource::<Seen>().0.len(),
+            1,
+            "the title got its confirm"
+        );
+        assert!(app.world().resource::<InputScript>().finished());
     }
 
     #[test]

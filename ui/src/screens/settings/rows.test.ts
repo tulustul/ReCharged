@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { UiSettings } from "../../bevy";
-import { PRESETS, rowsOf, type RowDef } from "./rows.ts";
+import type { UiBindings, UiSettings } from "../../bevy";
+import { PRESETS, rebindNotice, rowsOf, type RowDef } from "./rows.ts";
 
 const settings: UiSettings = {
   gameplay: { speedUnit: "kmh", cameraMode: "chase", cameraShake: true, hudScale: 1, minimap: true, split: "horizontal", aiCatchUp: true, aiDifficulty: "pro", hints: true },
@@ -80,4 +80,20 @@ test("cyclers and sliders read and write their field", () => {
   const size = row("graphics", "windowSize");
   if (size.kind !== "cycle") return assert.fail("cycle row");
   assert.deepEqual(size.pick(settings, size.choices.length - 1).graphics.windowSize, [2560, 1440]);
+});
+
+test("a conflicting rebind says it swapped, or that the other action is unbound", () => {
+  const bindings = (camera: number): UiBindings => ({
+    schemes: [{ scheme: "keyboardA", actions: [{ action: "camera", bindings: Array.from({ length: camera }, () => ({ kind: "key", code: "KeyX" })) }] }],
+  });
+  const camera = { scheme: "keyboardA", action: "camera" } as const;
+  assert.deepEqual(rebindNotice({ kind: "conflict", other: camera, swapped: true }, "keyboardA", bindings(1)), { text: "Swapped with Camera", unbound: null });
+  assert.deepEqual(rebindNotice({ kind: "conflict", other: camera, swapped: false }, "keyboardA", bindings(0)), {
+    text: "Camera is now unbound",
+    unbound: camera,
+  });
+  assert.equal(rebindNotice({ kind: "conflict", other: camera, swapped: false }, "keyboardA", bindings(1)).text, "Removed from Camera");
+  assert.equal(rebindNotice({ kind: "conflict", other: camera, swapped: true }, "keyboardB", bindings(1)).text, "Swapped with Camera (Keyboard A)", "other scheme named");
+  assert.deepEqual(rebindNotice({ kind: "cancelled" }, "keyboardA", null), { text: "Rebind cancelled", unbound: null });
+  assert.deepEqual(rebindNotice(null, "keyboardA", null), { text: null, unbound: null });
 });

@@ -124,7 +124,7 @@ function TracksTab({ lines, index, onHover }: { lines: Line[]; index: number; on
         {lines.map((l, i) => (
           <button
             key={`${l.track}-${l.reverse}-${l.mirror}`}
-            onPointerEnter={() => onHover(i)}
+            onPointerHover={() => onHover(i)}
             style={{
               height: ROW,
               flexShrink: 0,

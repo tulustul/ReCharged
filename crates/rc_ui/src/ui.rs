@@ -1,7 +1,10 @@
-//! `ui.*` channels: readiness and render errors of the React app, UI sound cues and music
-//! stingers, menu navigation (`ui.nav`) and toasts, plus the readiness watchdog.
+//! `ui.*` channels: readiness and render errors of the React app, the screen it shows
+//! (`ui.screen`, logged and waited on by `--input-script`), UI sound cues and music stingers, menu
+//! navigation (`ui.nav`) and toasts, plus the readiness watchdog.
 
+use bevy::input::gamepad::Gamepad;
 use bevy::prelude::*;
+use bevy::window::{CursorMoved, CursorOptions, PrimaryWindow};
 use bevy_react::prelude::*;
 use rc_core::prelude::*;
 use rc_game::GameNotice;
@@ -29,6 +32,17 @@ pub struct UiError {
     /// Component stack, if React provided one.
     #[ts(optional)]
     pub stack: Option<String>,
+}
+
+/// React → Bevy message `ui.screen`: the screen React shows changed — a menu route (`title`,
+/// `main`, `trackSelect` …), `loading`, or the race layer's view (`race`, `pause`, `results`,
+/// `standings`, `score`, `changeTrack`).
+#[react_message(name = "ui.screen")]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct UiScreen {
+    /// Screen id.
+    pub screen: String,
 }
 
 mirror_enum!(
@@ -150,11 +164,14 @@ pub struct UiStatus {
     pub ready: bool,
     /// `ui.error` messages received.
     pub errors: u32,
+    /// The screen React reported last (`ui.screen`).
+    pub screen: String,
 }
 
 pub(crate) fn register(app: &mut App) {
     app.add_react_handler(on_ready)
         .add_react_handler(on_error)
+        .add_react_handler(on_screen)
         .add_react_handler(on_cue)
         .add_react_handler(
             |stinger: On<PlayStinger>, mut out: MessageWriter<MusicStinger>| {
@@ -189,6 +206,14 @@ fn on_error(error: On<UiError>, status: Option<ResMut<UiStatus>>) {
     }
 }
 
+fn on_screen(screen: On<UiScreen>, status: Option<ResMut<UiStatus>>) {
+    let screen = &screen.event().screen;
+    if let Some(mut status) = status.filter(|s| s.screen != *screen) {
+        info!("UI screen: {screen}");
+        status.screen.clone_from(screen);
+    }
+}
+
 fn on_cue(
     cue: On<PlayCue>,
     time: Res<Time<Real>>,
@@ -209,6 +234,35 @@ fn on_cue(
 pub(crate) fn forward_nav(mut navs: MessageReader<UiNav>, events: ReactEvents) {
     for nav in navs.read() {
         events.send(&NavEvent::from(nav));
+    }
+}
+
+/// Hides the OS cursor after keyboard or gamepad input and shows it again once the mouse really
+/// moves (a resting pointer neither shows nor steals the keyboard/pad focus; React moves the focus
+/// on pointer motion only).
+pub(crate) fn cursor_visibility(
+    mut moved: MessageReader<CursorMoved>,
+    mut navs: MessageReader<UiNav>,
+    keys: Option<Res<ButtonInput<KeyCode>>>,
+    pads: Query<&Gamepad>,
+    mut cursors: Query<&mut CursorOptions, With<PrimaryWindow>>,
+) {
+    // A cursor entering the window has no delta: only motion inside it counts.
+    let moved = moved
+        .read()
+        .any(|m| m.delta.is_some_and(|d| d != Vec2::ZERO));
+    let pressed = navs.read().count() > 0
+        || keys.is_some_and(|k| k.get_just_pressed().next().is_some())
+        || pads.iter().any(|p| p.get_just_pressed().next().is_some());
+    let visible = match (moved, pressed) {
+        (true, _) => true,
+        (false, true) => false,
+        (false, false) => return,
+    };
+    for mut cursor in &mut cursors {
+        if cursor.visible != visible {
+            cursor.visible = visible;
+        }
     }
 }
 
@@ -268,5 +322,47 @@ pub(crate) fn watchdog(
     );
     if automation.is_some_and(|a| a.is_automated()) {
         exit.write(AppExit::error());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_cursor_hides_on_key_and_pad_navigation_and_shows_when_the_mouse_moves() {
+        let mut app = App::new();
+        app.add_message::<CursorMoved>()
+            .add_message::<UiNav>()
+            .add_systems(Update, cursor_visibility);
+        let window = app
+            .world_mut()
+            .spawn((PrimaryWindow, CursorOptions::default()))
+            .id();
+        let visible = |app: &App| app.world().get::<CursorOptions>(window).map(|c| c.visible);
+        let moved = |delta| CursorMoved {
+            window,
+            position: Vec2::splat(10.0),
+            delta,
+        };
+        app.world_mut().write_message(UiNav {
+            action: NavAction::Down,
+            slot: None,
+            device: DeviceKind::Gamepad,
+            repeat: false,
+        });
+        app.update();
+        assert_eq!(visible(&app), Some(false), "hidden after pad navigation");
+        app.world_mut().write_message(moved(None));
+        app.update();
+        assert_eq!(
+            visible(&app),
+            Some(false),
+            "entering the window is not motion"
+        );
+        app.world_mut()
+            .write_message(moved(Some(Vec2::new(3.0, 0.0))));
+        app.update();
+        assert_eq!(visible(&app), Some(true), "shown once the mouse moves");
     }
 }

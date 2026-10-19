@@ -55,6 +55,7 @@ export const hud = {
     hitBy: (item: string, who: string | null) => (who ? `Hit by ${item} — ${who}` : `Hit by ${item}`),
     blocked: (item: string) => `Shield blocked the ${item}`,
     landed: (item: string, who: string) => `${item} hit ${who}!`,
+    landedMany: (item: string, count: number) => `${item} hit ${count} racers`,
     landedBlocked: (who: string) => `${who}'s shield blocked it`,
   },
 } as const;

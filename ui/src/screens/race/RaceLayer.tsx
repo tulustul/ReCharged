@@ -4,7 +4,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { bevy, type AppStatus } from "../../bevy";
+import { ScreenName } from "../../nav/input";
 import { createMorpher, morphStyle, router, type Route } from "../../nav/routes";
+import { draft, draftFromSetup } from "../../state/draft";
 import { hmrSingleton } from "../../state/store";
 import { openDialog } from "../../state/overlays";
 import { Hud } from "../../hud/Hud";
@@ -42,6 +44,12 @@ export function RaceLayer({ status }: { status: AppStatus }) {
   }, [status.paused]);
 
   const show = (next: View) => raceMorph.run(() => setView(next));
+  // Change track / Next track start from what this session races (laps, rivals, weather …).
+  const changeTrack = () => {
+    const setup = session.get().setup;
+    if (setup) draft.set(draftFromSetup(draft.get(), setup));
+    show("changeTrack");
+  };
   const toMenu = (...stack: Route[]) => {
     router.set(stack);
     bevy.race.quit(null);
@@ -64,12 +72,12 @@ export function RaceLayer({ status }: { status: AppStatus }) {
     ],
     quickRace: [
       { label: a.restart, primary: true, run: () => bevy.race.restart(null) },
-      { label: a.changeTrack, run: () => show("changeTrack") },
+      { label: a.changeTrack, run: changeTrack },
       { label: a.menu, run: () => toMenu("main") },
     ],
     timeTrial: [
       { label: a.retry, primary: true, run: () => bevy.race.restart(null) },
-      { label: a.changeTrack, run: () => show("changeTrack") },
+      { label: a.changeTrack, run: changeTrack },
       { label: a.menu, run: () => toMenu("main") },
     ],
     versus: [{ label: a.continue, primary: true, run: () => show("score") }],
@@ -92,7 +100,7 @@ export function RaceLayer({ status }: { status: AppStatus }) {
       ];
   const scoreActions: Action[] = [
     { label: a.rematch, primary: true, run: () => bevy.race.rematch(null) },
-    { label: a.nextTrack, run: () => show("changeTrack") },
+    { label: a.nextTrack, run: changeTrack },
     { label: a.lobby, run: () => toMenu("main", "lobby") },
     { label: a.menu, run: () => toMenu("main") },
   ];
@@ -105,7 +113,7 @@ export function RaceLayer({ status }: { status: AppStatus }) {
         {view === "standings" && <CupStandings actions={standingActions} />}
         {view === "score" && <VersusScore actions={scoreActions} />}
         {view === "changeTrack" && (
-          <TrackSelect inRace={{ onPick: (variant) => bevy.race.nextTrack(variant), onBack: () => show(mode === "versus" ? "score" : "results") }} />
+          <TrackSelect inRace={{ onPick: (next) => bevy.race.nextTrack(next), onBack: () => show(mode === "versus" ? "score" : "results") }} />
         )}
       </node>
     );
@@ -123,8 +131,10 @@ export function RaceLayer({ status }: { status: AppStatus }) {
         <Pause onHowTo={() => setSub("howTo")} onSettings={() => setSub("settings")} />
       );
   }
+  const screen = results ? view : status.paused ? (sub === "howTo" ? "pauseHowToPlay" : sub === "settings" ? "pauseSettings" : "pause") : "race";
   return (
     <node style={fill}>
+      <ScreenName name={screen} />
       {/* Hidden (kept mounted: feed, bindings and banners survive) while the pause menu is open. */}
       {!results && (
         <node style={{ ...fill, display: status.paused ? "none" : "flex" }}>

@@ -34,8 +34,9 @@ pub struct UiResultEntry {
     pub time_ms: u32,
     /// Best lap in ms.
     pub best_lap_ms: Option<u32>,
-    /// Points this race gave (cup: everyone; Versus: players; `null` until processed / other
-    /// modes).
+    /// Points this race gave (cup: everyone; Versus: players; `null` until processed, for AI in
+    /// Versus and in Quick Race / Time Trial — the PTS column shows only when some line has
+    /// points).
     pub points: Option<u32>,
 }
 
@@ -113,7 +114,7 @@ impl UiResults {
                     finished: e.finished,
                     time_ms: ticks_to_ms(e.time_ticks),
                     best_lap_ms: e.best_lap_ticks.map(ticks_to_ms),
-                    points: outcome.and_then(|o| o.points.get(i).copied()),
+                    points: outcome.and_then(|o| o.points.get(i).copied().flatten()),
                 })
                 .collect(),
             outcome: outcome.map(|o| UiOutcome {

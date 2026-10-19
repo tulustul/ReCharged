@@ -1,6 +1,8 @@
 // Toasts (unlocks, Golden Batteries, saves, errors): top-right, above everything, click-through;
-// each dismisses itself.
+// each dismisses itself after TOAST_MS of Bevy's frame clock (a shared-value driver, not a JS
+// timer), so a toast raised while the first frames stall (boot) is still seen.
 import { useEffect } from "react";
+import { useSharedValue, withTiming } from "bevy-react";
 
 import { BatteryIcon, BoltIcon, CheckIcon, WarningIcon } from "./icons";
 import { useEnter } from "../hooks";
@@ -37,10 +39,10 @@ const tone = {
 
 function ToastCard({ toast }: { toast: ToastSpec }) {
   const enter = useEnter(60, 0);
+  const life = useSharedValue(0);
   useEffect(() => {
-    const timer = setTimeout(() => dismissToast(toast.id), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [toast.id]);
+    life.value = withTiming(1, { duration: TOAST_MS, onComplete: (completed) => completed && dismissToast(toast.id) });
+  }, [life, toast.id]);
   const { accent, icon } = tone[toast.tone];
   return (
     <node

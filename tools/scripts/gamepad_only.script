@@ -7,7 +7,9 @@
 # Pads: D-pad moves, A (South) confirms, B (East) backs, LB/RB tabs, Start pauses.
 
 wait ui
-3.5 nav gamepad confirm            # the splash has timed out; Title: any button
+wait screen title                  # the splash ends after its fade
+0.3 nav gamepad confirm            # Title: any button
+wait screen main
 1.5 shot pad_01_main_menu
 
 # Settings: Graphics → VSync off, then Accessibility → Steering assist on (both saved to
@@ -29,17 +31,23 @@ wait ui
 0.8 shot pad_02_settings
 0.3 nav gamepad back               # B: main menu
 
-# Quick Race on Backyard Bash, 1 lap (see keyboard_only.script for the grid route)
+# Quick Race on Backyard Bash, 1 lap: Confirm on the card puts the focus on Choose car, Up reaches
+# the options (see keyboard_only.script)
 1.2 nav gamepad down               # Quick Race
 0.3 nav gamepad confirm
-2.0 nav gamepad up
+wait screen trackSelect
+0.3 nav gamepad up
 0.3 nav gamepad left
 0.3 nav gamepad left               # Toy Town
 0.3 nav gamepad right              # Sofa Circuit
 0.3 nav gamepad right              # Backyard Bash (5 laps)
-0.3 nav gamepad right              # options: Layout
-0.3 nav gamepad down               # Mirror
-0.3 nav gamepad down               # Laps
+0.3 nav gamepad confirm            # select it: the focus moves to Choose car
+0.3 nav gamepad up                 # Time of day
+0.3 nav gamepad up                 # Weather
+0.3 nav gamepad up                 # Items
+0.3 nav gamepad up                 # AI difficulty
+0.3 nav gamepad up                 # Rivals
+0.3 nav gamepad up                 # Laps
 0.3 nav gamepad left               # 4
 0.3 nav gamepad left               # 3
 0.3 nav gamepad left               # 2
@@ -108,14 +116,19 @@ wait menu
 0.8 shot pad_10_lobby
 0.3 nav gamepad confirm            # P1 ready
 0.3 nav gamepad2 confirm           # P2 ready → track select (P1 picks)
-2.5 nav gamepad up
+wait screen trackSelect
+0.3 nav gamepad up
 0.3 nav gamepad left
 0.3 nav gamepad left               # Toy Town
 0.3 nav gamepad right              # Sofa Circuit
 0.3 nav gamepad right              # Backyard Bash
-0.3 nav gamepad right              # options: Layout
-0.3 nav gamepad down               # Mirror
-0.3 nav gamepad down               # Laps 5
+0.3 nav gamepad confirm            # select it: Start race
+0.3 nav gamepad up                 # Time of day
+0.3 nav gamepad up                 # Weather
+0.3 nav gamepad up                 # Items
+0.3 nav gamepad up                 # AI difficulty
+0.3 nav gamepad up                 # Rivals
+0.3 nav gamepad up                 # Laps 5
 0.3 nav gamepad left
 0.3 nav gamepad left
 0.3 nav gamepad left

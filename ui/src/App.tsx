@@ -10,7 +10,7 @@ import { ToastHost } from "./components/Toast";
 import { useDebugRoutes } from "./debug";
 import { SplitContext } from "./hooks";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { useNav } from "./nav/input";
+import { ScreenName, useNav } from "./nav/input";
 import { back, menuMorph, morphStyle, router, type Route } from "./nav/routes";
 import { top } from "./nav/router";
 import { CarSelect } from "./screens/CarSelect";
@@ -64,10 +64,19 @@ function Main() {
   const status = useStore(appState);
   switch (status?.state) {
     case "loading":
-      return <Loading />;
+      return (
+        <>
+          <ScreenName name="loading" />
+          <Loading />
+        </>
+      );
     case "unloading":
       // One frame between a race and the menu (or the next load): no flash of either screen.
-      return <node style={{ ...fill, backgroundColor: color.bg }} />;
+      return (
+        <node style={{ ...fill, backgroundColor: color.bg }}>
+          <ScreenName name="unloading" />
+        </node>
+      );
     case "inRace":
       return <RaceLayer status={status} />;
     default:
@@ -85,6 +94,7 @@ function MenuHost() {
   const morph = useStore(menuMorph.morph);
   return (
     <node style={{ ...fill, ...morphStyle(morph) }}>
+      <ScreenName name={route} />
       <ErrorBoundary key={route} fallback={(error) => <ScreenError error={error} />}>
         <ScreenFor route={route} />
       </ErrorBoundary>

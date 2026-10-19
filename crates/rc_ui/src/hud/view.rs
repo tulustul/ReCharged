@@ -166,6 +166,7 @@ impl HudView<'_, '_> {
             hud_scale: settings.gameplay.hud_scale,
             minimap: settings.gameplay.minimap,
             reduce_flashing: settings.accessibility.reduce_flashing,
+            colorblind_markers: settings.accessibility.colorblind_markers,
         })
     }
 

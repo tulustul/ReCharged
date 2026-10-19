@@ -55,8 +55,9 @@ pub(crate) fn single_player(config: &RaceConfig) -> bool {
 }
 
 /// Applies the result of the profile owner (slot 0) to stats and, in single-player modes, to the
-/// layout's records (best lap any mode, best race and medal Time Trial only). `distance` = how far
-/// the owner drove (u).
+/// layout's records (best lap any mode, best race and medal Time Trial only). A Time Trial run
+/// counts as a race but never as a win or podium (it has no rivals). `distance` = how far the
+/// owner drove (u).
 pub(crate) fn apply_results(
     profile: &mut Profile,
     config: &RaceConfig,
@@ -74,8 +75,10 @@ pub(crate) fn apply_results(
     };
     let stats = &mut profile.stats;
     stats.races += 1;
-    stats.wins += u32::from(entry.rank == 1);
-    stats.podiums += u32::from((1..=3).contains(&entry.rank));
+    if config.mode != GameMode::TimeTrial {
+        stats.wins += u32::from(entry.rank == 1);
+        stats.podiums += u32::from((1..=3).contains(&entry.rank));
+    }
     stats.distance += f64::from(distance.max(0.0));
     if !single_player(config) {
         return update;
@@ -186,8 +189,14 @@ mod tests {
             (7, Some(6000))
         );
         assert_eq!(
-            (p.stats.races, p.stats.wins, p.stats.distance),
-            (1, 1, 1950.0)
+            (
+                p.stats.races,
+                p.stats.wins,
+                p.stats.podiums,
+                p.stats.distance
+            ),
+            (1, 0, 0, 1950.0),
+            "a Time Trial run is a race, not a win"
         );
 
         // Slower run: no new records; the best medal stays.

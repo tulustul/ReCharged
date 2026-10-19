@@ -36,9 +36,17 @@ export function refreshSession() {
   bevy.race.snapshot().then((s) => demoMode.get() || session.set(s), fail("race.snapshot"));
 }
 
+/** Results and Cup end list the unlocks in their own panel: no toasts on top of them. */
+function unlocksListed(): boolean {
+  const s = appState.get();
+  return (s?.state === "inRace" && s.phase === "finished") || top(router.get()) === "cupEnd";
+}
+
 function onUnlocked(items: UiUnlockedItem[]) {
   sfx("unlock");
-  for (const item of items) pushToast({ tone: "unlock", title: appStrings.unlockedTitle, text: unlockLabel(item, catalog.get()) });
+  if (!unlocksListed()) {
+    for (const item of items) pushToast({ tone: "unlock", title: appStrings.unlockedTitle, text: unlockLabel(item, catalog.get()) });
+  }
   refreshProfile();
 }
 

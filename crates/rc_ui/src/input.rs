@@ -213,7 +213,8 @@ pub struct UiConflict {
     pub action: UiDriveAction,
 }
 
-/// Bevy → React event `input.rebindResult`: the capture ended (rc_game stores the binding).
+/// Bevy → React event `input.rebindResult`: the capture ended (rc_game stores the binding; on a
+/// conflict the two actions swap).
 #[react_event(name = "input.rebindResult")]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
@@ -225,8 +226,11 @@ pub struct RebindDone {
     pub action: UiDriveAction,
     /// The captured binding (`null` = cancelled).
     pub binding: Option<UiBinding>,
-    /// An action that already used it.
+    /// An action that already used it: the two swapped.
     pub conflict: Option<UiConflict>,
+    /// The binding the conflicting action received (the rebound action's previous one); `null`
+    /// with a conflict = that action lost the captured binding (it may be unbound now).
+    pub previous: Option<UiBinding>,
 }
 
 impl From<&RebindResult> for RebindDone {
@@ -239,6 +243,7 @@ impl From<&RebindResult> for RebindDone {
                 scheme: scheme.into(),
                 action: action.into(),
             }),
+            previous: result.previous.as_ref().map(UiBinding::from),
         }
     }
 }

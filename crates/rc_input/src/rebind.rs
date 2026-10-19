@@ -135,8 +135,13 @@ pub(crate) fn capture(
     let controls = settings.map(|s| s.controls.clone()).unwrap_or_default();
     let conflict =
         binding.and_then(|b| find_conflict(&controls, request.scheme, request.action, b));
+    let previous = controls
+        .bindings(request.scheme)
+        .get(request.action)
+        .first()
+        .copied();
     info!(
-        "rebind {:?} {:?}: {binding:?} (conflict {conflict:?})",
+        "rebind {:?} {:?}: {binding:?} (conflict {conflict:?}, was {previous:?})",
         request.scheme, request.action
     );
     results.write(RebindResult {
@@ -144,6 +149,7 @@ pub(crate) fn capture(
         action: request.action,
         binding,
         conflict,
+        previous,
     });
 }
 

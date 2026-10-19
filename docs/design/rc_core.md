@@ -16,11 +16,11 @@ at the crate root; subsystems write `use rc_core::prelude::*;` and add `CorePlug
 | `race` | `GameMode`, `Controller`, `RacerSetup`, `RaceConfig`, `GhostData`, `Racer` (requires the shared racer components), `LocalPlayer`, `AiDriver`, `RaceProgress`, `RaceStatus`, `Standings`, `RaceResults`, `RaceEvent`/`RaceEventKind`, `HintKind`, `GoldenBattery`, `GhostCar` |
 | `vehicle` | `CarControl`, `VehicleTelemetry`/`WheelState`, `Charge`, `CatchUp`, `CarImpact`, `CarLanded`, `RespawnCar`/`RespawnKind`, `CarRespawned`, `ApplyImpulse`, `DrainCharge`, `GrantCharge` |
 | `items` | `ItemKind`, `HazardKind`, `Effect` (data), `StatusEffects` + getters, `ItemSlot`, `Pickup`, `Projectile`, `Hazard`, `ApplyEffect`, `ItemEvent`, `HitEvent`, `Explosion` |
-| `input` | `InputDevice`, `DeviceKind`, `ControlScheme`, `DriveAction`, `Binding`, `ActionBindings` (GDD §12.1 defaults), `NavAction`, `UiNav`, `RebindRequest`/`RebindResult`, `DeviceEvent`, `PauseRequest`, `LocalPlayers` |
+| `input` | `InputDevice`, `DeviceKind`, `ControlScheme`, `DriveAction`, `Binding`, `ActionBindings` (GDD §12.1 defaults), `NavAction`, `UiNav`, `RebindRequest`/`RebindResult` (+ `previous`: the swap partner's binding), `DeviceEvent`, `PauseRequest`, `LocalPlayers` |
 | `camera` | `GameCamera`, `MenuCamera`, `OverlayCamera`, `UiHost`, `PlayerViewports` |
 | `weather` | `WeatherKind`, `TimeOfDay`, `WeatherChoice`, `WeatherSetup`, `WeatherState`, `WeatherEvent` |
 | `track` | `SurfaceKind` + `props()` (GDD §5.2 incl. wet modifiers), `SurfaceProps::with_weather`, `TrackPiece`, `Surface`, `Prop`, `TrackSummary` |
-| `ui` | `UiCue` (+ `stem()` = `assets/audio/sfx/<stem>.ogg`), `UiSound`, `MenuBackdrop`, `BackdropFocus` |
+| `ui` | `UiCue` (+ `stem()` = `assets/audio/sfx/<stem>.ogg`), `UiSound`, `MenuBackdrop`, `BackdropFocus` (`Wide`, `Car`, `Room` = no car), `MarkerShape` + `RacerMarker::of(grid index, slot)` (colour-blind markers shared by rc_vfx tags and rc_ui) |
 | `flow` | `LoadingTasks` (build-time `register`), `LoadingDone`, `LoadingFailed`, `LobbyState`, `AutomationConfig` (+ `QuickRaceArgs`, `ScreenshotPlan`, `is_automated`) |
 | `settings` | `Settings { gameplay, graphics, audio, controls, accessibility }` with GDD §15 defaults, RON round-trip, `#[serde(default)]` everywhere |
 | `paths` | `UserPaths`, pure `resolve_assets_dir` / `resolve_user_dir` (CLI → env → defaults) |

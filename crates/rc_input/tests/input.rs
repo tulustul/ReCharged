@@ -393,6 +393,7 @@ fn rebinding_captures_the_next_key_and_reports_conflicts() {
             action: DriveAction::Boost,
             binding: Some(Binding::Key(KeyCode::KeyK)),
             conflict: None,
+            previous: Some(Binding::Key(KeyCode::ShiftLeft)),
         }]
     );
     let s = capture(&mut app, KeyCode::ArrowUp);

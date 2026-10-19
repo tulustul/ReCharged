@@ -5,7 +5,8 @@
 #   cargo run -p recharged -- --user-data-dir target/qa/data/vs4 --window 1600x900 \
 #     --input-script tools/scripts/qa/vs4.script --exit-after 700
 wait ui
-3.5 nav keyboardA confirm          # Title
+wait screen title                  # the splash ends after its fade (frame clock)
+0.3 nav keyboardA confirm          # Title
 1.5 nav keyboardA up
 0.3 nav keyboardA up
 0.3 nav keyboardA up               # Settings

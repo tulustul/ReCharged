@@ -41,6 +41,9 @@ only `ui.nav` — as with real devices.
 [<when>] <step>
 when     <secs> after the previous step (wall clock, default 0) | @<tick> once RaceStatus.race_ticks ≥ tick
 wait     ui | menu | loading | race | intro | countdown | racing | finished | paused | running
+         | screen <name>   the screen React reports (`ui.screen`): a menu route (title, main,
+                           trackSelect, carSelect, settings …), loading, race, pause, results,
+                           standings, score, changeTrack
 nav      <device> up|down|left|right|confirm|back|prevTab|nextTab   tap the fixed menu key (GDD §12.2)
 hold     <device> <control> <value>   held until changed: steer -1…1, the others 0…1
 tap      <device> <control>           held 0.1 s (not steer)
@@ -55,29 +58,37 @@ control  throttle brake steer drift item boost lookBack reset camera pause
   Nav keys: A = WASD/Space/Esc, B = arrows/Enter/Backspace, both Q/E for tabs; pads = D-pad,
   A/B, LB/RB.
 - `wait ui` waits for React's `ui.ready` (the binary mirrors `rc_ui::UiStatus` into
-  `InputScript::ui_ready`); start every script with it.
+  `InputScript::ui_ready`); start every script with it. `wait screen <name>` waits until React
+  reports that screen (mirrored into `InputScript::screen`; rc_ui logs every change as
+  `UI screen: <name>`): use it after the splash and wherever a step needs a screen to be up,
+  instead of guessing a delay — the first frames may stall for seconds while pipelines compile.
 - A `nav` step also waits ≥ 4 frames after the previous step: React needs a few frames to show a
   dialog or the pause menu, and at low frame rates (a DPMS-blanked monitor stalls vsync'd
   presentation to ~1 fps; software rendering in CI) wall-clock delays alone outrun it. The smoke
   script passes at ~1 fps.
 - Errors at load (`--input-script <file>:<line>: <problem>`) exit with code 2 before a window opens.
 - `--exit-after <s>` is the run's timeout: if the script has not finished by then the exit code is
-  1 and the log names the step (`--input-script did not finish; it is at line 27: wait menu`).
+  1 and the log names the step and the screen React showed (`--input-script did not finish; it
+  is at line 27: wait menu (screen: pause)`). `RUST_LOG=info,bevy_react_core::js=debug` adds a
+  line per `ui.nav` with the screen that got it, and every focus move.
   The rumble warnings gilrs prints for the virtual pads are filtered from the log.
 
 **Writing scripts.** Held driving inputs also act in menus like real ones (keyboard A's throttle W
-is nav Up, Space is drift *and* Confirm): `release` before menus or a pause. Focusing a Track
-select card selects it (laps reset to its default), and the options panel is right of the last
-column — go top-left, then right ×3 (Backyard Bash). Scripts assume default settings and a fresh
-profile: give each run its own fresh `--user-data-dir`. Use `--window <W>x<H>` (i3 floats a
-fixed-size window at that size).
+is nav Up, Space is drift *and* Confirm): `release` before menus or a pause. Keep taps of one key
+≥ 0.1 s apart (closer ones merge into one press). Track select: focusing a card previews it (laps
+reset to its default); Confirm selects it and puts the focus on Start / Choose car, so Confirm,
+Confirm takes the focused track with its options; Up from there reaches every option (from Start:
+Time of day, Weather, Items, AI difficulty, Rivals, Laps, Mirror, Layout). Scripts assume default
+settings and a fresh profile: give each run its own fresh `--user-data-dir`. Use
+`--window <W>x<H>` (i3 floats a fixed-size window at that size). Park the mouse pointer outside
+the window: focus follows real pointer motion only, but a hand on the mouse still wins.
 
 **Shipped scripts** (`tools/scripts/`):
 | Script | Flow | Time |
 |---|---|---|
 | `keyboard_only.script` | Title → Settings (Graphics → VSync off, Accessibility → Steering assist on) → Quick Race (Backyard Bash, 1 lap, Dumpster) → drive (throttle, boost, item, look back, camera ×3, reset hold, scheme-B item, drift) → Pause → Resume → finish → Results → Menu → Versus: P1 joins with Space, P2 with Enter, car/ready → track (1 lap) → 2P split-screen race → P2 pauses → Quit → menu | ~2 min |
 | `gamepad_only.script` | the same on virtual pads (two pads in Versus; analog trigger and stick values; LB for the tab) | ~2.5 min |
-| `smoke.script` | CI: Title → Quick Race → drive 4 s → pause → quit → menu → exit | ~40 s (2 min at 1 fps) |
+| `smoke.script` | CI: Title → Quick Race → drive 4 s → pause → quit → menu → exit, waiting on each screen (`wait screen`) instead of fixed delays | ~40 s (2 min at 1 fps) |
 
 ```sh
 rm -rf target/agent-data/kb && cargo run -p recharged -- --user-data-dir target/agent-data/kb \
@@ -141,9 +152,9 @@ cargo run -p recharged -- --user-data-dir target/agent-data/x --calibrate-medals
 Rerun after changing a track, the AI or the Phantom.
 
 ## `--bench <track>_<n>p`
-The CLI turns the scenario into `--quick-race <track> --players <n> --autopilot --seed 1` (other
-race options such as `--weather` may be added; `--quick-race`/`--players` are rejected) and a
-1920×1080 window unless `--window`; the binary forces a scale factor of 1 (the budget means
+The CLI turns the scenario into `--quick-race <track> --players <n> --autopilot --seed 1
+--unlock-all` (other race options such as `--weather` may be added; `--quick-race`/`--players` are
+rejected; locked tracks bench like the others) and a 1920×1080 window unless `--window`; the binary forces a scale factor of 1 (the budget means
 physical pixels; this desktop's DPI scale would otherwise render 2240×1260) and starts from
 `Settings::default()` with vsync off (inserted before rc_game's boot, which keeps it and never
 saves it): the same High quality whatever the profile, frame cost rather than the display rate

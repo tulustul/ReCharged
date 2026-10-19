@@ -68,9 +68,12 @@ pub enum GameCommand {
     /// Versus "Rematch": the same track as a new race of the session, without reloading. Other
     /// modes: same as [`GameCommand::Restart`].
     Rematch,
-    /// Versus "Next track" (P1 picks), Quick Race / Time Trial "Change track": the same options
-    /// on another layout (Unloading → Loading). Not in cups.
+    /// The same options on another layout (Unloading → Loading). Not in cups.
     NextTrack(TrackVariant),
+    /// Quick Race / Time Trial "Change track", Versus "Next track" (P1 picks): another layout with
+    /// the race options picked on Track select; the players and their cars stay (Unloading →
+    /// Loading). Not in cups.
+    ChangeTrack(Box<TrackPick>),
     /// Leave the session: Unloading → Menu. An unfinished cup is lost (React confirms).
     QuitToMenu,
     /// Pause the race (Intro, Countdown or Racing).
@@ -140,6 +143,39 @@ pub struct RaceRequest {
     pub items: Option<bool>,
     /// RNG seed (`None` = from the clock).
     pub seed: Option<u64>,
+}
+
+/// A layout and race options picked after a race ([`GameCommand::ChangeTrack`]); `None` keeps
+/// the session's value (rc_game validates and clamps them like a [`RaceRequest`]).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TrackPick {
+    /// Layout.
+    pub variant: TrackVariant,
+    /// Laps.
+    pub laps: Option<u8>,
+    /// AI opponents.
+    pub ai: Option<u8>,
+    /// AI difficulty.
+    pub difficulty: Option<Difficulty>,
+    /// Items.
+    pub items: Option<bool>,
+    /// Weather.
+    pub weather: Option<WeatherChoice>,
+    /// Time of day.
+    pub time: Option<TimeOfDay>,
+}
+
+impl TrackPick {
+    /// `request` on this layout with these options.
+    pub(crate) fn apply_to(&self, request: &mut RaceRequest) {
+        request.variant = self.variant.clone();
+        request.laps = self.laps.or(request.laps);
+        request.ai = self.ai.or(request.ai);
+        request.difficulty = self.difficulty.or(request.difficulty);
+        request.items = self.items.or(request.items);
+        request.weather = self.weather.or(request.weather);
+        request.time = self.time.or(request.time);
+    }
 }
 
 impl RaceRequest {

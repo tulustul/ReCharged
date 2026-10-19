@@ -48,7 +48,7 @@ export function PlayerHud({ view, setup, tick, values, dots, views, phase }: Pro
       </node>
       {showMap && (
         <node style={{ positionType: "absolute", left: pad, bottom: pad }}>
-          <Minimap size={Math.round(Math.min(270 * k, rect.h * 0.42))} outline={setup.outline} racers={setup.racers} dots={dots} own={[p.racer]} k={k} />
+          <Minimap size={Math.round(Math.min(270 * k, rect.h * 0.42))} outline={setup.outline} racers={setup.racers} dots={dots} own={[p.racer]} k={k} markers={setup.colorblindMarkers} />
         </node>
       )}
       <node style={{ positionType: "absolute", left: 0, right: 0, top: Math.round(rect.h * (compact ? 0.06 : 0.08)), flexDirection: "column", alignItems: "center", gap: Math.round(12 * k) }}>

@@ -1,5 +1,6 @@
 //! Automation hooks owned by the binary: `--exit-after`, `--screenshot*`, the host side of
-//! `--input-script` (UI readiness for `wait ui`, `shot` screenshots, `exit`), startup notes.
+//! `--input-script` (UI readiness for `wait ui`, the screen for `wait screen`, `shot`
+//! screenshots, `exit`), startup notes.
 
 use std::path::{Path, PathBuf};
 
@@ -37,12 +38,16 @@ fn log_flags(cfg: Res<AutomationConfig>, paths: Res<UserPaths>) {
     }
 }
 
-/// `wait ui` in an input script waits for React's `ui.ready`.
+/// `wait ui` / `wait screen <name>` in an input script wait for React's `ui.ready` / `ui.screen`.
 fn ui_ready_for_script(ui: Option<Res<UiStatus>>, script: Option<ResMut<InputScript>>) {
-    if let (Some(ui), Some(mut script)) = (ui, script)
-        && script.ui_ready != ui.ready
-    {
+    let (Some(ui), Some(mut script)) = (ui, script) else {
+        return;
+    };
+    if script.ui_ready != ui.ready {
         script.ui_ready = ui.ready;
+    }
+    if script.screen != ui.screen {
+        script.screen.clone_from(&ui.screen);
     }
 }
 

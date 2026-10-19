@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef } from "react";
 import { interpolate, useSharedValue, withDelay, withSpring, type BevyStyle } from "bevy-react";
 
 import { bevy, on, type ReactEvents, type UiUnlockedItem } from "./bevy";
+import { draft } from "./state/draft";
 import { hmrSingleton } from "./state/store";
 import { spring } from "./theme/motion";
 
@@ -42,6 +43,19 @@ export function useSeen(item: UiUnlockedItem | null, fresh: boolean) {
     if (item && fresh) bevy.profile.seen({ item });
     // `key` identifies the item; the object itself changes identity every render.
   }, [key, fresh]);
+}
+
+/** Hides the 3D showroom car while mounted (screens that cover the turntable: Garage grid, Credits
+ * roll, Cup-end podium); the wide shot of the player's car returns afterwards. */
+export function useRoomBackdrop() {
+  useEffect(() => {
+    const backdrop = (focus: "room" | "wide") => {
+      const d = draft.get();
+      bevy.menu.backdrop({ car: d.car, paint: d.paint, focus });
+    };
+    backdrop("room");
+    return () => backdrop("wide");
+  }, []);
 }
 
 /** True inside split-screen race overlays: panels use translucent fills instead of glass. */

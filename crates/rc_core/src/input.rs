@@ -280,6 +280,9 @@ pub struct RebindResult {
     pub binding: Option<Binding>,
     /// Another action already uses it (keyboard schemes are checked together).
     pub conflict: Option<(ControlScheme, DriveAction)>,
+    /// The rebound action's primary binding before the capture: on a conflict the two swap, so
+    /// the conflicting action receives it (`None`: it is left without the captured binding).
+    pub previous: Option<Binding>,
 }
 
 /// Device assignment changes (producer input; consumers game, ui).

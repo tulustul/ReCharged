@@ -1,12 +1,12 @@
-//! `race.*` channels (start, restart, next race, rematch, next track, resume, quit, the session
-//! snapshot) and `loading.progress`. Results, standings and the scoreboard: [`crate::results`];
-//! the HUD channels: [`crate::hud`].
+//! `race.*` channels (start, restart, next race, rematch, next track with its options, resume,
+//! quit, the session snapshot) and `loading.progress`. Results, standings and the scoreboard:
+//! [`crate::results`]; the HUD channels: [`crate::hud`].
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_react::prelude::*;
 use rc_core::prelude::*;
-use rc_game::{CupRun, GameCommand, PlayerCar, RaceOutcome, RaceRequest, VersusSession};
+use rc_game::{CupRun, GameCommand, PlayerCar, RaceOutcome, RaceRequest, TrackPick, VersusSession};
 
 use crate::content::{UiDifficulty, UiTimeOfDay, UiWeatherChoice};
 use crate::hud::{HudView, UiHudSnapshot};
@@ -147,19 +147,6 @@ impl From<&StartRace> for RaceRequest {
     }
 }
 
-/// A layout.
-#[derive(serde::Deserialize, ts_rs::TS, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub struct UiTrackVariant {
-    /// Track id.
-    pub track: String,
-    /// Reverse layout.
-    pub reverse: bool,
-    /// Mirrored.
-    pub mirror: bool,
-}
-
 /// React → Bevy message `race.restart`: same race again, no reload (Pause/Results "Restart",
 /// Time Trial "Retry").
 #[react_message(name = "race.restart")]
@@ -173,9 +160,55 @@ pub struct NextRace;
 #[react_message(name = "race.rematch")]
 pub struct Rematch;
 
-/// React → Bevy message `race.nextTrack`: Versus, P1 picked the next track.
+/// React → Bevy message `race.nextTrack`: after a race, another layout with the options picked
+/// on Track select — Quick Race / Time Trial "Change track", Versus "Next track" (P1 picks).
 #[react_message(name = "race.nextTrack")]
-pub struct NextTrack(pub UiTrackVariant);
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct NextTrack {
+    /// Track id.
+    pub track: String,
+    /// Reverse layout.
+    pub reverse: bool,
+    /// Mirrored.
+    pub mirror: bool,
+    /// AI opponents (default: as before).
+    #[ts(optional)]
+    pub ai: Option<u8>,
+    /// AI difficulty.
+    #[ts(optional)]
+    pub difficulty: Option<UiDifficulty>,
+    /// Laps.
+    #[ts(optional)]
+    pub laps: Option<u8>,
+    /// Weather.
+    #[ts(optional)]
+    pub weather: Option<UiWeatherChoice>,
+    /// Time of day.
+    #[ts(optional)]
+    pub time: Option<UiTimeOfDay>,
+    /// Items on/off.
+    #[ts(optional)]
+    pub items: Option<bool>,
+}
+
+impl From<&NextTrack> for TrackPick {
+    fn from(next: &NextTrack) -> Self {
+        Self {
+            variant: TrackVariant {
+                track: TrackId::new(next.track.as_str()),
+                reverse: next.reverse,
+                mirror: next.mirror,
+            },
+            laps: next.laps,
+            ai: next.ai,
+            difficulty: next.difficulty.map(Into::into),
+            items: next.items,
+            weather: next.weather.map(Into::into),
+            time: next.time.map(Into::into),
+        }
+    }
+}
 
 /// React → Bevy message `race.resume`: close the pause menu (idempotent).
 #[react_message(name = "race.resume")]
@@ -184,6 +217,39 @@ pub struct ResumeRace;
 /// React → Bevy message `race.quit`: leave the race for the menu.
 #[react_message(name = "race.quit")]
 pub struct QuitRace;
+
+mirror_enum!(
+    /// [`MarkerShape`]: a colour-blind marker shape.
+    UiMarkerShape = MarkerShape { Circle, Triangle, Square, Diamond, Star, Cross, Pentagon, Hexagon }
+);
+
+/// A racer's colour-blind marker ([`RacerMarker`], shared with rc_vfx's name tags).
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum UiMarker {
+    /// P1–P4.
+    Player {
+        /// Slot 0–3.
+        slot: u8,
+    },
+    /// An AI rival's shape.
+    Shape {
+        /// The shape.
+        shape: UiMarkerShape,
+    },
+}
+
+impl From<RacerMarker> for UiMarker {
+    fn from(marker: RacerMarker) -> Self {
+        match marker {
+            RacerMarker::Player(slot) => Self::Player { slot: slot.0 },
+            RacerMarker::Shape(shape) => Self::Shape {
+                shape: shape.into(),
+            },
+        }
+    }
+}
 
 /// A racer of the session.
 #[derive(serde::Serialize, ts_rs::TS, Debug, Clone, PartialEq)]
@@ -198,6 +264,8 @@ pub struct UiRacer {
     pub slot: Option<u8>,
     /// Racer colour, sRGB 0–1.
     pub color: [f32; 3],
+    /// Colour-blind marker (shown when the setting is on).
+    pub marker: UiMarker,
 }
 
 /// The session's setup (loading screen, pause, results).
@@ -221,6 +289,8 @@ pub struct UiRaceSetup {
     pub time: UiTimeOfDay,
     /// Items enabled.
     pub items: bool,
+    /// The rivals' difficulty (`null` without rivals).
+    pub difficulty: Option<UiDifficulty>,
     /// Racers in grid order.
     pub racers: Vec<UiRacer>,
 }
@@ -236,6 +306,10 @@ impl From<&RaceConfig> for UiRaceSetup {
             weather: config.weather.weather.into(),
             time: config.weather.time.into(),
             items: config.items,
+            difficulty: config.racers.iter().find_map(|r| match r.controller {
+                Controller::Ai { difficulty, .. } => Some(difficulty.into()),
+                Controller::Human { .. } => None,
+            }),
             racers: UiRacer::of(config),
         }
     }
@@ -247,14 +321,19 @@ impl UiRacer {
         config
             .racers
             .iter()
-            .map(|r| Self {
-                name: r.name.clone(),
-                car: r.car.0.clone(),
-                slot: match r.controller {
-                    Controller::Human { slot, .. } => Some(slot.0),
+            .enumerate()
+            .map(|(i, r)| {
+                let slot = match r.controller {
+                    Controller::Human { slot, .. } => Some(slot),
                     Controller::Ai { .. } => None,
-                },
-                color: r.color,
+                };
+                Self {
+                    name: r.name.clone(),
+                    car: r.car.0.clone(),
+                    slot: slot.map(|s| s.0),
+                    color: r.color,
+                    marker: RacerMarker::of(i, slot).into(),
+                }
             })
             .collect()
     }
@@ -329,12 +408,8 @@ pub(crate) fn register(app: &mut App) {
             out.write(GameCommand::Rematch);
         })
         .add_react_handler(|next: On<NextTrack>, mut out: MessageWriter<GameCommand>| {
-            let v = &next.event().0;
-            out.write(GameCommand::NextTrack(TrackVariant {
-                track: TrackId::new(v.track.as_str()),
-                reverse: v.reverse,
-                mirror: v.mirror,
-            }));
+            let pick = TrackPick::from(next.event());
+            out.write(GameCommand::ChangeTrack(Box::new(pick)));
         })
         .add_react_handler(|_: On<ResumeRace>, mut out: MessageWriter<GameCommand>| {
             out.write(GameCommand::Resume);
@@ -407,5 +482,65 @@ mod tests {
         assert_eq!(request.difficulty, Some(Difficulty::Elite));
         assert_eq!(request.weather, Some(WeatherChoice::Random));
         assert_eq!(request.items, Some(false));
+    }
+
+    #[test]
+    fn racers_carry_the_shared_colour_blind_marker() {
+        let ai = Controller::Ai {
+            rival: RivalId::new("dash"),
+            difficulty: Difficulty::Pro,
+        };
+        let config = RaceConfig {
+            racers: vec![
+                RacerSetup::default(), // P1
+                RacerSetup {
+                    controller: ai.clone(),
+                    ..default()
+                },
+                RacerSetup {
+                    controller: ai,
+                    ..default()
+                },
+            ],
+            ..default()
+        };
+        let markers: Vec<UiMarker> = UiRacer::of(&config).iter().map(|r| r.marker).collect();
+        assert_eq!(
+            markers,
+            [
+                UiMarker::Player { slot: 0 },
+                UiMarker::Shape {
+                    shape: UiMarkerShape::Triangle
+                },
+                UiMarker::Shape {
+                    shape: UiMarkerShape::Square
+                },
+            ],
+            "shapes by grid index, as on the name tags"
+        );
+    }
+
+    #[test]
+    fn next_track_carries_the_picked_options() {
+        let next = NextTrack {
+            track: "sofa_circuit".into(),
+            reverse: false,
+            mirror: true,
+            ai: Some(5),
+            difficulty: Some(UiDifficulty::Rookie),
+            laps: Some(2),
+            weather: Some(UiWeatherChoice::Random),
+            time: Some(UiTimeOfDay::Night),
+            items: Some(false),
+        };
+        let pick = TrackPick::from(&next);
+        assert_eq!(pick.variant.track.as_str(), "sofa_circuit");
+        assert!(pick.variant.mirror && !pick.variant.reverse);
+        assert_eq!(
+            (pick.laps, pick.ai, pick.items),
+            (Some(2), Some(5), Some(false))
+        );
+        assert_eq!(pick.difficulty, Some(Difficulty::Rookie));
+        assert_eq!(pick.time, Some(TimeOfDay::Night));
     }
 }

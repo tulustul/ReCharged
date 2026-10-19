@@ -1,9 +1,11 @@
-// UI-17 Credits: team, tools, licences, rolling upwards (Bevy animates it; React renders once).
+// UI-17 Credits: team, tools, licences, rolling upwards (Bevy animates it; React renders once)
+// over the showroom room (its car is hidden so the roll stays readable).
 import { useEffect } from "react";
 import { interpolate, useSharedValue, withRepeat, withTiming } from "bevy-react";
 
 import { BoltIcon } from "../components/icons";
 import { Hints } from "../components/Hints";
+import { useRoomBackdrop } from "../hooks";
 import { back } from "../nav/routes";
 import { useFocusNav } from "../nav/useFocusNav";
 import { hint } from "../strings/common";
@@ -23,6 +25,7 @@ const ROLL_TO = 92 - COLUMN_PX;
 
 export function Credits() {
   useFocusNav({}, { region: "none", index: 0 }, { back, confirm: back });
+  useRoomBackdrop();
   const roll = useSharedValue(0);
   useEffect(() => {
     roll.value = withRepeat(withTiming(1, { duration: ((ROLL_FROM - ROLL_TO) / ROLL_PX_PER_S) * 1000, easing: "linear" }));

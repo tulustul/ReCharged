@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { UiProfile, UiTrack } from "../bevy";
-import { DEFAULT_DRAFT, maxAi, normalize, oncePer, startMessage, weatherChoices, withTrack } from "./draft.ts";
+import type { UiProfile, UiRaceSetup, UiTrack } from "../bevy";
+import { DEFAULT_DRAFT, draftFromSetup, maxAi, nextTrackMessage, normalize, oncePer, startMessage, weatherChoices, withTrack } from "./draft.ts";
 
 const track = (over: Partial<UiTrack> = {}): UiTrack => ({
   id: "aisle_rush",
@@ -86,4 +86,30 @@ test("one Confirm sends race.start once: repeats within the window are dropped",
   assert.equal(gate(5016), false, "the same press seen twice");
   assert.equal(gate(5999), false);
   assert.equal(gate(6000), true, "a new press after the window");
+});
+
+test("change track starts from the session's own options and sends them all", () => {
+  const setup: UiRaceSetup = {
+    mode: { kind: "timeTrial" },
+    track: "toy_town",
+    reverse: true,
+    mirror: false,
+    laps: 3,
+    weather: { kind: "random" },
+    time: "night",
+    items: false,
+    difficulty: null,
+    racers: [{ name: "Player", car: "zip", slot: 0, color: [0, 0.85, 1], marker: { kind: "player", slot: 0 } }],
+  };
+  const d = draftFromSetup({ ...DEFAULT_DRAFT, mode: "quickRace", difficulty: "elite" }, setup);
+  assert.equal(d.mode, "timeTrial");
+  assert.deepEqual([d.track, d.reverse, d.time, d.ai, d.difficulty], ["toy_town", true, "night", 0, "elite"]);
+  const next = nextTrackMessage({ ...d, track: "sofa_circuit", laps: 7 });
+  assert.deepEqual(
+    [next.track, next.laps, next.ai, next.items, next.time],
+    ["sofa_circuit", 3, 0, false, "night"],
+    "Time Trial rules still apply",
+  );
+  const quick = nextTrackMessage({ ...d, mode: "quickRace", laps: 5, ai: 4, items: true });
+  assert.deepEqual([quick.laps, quick.ai, quick.items, quick.difficulty], [5, 4, true, "elite"]);
 });

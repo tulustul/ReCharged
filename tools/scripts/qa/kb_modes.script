@@ -8,7 +8,8 @@
 # Screenshots: <user-data-dir>/screenshots/kbm_*.png. Fresh profile, default settings.
 
 wait ui
-3.5 nav keyboardA confirm          # Title: any button
+wait screen title
+0.3 nav keyboardA confirm          # Title: any button
 1.5 shot kbm_01_main
 
 # Garage (5th entry)
@@ -161,6 +162,7 @@ wait menu
 0.3 nav keyboardA right
 0.3 nav keyboardA right            # Backyard Bash
 0.6 shot kbm_33_tt_track_select
+0.3 nav keyboardA confirm          # select it: the focus moves to Choose car
 0.3 nav keyboardA confirm          # → car select
 2.0 nav keyboardA confirm          # race
 wait racing

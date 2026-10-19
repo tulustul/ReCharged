@@ -26,7 +26,7 @@ import { hint, word } from "../../strings/common";
 import { actionName, schemeName, settingsText } from "../../strings/settings";
 import { text } from "../../theme/styles";
 import { color, space } from "../../theme/tokens";
-import { rowsOf, TABS, type RowDef } from "./rows";
+import { rebindNotice, rowsOf, TABS, type RebindNotice, type RowDef } from "./rows";
 
 const SCHEMES: UiScheme[] = ["keyboardA", "keyboardB", "gamepad"];
 const ROW = 56;
@@ -37,6 +37,7 @@ type Item =
   | { type: "binding"; action: UiDriveAction }
   | { type: "resetBindings" };
 
+
 export function Settings({ onBack }: { onBack: () => void }) {
   const device = useDevice();
   const [tab, setTab] = useState(0);
@@ -44,12 +45,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const bindings = useStore(bindingsStore);
   const [scheme, setScheme] = useState<UiScheme>(device === "gamepad" ? "gamepad" : device === "keyboardB" ? "keyboardB" : "keyboardA");
   const [capture, setCapture] = useState<UiDriveAction | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<RebindNotice | null>(null);
   useEffect(refreshSettings, []);
   useEvent("input.rebindResult", (r) => {
     setCapture(null);
-    if (!r.binding) setNotice(settingsText.cancelled);
-    else if (r.conflict) setNotice(settingsText.conflict(actionName[r.conflict.action], schemeName[r.conflict.scheme]));
+    if (!r.binding) setNotice({ kind: "cancelled" });
+    else if (r.conflict) setNotice({ kind: "conflict", other: r.conflict, swapped: r.previous !== null });
     else setNotice(null);
   });
   useDebug("tab", (id) => setTab(Math.max(0, TABS.indexOf(id as (typeof TABS)[number]))));
@@ -76,6 +77,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
     if (!item || !s) return false;
     if (item.type === "scheme") {
       sfx("toggle");
+      setNotice(null);
       setScheme(SCHEMES[cycle(SCHEMES.indexOf(scheme), delta, SCHEMES.length)]);
       return true;
     }
@@ -106,6 +108,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
       bevy.input.rebind({ scheme, action: item.action });
     } else if (item.type === "resetBindings") {
       sfx("select");
+      setNotice(null);
       bevy.input.resetBindings({ scheme });
     } else if (item.type === "row" && item.row.id === "resetProgress") {
       sfx("select");
@@ -120,6 +123,8 @@ export function Settings({ onBack }: { onBack: () => void }) {
     confirm: (f) => activate(items[f.index]),
   });
   const focused = items[nav.focus.index];
+  // The action a rebind left without any binding (shown in this scheme) is highlighted.
+  const { text: noticeText, unbound } = rebindNotice(notice, scheme, bindings);
   const label = (item: Item | undefined) =>
     !item ? "" : item.type === "row" ? settingsText.rows[item.row.id] : item.type === "scheme" ? settingsText.rows.scheme : item.type === "resetBindings" ? settingsText.rows.resetBindings : [actionName[item.action], ""];
   const [title, desc] = label(focused) || ["", ""];
@@ -145,6 +150,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
                   height={ROW}
                   focused={nav.is("rows", i)}
                   disabled={item.type === "row" && item.row.locked}
+                  warn={item.type === "binding" && unbound?.scheme === scheme && unbound.action === item.action}
                   onHover={() => nav.hover("rows", i)}
                   onPress={() => activate(item)}
                 >
@@ -162,10 +168,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
               <text style={text.small}>{settingsText.captureHint}</text>
             </node>
           )}
-          {notice && !capture && (
+          {noticeText && !capture && (
             <node style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
               <WarningIcon size={26} />
-              <text style={{ ...text.small, color: color.warning, flexShrink: 1 }}>{notice}</text>
+              <text style={{ ...text.small, color: color.warning, flexShrink: 1 }}>{noticeText}</text>
             </node>
           )}
         </Panel>

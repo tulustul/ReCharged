@@ -1,5 +1,6 @@
-// UI-21 Cup end: podium of the top 3 cars, your trophy, unlocks; the credits roll after a Grand
-// Volt win. Opening it plays the podium stinger (`ui.stinger`).
+// UI-21 Cup end: podium of the top 3 cars standing on their 1-2-3 blocks (names on the blocks; the
+// showroom's own car is hidden), your trophy, unlocks; the credits roll after a Grand Volt win.
+// Opening it plays the podium stinger (`ui.stinger`).
 import { useEffect } from "react";
 
 import { bevy, type UiStandingRow } from "../bevy";
@@ -13,11 +14,11 @@ import { useFocusNav } from "../nav/useFocusNav";
 import { sfx } from "../sound";
 import { catalog, profile, session } from "../state/stores";
 import { unlockLabel } from "../state/unlocks";
+import { useRoomBackdrop } from "../hooks";
 import { useStore } from "../state/useStore";
 import { appStrings } from "../strings/app";
 import { hint, trophyName } from "../strings/common";
 import { cupEnd } from "../strings/race";
-import { spring } from "../theme/motion";
 import { text } from "../theme/styles";
 import { color, radius, slotColor, space } from "../theme/tokens";
 
@@ -38,6 +39,7 @@ export function CupEnd() {
     else backTo("cupSelect");
   };
   useFocusNav({ go: { count: 1, cols: 1 } }, { region: "go", index: 0 }, { confirm: finish, back: finish });
+  useRoomBackdrop();
   const rows = cup?.rows ?? [];
   const podium: [UiStandingRow | undefined, number][] = [
     [rows[1], 2],
@@ -73,17 +75,22 @@ export function CupEnd() {
   );
 }
 
-const HEIGHT: Record<number, number> = { 1: 300, 2: 220, 3: 170 };
+const HEIGHT: Record<number, number> = { 1: 310, 2: 250, 3: 205 };
 const TONE: Record<number, string> = { 1: color.gold, 2: color.silver, 3: color.bronze };
+/** Transparent rows under the wheels in the car thumbnails (share of their height): the image
+ * overlaps the block by this much, so the car stands on it. */
+const CAR_FOOT = 0.16;
 
 function Step({ row, place }: { row: UiStandingRow; place: number }) {
   const car = useStore(catalog)?.cars.find((c) => c.id === row.car);
   const tint = row.slot !== null ? slotColor[row.slot] : rgbHex(row.color);
+  const size = place === 1 ? 320 : 260;
   return (
-    <node style={{ width: 330, flexDirection: "column", alignItems: "center", gap: 10 }}>
-      {car?.thumbnail && <image src={car.thumbnail} style={{ width: place === 1 ? 320 : 260, height: place === 1 ? 320 : 260, imageRendering: "trilinear", transform: { scale: 1 }, transition: { transform: spring.bouncy } }} />}
-      <text style={{ ...text.h3, color: tint }}>{row.name.toUpperCase()}</text>
-      <text style={{ ...text.label, color: color.textDim }}>{cupEnd.points(row.points)}</text>
+    <node style={{ width: 330, flexDirection: "column", alignItems: "center" }}>
+      {car?.thumbnail && (
+        // Above the block (zIndex) so the wheels rest on its top edge.
+        <image src={car.thumbnail} style={{ width: size, height: size, imageRendering: "trilinear", zIndex: 1, margin: { bottom: -Math.round(size * CAR_FOOT) } }} />
+      )}
       <node
         style={{
           alignSelf: "stretch",
@@ -94,10 +101,12 @@ function Step({ row, place }: { row: UiStandingRow; place: number }) {
           borderColor: TONE[place],
           flexDirection: "column",
           alignItems: "center",
-          padding: { top: 18 },
+          padding: { top: 10 },
         }}
       >
-        <text style={{ ...text.hero, fontSize: 92, color: TONE[place] }}>{`${place}`}</text>
+        <text style={{ ...text.hero, fontSize: 84, color: TONE[place] }}>{`${place}`}</text>
+        <text style={{ ...text.h3, color: tint }}>{row.name.toUpperCase()}</text>
+        <text style={{ ...text.label, color: color.textDim }}>{cupEnd.points(row.points)}</text>
       </node>
     </node>
   );

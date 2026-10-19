@@ -5,7 +5,8 @@ wait ui
 0.3 shot cor_01_ui_ready
 1.0 shot cor_02_1s
 2.0 shot cor_03_3s
-1.0 nav keyboardA confirm          # Title
+wait screen title                  # the splash ends after its fade (frame clock)
+0.3 nav keyboardA confirm          # Title
 1.5 shot cor_04_main
 0.3 nav keyboardA down
 0.3 nav keyboardA down             # Time Trial
@@ -13,7 +14,8 @@ wait ui
 2.0 nav keyboardA up
 0.3 nav keyboardA left
 0.3 nav keyboardA left             # Toy Town
-0.3 nav keyboardA confirm
+0.3 nav keyboardA confirm          # select it: the focus moves to Choose car
+0.3 nav keyboardA confirm          # → car select
 2.0 nav keyboardA confirm          # race
 wait countdown
 1.0 shot cor_05_tt_countdown

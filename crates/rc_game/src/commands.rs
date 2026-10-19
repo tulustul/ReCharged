@@ -14,7 +14,7 @@ use crate::save::load_ghost;
 use crate::series::{CupRun, Series, VersusSession};
 use crate::{GameCommand, GameNotice, RaceRequest};
 
-/// The request of the running series: `NextRace` / `NextTrack` rebuild from it.
+/// The request of the running series: `NextRace` / `NextTrack` / `ChangeTrack` rebuild from it.
 #[derive(Resource, Debug, Clone)]
 pub(crate) struct ActiveRequest(pub RaceRequest);
 
@@ -236,7 +236,9 @@ pub(crate) fn session_commands(
                 next.phase.set(RacePhase::Setup);
                 next.pause.set(PauseState::Running);
             }
-            GameCommand::NextRace | GameCommand::NextTrack(_) if in_race => {
+            GameCommand::NextRace | GameCommand::NextTrack(_) | GameCommand::ChangeTrack(_)
+                if in_race =>
+            {
                 let (Some(config), Some(active)) = (config.as_deref(), active.as_deref_mut())
                 else {
                     continue;
@@ -278,6 +280,7 @@ pub(crate) fn session_commands(
             | GameCommand::Rematch
             | GameCommand::NextRace
             | GameCommand::NextTrack(_)
+            | GameCommand::ChangeTrack(_)
             | GameCommand::QuitToMenu
             | GameCommand::DropPlayer(_) => warn!("{command:?} ignored in {state:?}"),
             _ => {}
@@ -285,8 +288,8 @@ pub(crate) fn session_commands(
     }
 }
 
-/// Where `NextRace` / `NextTrack` lead: the next session's setup, the menu (cup over), or nowhere
-/// (`Ok(None)`: not allowed now).
+/// Where `NextRace` / `NextTrack` / `ChangeTrack` lead: the next session's setup, the menu (cup
+/// over), or nowhere (`Ok(None)`: not allowed now).
 fn next_session(
     command: &GameCommand,
     config: &RaceConfig,
@@ -297,8 +300,8 @@ fn next_session(
     let mut request = active.0.clone();
     request.seed = Some(rng::draw(config.seed, 1, RngStream::RaceSetup, u64::MAX));
     match (command, cup) {
-        (GameCommand::NextTrack(_), Some(_)) => {
-            warn!("NextTrack is not available in a cup");
+        (GameCommand::NextTrack(_) | GameCommand::ChangeTrack(_), Some(_)) => {
+            warn!("{command:?} is not available in a cup");
             return Ok(None);
         }
         (_, Some(run)) => {
@@ -325,6 +328,7 @@ fn next_session(
             return Ok(Some(AfterUnload::Reload(Box::new(next))));
         }
         (GameCommand::NextTrack(variant), None) => request.variant = variant.clone(),
+        (GameCommand::ChangeTrack(pick), None) => pick.apply_to(&mut request),
         (_, None) => {}
     }
     let dropped = versus.as_ref().map_or(&[][..], |s| &s.dropped[..]);
@@ -340,6 +344,14 @@ fn next_session(
     {
         session.series.race += 1;
     }
+    info!(
+        "next race on {:?} ({} racers, {} laps, items {}, {:?})",
+        next.variant,
+        next.racers.len(),
+        next.laps,
+        next.items,
+        next.weather
+    );
     active.0 = request;
     Ok(Some(AfterUnload::Reload(Box::new(next))))
 }

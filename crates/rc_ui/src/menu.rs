@@ -13,7 +13,7 @@ use crate::content::{
 
 mirror_enum!(
     /// [`BackdropFocus`]: showroom camera framing.
-    UiBackdropFocus = BackdropFocus { Wide, Car }
+    UiBackdropFocus = BackdropFocus { Wide, Car, Room }
 );
 
 /// Star ratings 1–5.

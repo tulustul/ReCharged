@@ -1,11 +1,12 @@
-// A screen's focus: regions moved by `ui.nav` directions and set by pointer hover, with the confirm /
-// back / tab / adjust actions routed to the screen. Plays the hover and back cues.
+// A screen's focus: regions moved by `ui.nav` directions and set by pointer motion over an item
+// (`onPointerHover`: a cursor resting where a new screen appears never takes the focus), with the
+// confirm / back / tab / adjust actions routed to the screen. Plays the hover and back cues.
 import { useState } from "react";
 
 import type { NavEvent } from "../bevy";
 import { sfx } from "../sound";
 import { clampFocus, enter, isDir, move, type Focus, type FocusMap } from "./focus";
-import { useNav } from "./input";
+import { screenName, useNav } from "./input";
 
 export type FocusHandlers = {
   confirm?: (focus: Focus) => void;
@@ -23,6 +24,7 @@ export function useFocusNav(map: FocusMap, initial: Focus, handlers: FocusHandle
   const focus = clampFocus(map, raw, initial.region);
   const moveTo = (next: Focus) => {
     if (next.region === focus.region && next.index === focus.index) return;
+    console.debug(`focus ${next.region}[${next.index}] on ${screenName()}`);
     sfx("hover");
     setFocus(next);
   };
@@ -42,7 +44,7 @@ export function useFocusNav(map: FocusMap, initial: Focus, handlers: FocusHandle
     z,
     enabled,
   );
-  /** Pointer hover focuses an item. */
+  /** Pointer motion over an item focuses it. */
   const hover = (region: string, index: number) => moveTo(enter(focus, region, map[region]?.count ?? 1, index));
   const is = (region: string, index: number) => focus.region === region && focus.index === index;
   return { focus, setFocus, hover, is };

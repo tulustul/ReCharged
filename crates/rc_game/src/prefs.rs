@@ -56,17 +56,24 @@ pub(crate) fn default_bindings(scheme: ControlScheme) -> ActionBindings {
     }
 }
 
-/// A captured binding becomes the action's primary binding (its other bindings stay) and is
-/// taken away from the action it conflicted with. `false` for a cancelled capture.
+/// A captured binding becomes the action's primary binding (its other bindings stay). On a
+/// conflict the two actions swap: the conflicting action receives the rebound action's previous
+/// primary binding in place of the captured one, or just loses it when there was none (it may end
+/// up unbound). `false` for a cancelled capture.
 pub(crate) fn apply_rebind(controls: &mut ControlSettings, result: &RebindResult) -> bool {
     let Some(binding) = result.binding else {
         return false;
     };
     if let Some((scheme, action)) = result.conflict {
-        controls
-            .bindings_mut(scheme)
-            .get_mut(action)
-            .retain(|b| *b != binding);
+        let other = controls.bindings_mut(scheme).get_mut(action);
+        if let Some(i) = other.iter().position(|b| *b == binding) {
+            match result.previous {
+                Some(previous) if !other.contains(&previous) => other[i] = previous,
+                _ => {
+                    other.remove(i);
+                }
+            }
+        }
     }
     let list = controls.bindings_mut(result.scheme).get_mut(result.action);
     list.retain(|b| *b != binding);
@@ -129,52 +136,80 @@ mod tests {
     }
 
     #[test]
-    fn rebinding_replaces_the_primary_and_steals_from_the_conflict() {
+    fn a_conflicting_rebind_swaps_with_the_other_action() {
         let mut c = ControlSettings::default();
         let result = RebindResult {
             scheme: ControlScheme::KeyboardB,
             action: DriveAction::LookBack,
             binding: Some(key(KeyCode::KeyE)),
             conflict: Some((ControlScheme::KeyboardA, DriveAction::UseItem)),
+            previous: Some(key(KeyCode::Numpad0)),
         };
         assert!(apply_rebind(&mut c, &result));
         assert_eq!(
             c.keyboard_b.look_back,
             [key(KeyCode::KeyE), key(KeyCode::Delete)]
         );
-        assert!(
-            c.keyboard_a.use_item.is_empty(),
-            "taken from the conflicting action"
+        assert_eq!(
+            c.keyboard_a.use_item,
+            [key(KeyCode::Numpad0)],
+            "the conflicting action gets the previous binding"
         );
 
-        let again = RebindResult {
+        // The other action keeps its other bindings; no duplicates either way.
+        let camera = RebindResult {
+            scheme: ControlScheme::KeyboardB,
+            action: DriveAction::Camera,
             binding: Some(key(KeyCode::Delete)),
-            conflict: None,
-            ..result
+            conflict: Some((ControlScheme::KeyboardB, DriveAction::LookBack)),
+            previous: Some(key(KeyCode::NumpadDecimal)),
         };
-        assert!(apply_rebind(&mut c, &again));
+        assert!(apply_rebind(&mut c, &camera));
         assert_eq!(
             c.keyboard_b.look_back,
-            [key(KeyCode::Delete)],
-            "no duplicates"
+            [key(KeyCode::KeyE), key(KeyCode::NumpadDecimal)]
         );
-
-        let empty = RebindResult {
-            scheme: ControlScheme::KeyboardA,
-            action: DriveAction::UseItem,
-            binding: Some(key(KeyCode::KeyF)),
-            conflict: None,
-        };
-        assert!(apply_rebind(&mut c, &empty));
-        assert_eq!(c.keyboard_a.use_item, [key(KeyCode::KeyF)]);
+        assert_eq!(
+            c.keyboard_b.camera,
+            [key(KeyCode::Delete), key(KeyCode::End)]
+        );
 
         let cancelled = RebindResult {
             binding: None,
-            ..empty
+            ..camera
         };
         let before = c.clone();
         assert!(!apply_rebind(&mut c, &cancelled));
         assert_eq!(c, before);
+    }
+
+    #[test]
+    fn without_a_previous_binding_the_other_action_is_left_unbound() {
+        let mut c = ControlSettings::default();
+        c.keyboard_a.use_item.clear(); // e.g. an old save
+        let result = RebindResult {
+            scheme: ControlScheme::KeyboardA,
+            action: DriveAction::UseItem,
+            binding: Some(key(KeyCode::KeyC)),
+            conflict: Some((ControlScheme::KeyboardA, DriveAction::Camera)),
+            previous: None,
+        };
+        assert!(apply_rebind(&mut c, &result));
+        assert_eq!(c.keyboard_a.use_item, [key(KeyCode::KeyC)]);
+        assert!(c.keyboard_a.camera.is_empty(), "Camera is now unbound");
+
+        let again = RebindResult {
+            binding: Some(key(KeyCode::KeyF)),
+            conflict: None,
+            previous: Some(key(KeyCode::KeyC)),
+            ..result
+        };
+        assert!(apply_rebind(&mut c, &again));
+        assert_eq!(
+            c.keyboard_a.use_item,
+            [key(KeyCode::KeyF)],
+            "replaces the primary"
+        );
     }
 
     #[test]

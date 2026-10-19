@@ -1,15 +1,17 @@
 // Settings rows as data (pure): what each row shows and how it edits `UiSettings` (GDD §15).
 // Picking a quality preset sets the graphics options it governs; changing one of them makes the
 // preset Custom (the preset table is UI policy — rc_render only reads the individual options).
-import type { UiGraphics, UiQuality, UiSettings } from "../../bevy";
+import type { UiBindings, UiConflict, UiDriveAction, UiGraphics, UiQuality, UiScheme, UiSettings } from "../../bevy";
 import { percent } from "../../format.ts";
 import { difficultyName } from "../../strings/common.ts";
 import {
   aaName,
+  actionName,
   cameraModeName,
   displayModeName,
   particlesName,
   qualityName,
+  schemeName,
   settingsText,
   shadowsName,
   speedUnitName,
@@ -175,4 +177,23 @@ export function rowsOf(tab: TabId, s: UiSettings): RowDef[] {
         { id: "autoAccelerate", kind: "toggle", get: (x) => x.accessibility.autoAccelerate, set: (x, v) => access(x, { autoAccelerate: v }) },
       ];
   }
+}
+
+/** What the last rebind did: cancelled, or a conflict — the two actions swapped bindings, or
+ * (without a previous binding) the other action lost the key. */
+export type RebindNotice = { kind: "cancelled" } | { kind: "conflict"; other: UiConflict; swapped: boolean };
+
+const bindingsOf = (b: UiBindings | null, scheme: UiScheme, action: UiDriveAction) =>
+  b?.schemes.find((x) => x.scheme === scheme)?.actions.find((a) => a.action === action)?.bindings ?? [];
+
+/** The notice line on `scheme`'s Controls tab, and the action to highlight: one a rebind left
+ * without any binding. */
+export function rebindNotice(notice: RebindNotice | null, scheme: UiScheme, bindings: UiBindings | null): { text: string | null; unbound: UiConflict | null } {
+  if (!notice) return { text: null, unbound: null };
+  if (notice.kind === "cancelled") return { text: settingsText.cancelled, unbound: null };
+  const { other, swapped } = notice;
+  const name = `${actionName[other.action]}${other.scheme === scheme ? "" : ` (${schemeName[other.scheme]})`}`;
+  if (swapped) return { text: settingsText.swapped(name), unbound: null };
+  const unbound = bindingsOf(bindings, other.scheme, other.action).length === 0;
+  return unbound ? { text: settingsText.nowUnbound(name), unbound: other } : { text: settingsText.removedFrom(name), unbound: null };
 }

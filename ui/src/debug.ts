@@ -102,7 +102,14 @@ function setup(mode: "quickRace" | "timeTrial" | "versus" | "championship") {
       weather: { kind: "fixed", weather: "clear" },
       time: "morning",
       items: true,
-      racers: Array.from({ length: 8 }, (_, i) => ({ name: i < humans ? `P${i + 1}` : RIVALS[i - humans], car: "zip", slot: i < humans ? i : null, color: [0, 0.85, 1] })),
+      difficulty: "pro",
+      racers: Array.from({ length: 8 }, (_, i) => ({
+        name: i < humans ? `P${i + 1}` : RIVALS[i - humans],
+        car: "zip",
+        slot: i < humans ? i : null,
+        color: [0, 0.85, 1] as [number, number, number],
+        marker: i < humans ? { kind: "player" as const, slot: i } : { kind: "shape" as const, shape: "circle" as const },
+      })),
     },
   }));
 }

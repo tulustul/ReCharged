@@ -7,7 +7,7 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
 ## Data flow
 | What | Channel | Rate |
 |---|---|---|
-| Racers (grid order: name, car, slot, colour), laps, mode, items, ghost, minimap outline (0–1, ≤ 240 points), HUD settings (speed unit, HUD scale, minimap, reduce flashing) | event `race.setup` | on entering the race and when `RaceConfig`, `TrackSummary` or `Settings` change |
+| Racers (grid order: name, car, slot, colour, colour-blind marker), laps, mode, items, ghost, minimap outline (0–1, ≤ 240 points), HUD settings (speed unit, HUD scale, minimap, reduce flashing, colour-blind markers) | event `race.setup` | on entering the race and when `RaceConfig`, `TrackSummary` or `Settings` change |
 | Race clock, countdown number, "ends in" seconds, standings (grid indices), per local player: position, lap (`max(lap, 1)`, ≤ laps), lap/last/best/finish ms, km/h, charge, boost ready, spending, item, roulette, wrong way, lock-on, goo fuse, shield | event `race.hud` (`UiHudTick`) | ≤ 10 Hz (`on_real_timer(100 ms)`), only when changed |
 | Countdown 3-2-1, GO, perfect start, stall, TT split, lap (best, fastest from lap 2), final lap, finished, Golden Battery, missed checkpoint, race-ends-in, hints; hits taken (`Hit`) and landed (`Landed`) | event `race.event` (`UiRaceEvent`) | as they happen (local players only, except the global ones) |
 | Each local player's view in UI px (`PlayerViewports` ÷ `UiScale`) + the free quadrant in 3P | event `viewports` | when changed |
@@ -28,6 +28,8 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
 | `Hud.tsx` | root: feed (snapshot + events), shared values (`values.ts`), one `PlayerHud` per view, the 3P `Panel` |
 | `PlayerHud.tsx` | composition per view: `Standing` (position, lap, clock, lap/best, TT split, lap flash, P-badge in split) top-left, `ItemSlot` (roulette strip) top-right, `Gauges` (speed + battery) bottom-right, `Minimap` bottom-left (1P/2P), centre column: `Notices`, `Warnings`, `Center` (countdown / finish / wrong way / final lap), `Hints` (hint with the action's button, spectate, skip intro, race ends in) |
 | `store.ts` | hmr-safe stores: setup, tick, views, and short-lived moments per slot (countdown, notices ≤ 3, banners, splits, lap flashes, hints) cleared by timers; reset on a new attempt |
+| `noticeList.ts` | pure notice rules (tested): each view's newest lines; hits the player's item landed collapse into one line per item while they come within 1 s of each other ("Oil Slick hit 3 racers") |
+| `markers.ts` | colour-blind marker outlines (tested), the same shapes as rc_vfx's name tags |
 | `layout.ts` | pure maths (tested): `hudLayout` (size factor `k = hudScale × max(0.6, √fit)`, compact under 0.75 fit), `fs` (font floor 18 UI px ≈ 12 px at 720p 4-way), fallback views, unit, clock, split, place suffix |
 | `look.ts`, `itemIcons.tsx` | translucent navy chips (never `backdropFilter`), display numbers with a drop shadow, caps labels; ten vector item icons (distinct shape and colour) |
 | `demo.ts` | screenshot scenes |
@@ -38,6 +40,11 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
 - Accessibility: splits carry sign **and** colour, warnings and notices carry text and icons, the
   own minimap dot is larger with a white ring (others' rings by role), Reduce flashing stops the
   meter flash and warning pulses, HUD scale scales everything big, small labels keep a floor.
+- Colour-blind markers (setting): every racer has a marker from rc_core's `RacerMarker` (rc_ui
+  sends it with each racer) — a shape by grid index for rivals (● ▲ ■ ◆ ★ ✚ ⬟ ⬢), the player
+  number for humans. With the setting on, rivals' minimap dots take their shape (static `<svg>`,
+  dark outline), humans' dots show their number, and the 3P standings show the shapes; rc_vfx's
+  name tags show the same marker left of the name, so a shape always means the same car.
 - Split-screen: each view gets a dark hairline border and a P1–P4 badge; 4P drops the minimap
   (GDD), 3P shows standings + a large minimap in the free quadrant.
 - A missed checkpoint (rc_race: a checkpoint's `s` passed outside its gate, once per pass) shows
@@ -47,7 +54,7 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
   toast.
 
 ## Verification
-`RECHARGED_UI_SCRIPT="13.5 demo hud [1-4] racing|warnings|roulette|finish|tt|countdown"` over a
+`RECHARGED_UI_SCRIPT="13.5 demo hud [1-4] racing|warnings|roulette|finish|tt|countdown [markers]"` over a
 real race (`--quick-race toy_town [--mode versus --players N] --window 1920x1080`) keeps the real
 views, racers and outline and fills the rest; without a race the scene brings its own (fallback
 views, sample outline). While `demoMode` is on the feed leaves the HUD stores alone and React

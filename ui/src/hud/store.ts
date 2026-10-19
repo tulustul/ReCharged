@@ -5,6 +5,9 @@ import { bevy, on, type UiHint, type UiHudSetup, type UiHudTick, type UiItemKind
 import { createStore, hmrSingleton, sameJson } from "../state/store";
 import { demoMode } from "../state/stores";
 import { hud as words, itemName } from "../strings/hud";
+import { landedNotice, withNotice, type Notice } from "./noticeList";
+
+export type { Notice } from "./noticeList";
 
 const store = <T>(key: string, initial: T) => hmrSingleton(`__rc_hud_${key}`, () => createStore<T>(initial, sameJson));
 
@@ -14,7 +17,6 @@ export const liveSetup = store<UiHudSetup | null>("liveSetup", null);
 export const hudTick = store<UiHudTick | null>("tick", null);
 export const hudViews = store<UiViewports>("views", { players: [], panel: null });
 
-export type Notice = { id: number; slot: number; tone: "good" | "bad" | "info" | "gold"; text: string; item?: UiItemKind };
 export type Banner = { kind: "finalLap"; id: number } | { kind: "finished"; id: number; rank: number; ms: number };
 export type Moments = {
   banner: Banner | null;
@@ -29,7 +31,6 @@ export const notices = store<Notice[]>("notices", []);
 export const moments = store<Record<number, Moments>>("moments", {});
 
 const EMPTY: Moments = { banner: null, split: null, lap: null, hint: null };
-const MAX_NOTICES = 3;
 const ms = { go: 1000, notice: 3200, finalLap: 2600, split: 3000, lap: 3500, hint: 5000 } as const;
 
 let nextId = 1;
@@ -45,9 +46,14 @@ function moment<K extends keyof Moments>(slot: number, key: K, value: NonNullabl
 }
 
 export function notify(slot: number, tone: Notice["tone"], text: string, item?: UiItemKind) {
-  const notice: Notice = { id: nextId++, slot, tone, text, item };
-  notices.update((list) => [...list.filter((n) => n.slot !== slot), ...list.filter((n) => n.slot === slot).slice(1 - MAX_NOTICES), notice]);
-  if (!demoMode.get()) setTimeout(() => notices.update((list) => list.filter((n) => n.id !== notice.id)), ms.notice);
+  show({ id: nextId++, slot, tone, text, item });
+}
+
+/** Shows `notice` (or updates its line); it goes when its own timer runs out unless a newer
+ * version of the line replaced it (a collapsed hit restarts the clock). */
+function show(notice: Notice) {
+  notices.update((list) => withNotice(list, notice));
+  if (!demoMode.get()) setTimeout(() => notices.update((list) => list.filter((n) => n !== notice)), ms.notice);
 }
 
 /** Forgets every moment (new attempt, leaving the race). */
@@ -91,7 +97,8 @@ export function onRaceEvent(e: UiRaceEvent) {
     case "hit":
       return notify(e.slot, e.blocked ? "info" : "bad", e.blocked ? words.notice.blocked(itemName[e.by]) : words.notice.hitBy(itemName[e.by], e.attacker), e.by);
     case "landed":
-      return notify(e.slot, e.blocked ? "info" : "good", e.blocked ? words.notice.landedBlocked(e.victim) : words.notice.landed(itemName[e.by], e.victim), e.by);
+      if (e.blocked) return notify(e.slot, "info", words.notice.landedBlocked(e.victim), e.by);
+      return show(landedNotice(notices.get(), nextId++, e.slot, e.by, e.victim, performance.now()));
     case "endsIn":
       return; // the tick's `endsIn` drives the countdown text
   }

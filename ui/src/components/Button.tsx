@@ -42,7 +42,7 @@ export function Button({ label, focused = false, onPress, onHover, locked, badge
   return (
     <button
       onClick={onPress}
-      onPointerEnter={onHover}
+      onPointerHover={onHover}
       style={{
         width,
         height: compact ? 50 : menu ? 66 : 58,

@@ -52,7 +52,7 @@ fn a_full_cup_scores_reverts_restarts_and_unlocks_the_next_cup() {
         app.world().resource::<RaceConfig>().variant.track.as_str(),
         "sofa_circuit"
     );
-    assert_eq!(outcome(&app).points[..3], [10, 8, 6]);
+    assert_eq!(outcome(&app).points[..3], [Some(10), Some(8), Some(6)]);
     assert_eq!(run(&app).series.points(&PLAYER), 10);
 
     // Restart from Results reverts the race; the replay finishes 2nd.

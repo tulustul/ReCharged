@@ -7,7 +7,9 @@
 # Format: docs/design/automation.md. (gamepad_only.script is the same flow on pads.)
 
 wait ui
-3.5 nav keyboardA confirm          # the splash has timed out; Title: any button
+wait screen title                  # the splash ends after its fade
+0.3 nav keyboardA confirm          # Title: any button
+wait screen main
 1.5 shot kb_01_main_menu
 
 # Settings: Graphics → VSync off, then Accessibility → Steering assist on (both saved to
@@ -29,18 +31,23 @@ wait ui
 0.8 shot kb_02_settings
 0.3 nav keyboardA back             # Esc: main menu
 
-# Quick Race on Backyard Bash, 1 lap. Focusing a card selects it (laps reset to its default),
-# and the options panel is right of the last column: go top left, then right ×3.
+# Quick Race on Backyard Bash, 1 lap. Focusing a card previews it (laps reset to its default);
+# Confirm selects it and puts the focus on Choose car; Up reaches every option.
 1.2 nav keyboardA down             # Quick Race
 0.3 nav keyboardA confirm
-2.0 nav keyboardA up
+wait screen trackSelect
+0.3 nav keyboardA up
 0.3 nav keyboardA left
 0.3 nav keyboardA left             # Toy Town
 0.3 nav keyboardA right            # Sofa Circuit
 0.3 nav keyboardA right            # Backyard Bash (5 laps)
-0.3 nav keyboardA right            # options: Layout
-0.3 nav keyboardA down             # Mirror
-0.3 nav keyboardA down             # Laps
+0.3 nav keyboardA confirm          # select it: the focus moves to Choose car
+0.3 nav keyboardA up               # Time of day
+0.3 nav keyboardA up               # Weather
+0.3 nav keyboardA up               # Items
+0.3 nav keyboardA up               # AI difficulty
+0.3 nav keyboardA up               # Rivals
+0.3 nav keyboardA up               # Laps
 0.3 nav keyboardA left             # 4
 0.3 nav keyboardA left             # 3
 0.3 nav keyboardA left             # 2
@@ -104,14 +111,19 @@ wait menu
 0.8 shot kb_10_lobby
 0.3 nav keyboardA confirm          # P1 ready
 0.3 nav keyboardB confirm          # P2 ready → track select (P1 picks)
-2.5 nav keyboardA up
+wait screen trackSelect
+0.3 nav keyboardA up
 0.3 nav keyboardA left
 0.3 nav keyboardA left             # Toy Town
 0.3 nav keyboardA right            # Sofa Circuit
 0.3 nav keyboardA right            # Backyard Bash
-0.3 nav keyboardA right            # options: Layout
-0.3 nav keyboardA down             # Mirror
-0.3 nav keyboardA down             # Laps 5
+0.3 nav keyboardA confirm          # select it: Start race
+0.3 nav keyboardA up               # Time of day
+0.3 nav keyboardA up               # Weather
+0.3 nav keyboardA up               # Items
+0.3 nav keyboardA up               # AI difficulty
+0.3 nav keyboardA up               # Rivals
+0.3 nav keyboardA up               # Laps 5
 0.3 nav keyboardA left
 0.3 nav keyboardA left
 0.3 nav keyboardA left

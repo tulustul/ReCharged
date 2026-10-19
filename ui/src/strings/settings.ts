@@ -70,7 +70,9 @@ export const settingsText = {
   resetConfirm: "Erase everything",
   capture: "Press a key or button…",
   captureHint: "Esc or Start cancels",
-  conflict: (action: string, scheme: string) => `Also bound to ${action} (${scheme})`,
+  swapped: (action: string) => `Swapped with ${action}`,
+  nowUnbound: (action: string) => `${action} is now unbound`,
+  removedFrom: (action: string) => `Removed from ${action}`,
   cancelled: "Rebind cancelled",
   unbound: "—",
 } as const;

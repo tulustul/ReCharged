@@ -63,8 +63,10 @@ only) → `rumble`. `FixedUpdate / SimSet::Drivers`: `drive_cars` writes `CarCon
 `RebindRequest` → the next new press of the scheme's family (keyboard key; pad button or an axis
 crossing 0.5 that was not already deflected) → `RebindResult { binding, conflict }`. Esc (keyboards)
 and Start (pad) cancel (`binding: None`). The conflict is the first other action using the binding:
-in the same scheme and, for keyboards, the other keyboard scheme. The press that opened the capture
-is never captured. rc_game applies the result to `Settings`.
+in the same scheme and, for keyboards, the other keyboard scheme. The result also carries the
+action's primary binding before the capture (`previous`): rc_game swaps the two actions' bindings
+with it and the UI says so. The press that opened the capture is never captured. rc_game applies
+the result to `Settings`.
 
 ## Rumble (`rumble.rs`)
 Impacts (strength × 0.8/0.4, 180 ms), item hits (0.9/0.5, 320 ms; blocked 0/0.4, 150 ms), landings
@@ -86,5 +88,5 @@ conflicts; pad disconnect and takeover.
 ## Known limitations
 - Mouse use does not set `LastUsed` (pointer input is React's), and there is no `DeviceKind::Mouse`
   glyph switching.
-- `--input-script` is implemented in `src/script.rs`: a scripted virtual device feeding `ButtonInput`/`Gamepad` before `InputSet::Collect` (see `docs/design/automation.md`).
+- `--input-script` is implemented in `src/script.rs`: a scripted virtual device feeding `ButtonInput`/`Gamepad` before `InputSet::Collect` (see `docs/design/automation.md`); `wait screen <name>` waits for the screen the host mirrors from rc_ui (`InputScript::screen`).
 - A finished human's car still receives driving input (rc_race may hand it to the AI, Re-Volt style).

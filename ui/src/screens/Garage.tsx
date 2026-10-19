@@ -1,15 +1,14 @@
 // UI-14 Garage: every car (locked ones as silhouettes with their unlock hint), stats and paints.
-// Confirm makes the focused car your pick for the next race.
-import { useEffect } from "react";
-
-import { bevy, type UiCar } from "../bevy";
+// Confirm makes the focused car your pick for the next race. The grid covers the showroom's
+// turntable, so the 3D car is hidden here (the cards show each car).
+import type { UiCar } from "../bevy";
 import { Badge } from "../components/Badge";
 import { Caption, StatBar } from "../components/bits";
 import { CheckIcon, LockIcon } from "../components/icons";
 import { Panel } from "../components/Panel";
 import { Screen } from "../components/Screen";
 import { rgbHex } from "../format";
-import { useSeen } from "../hooks";
+import { useRoomBackdrop, useSeen } from "../hooks";
 import { back } from "../nav/routes";
 import { useFocusNav } from "../nav/useFocusNav";
 import { sfx } from "../sound";
@@ -38,9 +37,7 @@ export function Garage() {
     back,
   });
   const car = cars[nav.focus.index];
-  useEffect(() => {
-    if (car && carUnlocked(profile.get(), car.id)) bevy.menu.backdrop({ car: car.id, paint: 0, focus: "car" });
-  }, [car]);
+  useRoomBackdrop();
   useSeen(car ? { kind: "car", id: car.id } : null, !!car && isFresh(p, { kind: "car", id: car.id }));
   const unlockedCount = cars.filter((c) => carUnlocked(p, c.id)).length;
   return (
@@ -70,7 +67,7 @@ function GarageCard({ car, picked, focused, onHover, onPress }: { car: UiCar; pi
   const unlocked = carUnlocked(p, car.id);
   return (
     <button
-      onPointerEnter={onHover}
+      onPointerHover={onHover}
       onClick={onPress}
       style={{
         flexDirection: "column",

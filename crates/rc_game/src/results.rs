@@ -19,8 +19,9 @@ use crate::{GameCommand, GameNotice, Step};
 #[derive(Resource, Debug, Clone, Default, PartialEq)]
 pub struct RaceOutcome {
     /// Points this race gave each line of `RaceResults::entries` (same order): every racer in a
-    /// cup, the players in Versus, 0 otherwise.
-    pub points: Vec<u32>,
+    /// cup, the players in Versus; `None` for lines that score nothing (AI in Versus, every line
+    /// in Quick Race and Time Trial).
+    pub points: Vec<Option<u32>>,
     /// New best lap on this layout (single-player).
     pub new_best_lap: bool,
     /// New best race time on this layout (Time Trial).
@@ -127,7 +128,7 @@ fn process_results(
     outcome.points = results
         .entries
         .iter()
-        .map(|e| if scored(e) { points_for(e.rank) } else { 0 })
+        .map(|e| scored(e).then(|| points_for(e.rank)))
         .collect();
     let positions = || {
         let scored_entries = results.entries.iter().filter(|e| scored(e));

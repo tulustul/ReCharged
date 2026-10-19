@@ -1,9 +1,8 @@
-// UI-5 Cup select: cup cards (tracks, difficulty, best trophy, lock reason). Confirm on an unlocked
-// cup → car select.
+// UI-5 Cup select: cup cards (tracks, difficulty, best trophy). A locked cup dims its race list and
+// says in its footer how to unlock it. Confirm on an unlocked cup → car select.
 import type { UiCup, UiDifficulty } from "../bevy";
 import { Badge } from "../components/Badge";
-import { LockOverlay } from "../components/bits";
-import { TrophyIcon } from "../components/icons";
+import { LockIcon, TrophyIcon } from "../components/icons";
 import { Screen } from "../components/Screen";
 import { useSeen } from "../hooks";
 import { back, go } from "../nav/routes";
@@ -71,7 +70,7 @@ function CupCard({ cup, focused, onHover, onPress }: { cup: UiCup; index: number
   const accent = ACCENT[cup.difficulty];
   return (
     <button
-      onPointerEnter={onHover}
+      onPointerHover={onHover}
       onClick={onPress}
       style={{
         flexGrow: 1,
@@ -96,8 +95,9 @@ function CupCard({ cup, focused, onHover, onPress }: { cup: UiCup; index: number
           <text style={{ ...text.caps, color: color.ink, letterSpacing: 1.5 }}>{difficultyName[cup.difficulty].toUpperCase()}</text>
         </node>
         {isFresh(p, { kind: "cup", id: cup.id }) && <Badge label={word.new} />}
+        {!unlocked && <LockIcon size={30} color={color.textDim} />}
       </node>
-      <text style={{ ...text.h2, fontSize: 40, lineBreak: "wordBoundary" }}>{cup.name.toUpperCase()}</text>
+      <text style={{ ...text.h2, fontSize: 40, lineBreak: "wordBoundary", color: unlocked ? color.text : color.textDim }}>{cup.name.toUpperCase()}</text>
       <text style={text.caps}>{cupSelect.races(cup.races.length).toUpperCase()}</text>
       <node style={{ flexDirection: "column", gap: 12, flexGrow: 1 }}>
         {cup.races.map((race, i) => {
@@ -105,27 +105,33 @@ function CupCard({ cup, focused, onHover, onPress }: { cup: UiCup; index: number
           const weather = race.weather.kind === "fixed" ? weatherName[race.weather.weather] : race.weather.kind === "dynamic" ? word.dynamic : word.random;
           return (
             <node key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <text style={{ ...text.label, color: accent, width: 22 }}>{`${i + 1}`}</text>
+              <text style={{ ...text.label, color: unlocked ? accent : color.textFaint, width: 22 }}>{`${i + 1}`}</text>
               <node style={{ flexDirection: "column", flexShrink: 1 }}>
                 <node style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  <text style={{ ...text.label, fontSize: 21 }}>{track?.name ?? "?"}</text>
+                  <text style={{ ...text.label, fontSize: 21, color: unlocked ? color.text : color.textFaint }}>{track?.name ?? "?"}</text>
                   {race.reverse && <Tag label={word.reverse} />}
                   {race.mirror && <Tag label={word.mirror} />}
                 </node>
-                <text style={{ ...text.small, fontSize: 16 }}>{`${weather} · ${timeName[race.time]}`}</text>
+                <text style={{ ...text.small, fontSize: 16, color: unlocked ? color.textDim : color.textFaint }}>{`${weather} · ${timeName[race.time]}`}</text>
               </node>
             </node>
           );
         })}
       </node>
       <node style={{ height: 1, backgroundColor: color.line }} />
-      <node style={{ flexDirection: "row", alignItems: "center", gap: 12, height: 40 }}>
-        <TrophyIcon size={34} color={trophy ? color[trophy] : color.textFaint} />
-        <text style={{ ...text.label, color: trophy ? color[trophy] : color.textFaint }}>
-          {trophy ? `${cupSelect.bestTrophy}: ${trophyName[trophy]}` : cupSelect.noTrophy}
-        </text>
-      </node>
-      {!unlocked && <LockOverlay reason={lockText(cup.unlock, cat)} />}
+      {unlocked ? (
+        <node style={{ flexDirection: "row", alignItems: "center", gap: 12, height: 40 }}>
+          <TrophyIcon size={34} color={trophy ? color[trophy] : color.textFaint} />
+          <text style={{ ...text.label, color: trophy ? color[trophy] : color.textFaint }}>
+            {trophy ? `${cupSelect.bestTrophy}: ${trophyName[trophy]}` : cupSelect.noTrophy}
+          </text>
+        </node>
+      ) : (
+        <node style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 40 }}>
+          <LockIcon size={30} color={color.warning} />
+          <text style={{ ...text.small, color: color.warning, fontWeight: "600", flexShrink: 1, lineBreak: "wordBoundary" }}>{lockText(cup.unlock, cat)}</text>
+        </node>
+      )}
     </button>
   );
 }

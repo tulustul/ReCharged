@@ -1,14 +1,17 @@
-# QA: a pointer resting (not moving) over the window steals keyboard/gamepad focus when a new
-# screen appears under it. hover_steal.sh parks the pointer over the Settings "Hints" row's
+# QA Q2 (fixed in T20b): a pointer resting (not moving) over the window must not steal the
+# keyboard/gamepad focus when a new screen appears under it (focus follows pointer motion only). hover_steal.sh parks the pointer over the Settings "Hints" row's
 # position (empty space in the main menu) before the game starts.
 wait ui
-3.5 nav keyboardA confirm          # Title
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
 1.5 shot hs_01_main
 0.3 nav keyboardA up
 0.3 nav keyboardA up
 0.3 nav keyboardA up               # Settings
 0.3 nav keyboardA confirm
-2.0 shot hs_02_settings_opened     # expected: focus on Speed units (row 0)
+wait screen settings
+1.0 shot hs_02_settings_opened     # expected: focus on Speed units (row 0)
 0.3 nav keyboardA right            # expected: km/h → mph
 1.0 shot hs_03_after_right
 0.3 nav keyboardA back

@@ -9,7 +9,9 @@ use bevy::prelude::*;
 use bevy::window::WindowFocused;
 use common::*;
 use rc_core::prelude::*;
-use rc_game::{GameCommand, GameNotice, PlayerCar, RaceOutcome, RaceRequest, VersusSession};
+use rc_game::{
+    GameCommand, GameNotice, PlayerCar, RaceOutcome, RaceRequest, TrackPick, VersusSession,
+};
 use rc_testkit::*;
 
 fn app(name: &str) -> App {
@@ -306,7 +308,11 @@ fn versus_keeps_a_scoreboard_over_rematches_and_tracks_and_ai_takes_over_dropped
         "the lobby closes for the race"
     );
     // Grid order P1, P2, AI, AI; everyone finishes in grid order.
-    assert_eq!(app.world().resource::<RaceOutcome>().points, [10, 8, 0, 0]);
+    assert_eq!(
+        app.world().resource::<RaceOutcome>().points,
+        [Some(10), Some(8), None, None],
+        "only the players score in Versus"
+    );
     assert_eq!((versus_points(&app, 0), versus_points(&app, 1)), (10, 8));
 
     app.world_mut().resource_mut::<FinishOrder>().0 = vec![1, 0, 2, 3];
@@ -356,6 +362,22 @@ fn versus_keeps_a_scoreboard_over_rematches_and_tracks_and_ai_takes_over_dropped
         3
     );
 
+    // "Next track" with options: the picked laps and items apply, the players stay.
+    let pick = TrackPick {
+        variant: TrackVariant::forward("test_oval"),
+        laps: Some(2),
+        items: Some(false),
+        ..default()
+    };
+    send(&mut app, GameCommand::ChangeTrack(Box::new(pick)));
+    wait_for_next_outcome(&mut app);
+    let config = app.world().resource::<RaceConfig>();
+    assert_eq!(
+        (config.variant.track.as_str(), config.laps, config.items),
+        ("test_oval", 2, false)
+    );
+    assert!(autopilot(&app), "the players and their cars stay");
+
     send(&mut app, GameCommand::QuitToMenu);
     wait_for_state(&mut app, AppState::Menu);
     assert_eq!(count_entities::<()>(&mut app), baseline);
@@ -370,7 +392,7 @@ fn versus_keeps_a_scoreboard_over_rematches_and_tracks_and_ai_takes_over_dropped
             .resource::<VersusSession>()
             .series
             .races_played(),
-        4
+        5
     );
     assert!(
         !autopilot(&app),

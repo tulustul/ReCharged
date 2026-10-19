@@ -9,7 +9,8 @@
 # Screenshots: <user-data-dir>/screenshots/padm_*.png. Fresh profile, default settings.
 
 wait ui
-3.5 nav gamepad confirm          # Title: any button
+wait screen title
+0.3 nav gamepad confirm          # Title: any button
 1.5 shot padm_01_main
 
 # Garage (5th entry)
@@ -170,6 +171,7 @@ wait menu
 0.3 nav gamepad right
 0.3 nav gamepad right            # Backyard Bash
 0.6 shot padm_33_tt_track_select
+0.3 nav gamepad confirm          # select it: the focus moves to Choose car
 0.3 nav gamepad confirm          # → car select
 2.0 nav gamepad confirm          # race
 wait racing

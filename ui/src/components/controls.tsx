@@ -16,15 +16,17 @@ type RowProps = {
   onHover: () => void;
   onPress?: () => void;
   disabled?: boolean;
+  /** Needs attention (e.g. an action left unbound by a rebind). */
+  warn?: boolean;
   children?: ReactNode;
   height?: number;
 };
 
 /** A settings/options row: label on the left, its control on the right. */
-export function OptionRow({ label, focused, onHover, onPress, disabled, children, height = 62 }: RowProps) {
+export function OptionRow({ label, focused, onHover, onPress, disabled, warn, children, height = 62 }: RowProps) {
   return (
     <button
-      onPointerEnter={onHover}
+      onPointerHover={onHover}
       onClick={onPress}
       style={{
         height,
@@ -35,8 +37,8 @@ export function OptionRow({ label, focused, onHover, onPress, disabled, children
         padding: { left: 26, right: 18 },
         borderRadius: radius.m,
         border: 1,
-        borderColor: focused ? "rgba(25, 217, 255, 0.55)" : color.clear,
-        backgroundColor: focused ? "rgba(25, 217, 255, 0.12)" : color.clear,
+        borderColor: focused ? "rgba(25, 217, 255, 0.55)" : warn ? "rgba(255, 176, 32, 0.6)" : color.clear,
+        backgroundColor: focused ? "rgba(25, 217, 255, 0.12)" : warn ? "rgba(255, 176, 32, 0.1)" : color.clear,
         transition: focusTransition,
       }}
     >
@@ -51,7 +53,7 @@ export function OptionRow({ label, focused, onHover, onPress, disabled, children
           backgroundColor: focused ? color.volt : color.clear,
         }}
       />
-      <text style={{ ...text.label, color: disabled ? color.textFaint : focused ? color.cyanHi : color.text, flexGrow: 1 }}>{label}</text>
+      <text style={{ ...text.label, color: disabled ? color.textFaint : warn ? color.warning : focused ? color.cyanHi : color.text, flexGrow: 1 }}>{label}</text>
       {disabled && <LockIcon size={20} color={color.textFaint} />}
       {children}
     </button>

@@ -7,7 +7,7 @@ sends intents. Everything crosses typed channels generated into `ui/src/bevy.ts`
 ## Structure
 | Where | What |
 |---|---|
-| `crates/rc_ui/src/` | one module per namespace: `app` (state, info, quit), `ui` (ready/error, `ui.sound` cues with a 40 ms retrigger guard, `ui.stinger`, `ui.nav`, `toast` = rc_game notices held until `ui.ready`), `input` (devices, bindings, rebind), `menu` (catalog view, `menu.backdrop` → `MenuBackdrop`), `profile` (profile/records/NEW badges), `settings` (mirror of `Settings` without bindings), `lobby`, `race` (commands, `race.snapshot`, `loading.progress`), `results` (`race.results` = `RaceResults` + `RaceOutcome`, `cup.standings`, `versus.score`), `hud` (race HUD: `race.setup`, `race.hud`, `race.event`, `viewports`, `hud.bind/unbind` — `docs/design/hud.md`), `filters` (`chargeSwap` morph, embedded WESL), `debug` (`RECHARGED_UI_SCRIPT`) |
+| `crates/rc_ui/src/` | one module per namespace: `app` (state, info, quit), `ui` (ready/error, `ui.screen` (the shown screen: logged, waited on by `--input-script`), `ui.sound` cues with a 40 ms retrigger guard, `ui.stinger`, `ui.nav`, `toast` = rc_game notices held until `ui.ready`; hides the OS cursor after keyboard/pad input until the mouse moves), `input` (devices, bindings, rebind), `menu` (catalog view, `menu.backdrop` → `MenuBackdrop`), `profile` (profile/records/NEW badges), `settings` (mirror of `Settings` without bindings), `lobby`, `race` (commands, `race.snapshot`, `loading.progress`), `results` (`race.results` = `RaceResults` + `RaceOutcome`, `cup.standings`, `versus.score`), `hud` (race HUD: `race.setup`, `race.hud`, `race.event`, `viewports`, `hud.bind/unbind` — `docs/design/hud.md`), `filters` (`chargeSwap` morph, embedded WESL), `debug` (`RECHARGED_UI_SCRIPT`) |
 | `ui/src/theme/` | `tokens.ts` (colours, slot colours, sizes, spacing, layers), `styles.ts` (text presets, glass), `motion.ts` (springs, timings) |
 | `ui/src/components/` | Button, Panel, Tabs, List/Carousel (`lists.tsx`), Grid/StatBar/LockOverlay/Spinner (`bits.tsx`), OptionRow/Toggle/Slider/Cycler (`controls.tsx`), Dialog, Toast, Glyph, Badge, Hints, Screen (frame), TrackArt, Backdrop, icons |
 | `ui/src/nav/` | `focus.ts` regions model, `stack.ts` nav layers, `router.ts` stack ops (pure, tested); `input.ts` (`useNav`, glyph device per slot), `useFocusNav.ts`, `routes.ts` (menu routes + morph transitions) |
@@ -33,7 +33,9 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
 - **Split-screen**: App provides `SplitContext` when a race has 2+ local players; `Panel` then uses
   a translucent fill (the overlay UI camera has no 3D frame to blur).
 - **Showroom**: `AppStatus.showroom` mirrors rc_core `ShowroomReady` (inserted by rc_render while
-  the 3D showroom draws the `MenuBackdrop` car). Without it the Backdrop draws navy glows/streaks
+  the 3D showroom draws the `MenuBackdrop` car). Screens that cover the turntable — the Garage grid,
+  the Credits roll, the Cup-end podium — set `focus: "room"` while mounted (`useRoomBackdrop`):
+  rc_render hides the car, the room stays; the wide shot of the draft's car returns after. Without it the Backdrop draws navy glows/streaks
   and Main menu / Car select show the car thumbnail (`assets/ui/cars/<id>.png`, only offered when it
   exists; same for track previews). The flag arrives before the 3D view is fully drawn (pipelines
   recompile after a race), so the navy layers stay 1 s and then fade out over the showroom.
@@ -41,6 +43,15 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
   everywhere, the custom `chargeSwap` (a crackling cyan/volt front) only Main menu → mode.
 - **Credits**: a roll over the showroom from `strings/credits.ts` (team, tools, generators, the
   Saira OFL notice); its distance and duration follow the list (57 UI px/s).
+- **Cup end**: the top three cars (thumbnails) stand on their 1-2-3 blocks — each image overlaps
+  its block by the thumbnails' transparent foot (16 %) and is drawn above it — with name and points
+  on the block face.
+- **Cup select**: a locked cup dims its race list and shows a lock and the unlock reason in its
+  footer (where an unlocked cup shows its best trophy).
+- **Splash and toasts** run on Bevy's frame clock (shared-value drivers whose completion ends
+  them), not on wall-clock JS timers: when the first frames stall (pipelines compiling
+  synchronously in automated runs) the splash and a boot toast ("Save file restored") are still
+  seen. Unlock toasts are skipped while Results or Cup end show (their panels list the unlocks).
 - **Loading**: the progress bar's glow (`boxShadow`) also compiles bevy_ui's box-shadow pipeline
   for the LDR camera split-screen races share, so their HUD glows never compile mid-race.
 
@@ -51,8 +62,24 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
   anywhere (a focused bevy `<button>` would also click on Enter).
 - Focus: a screen declares regions (`list`/`row`/`grid` via `cols`, neighbours per direction,
   optional wrap) and `useFocusNav` moves through them; entering a region restores its last index.
-  Pointer hover sets the same focus (one highlight), click activates. Left/right on adjustable rows
-  (cyclers, toggles, sliders) change the value instead of moving.
+  Pointer motion over an item sets the same focus (one highlight), click activates. Focus follows
+  only real motion — items use `onPointerHover` (fires on frames the pointer moved over them), never
+  `onPointerEnter`, which also fires when a screen appears under a resting cursor (or X11 left
+  Bevy a stale position after the window moved): a parked mouse never steals the keyboard/pad
+  focus. rc_ui hides the OS cursor after keyboard/pad input until the mouse moves. Left/right on
+  adjustable rows (cyclers, toggles, sliders) change the value instead of moving.
+- Track select: focusing a card previews it (it becomes the draft's track, laps reset to its
+  default; the panel shows its options and records). Confirm on a card selects it and moves the
+  focus onto Start / Choose car (Confirm, Confirm is the fast path); Up from there reaches every
+  option row; Back or Left returns to the selected card (Right from the last column also enters
+  the panel). The same screen serves Time Trial, Versus (P1 picks) and, after a race, Change track
+  / Next track with every option (laps, rivals, difficulty, items, weather, time; seeded from the
+  session's setup) → `race.nextTrack` → rc_game `ChangeTrack`.
+- Screens report themselves to Bevy (`ui.screen`, once per change): the menu route, `loading`,
+  `unloading`, or the race layer's `race` / `pause` / `pauseHowToPlay` / `pauseSettings` /
+  `results` / `standings` / `score` / `changeTrack`; rc_ui logs it (`UI screen: …`) and keeps it in
+  `UiStatus::screen` for `--input-script`'s `wait screen <name>`. Every `ui.nav` is logged at debug
+  level with the screen that got it, and every focus move (`RUST_LOG=bevy_react_core::js=debug`).
 - Per-slot focus: the Versus lobby keeps a choice per slot (`state/lobby.ts`) and applies each
   `ui.nav` to its `slot`; slot-less events (unassigned devices, shared Esc/Q/E) only leave the
   screen. Joining/leaving is rc_input's (`lobby.slots`). Track select in Versus accepts P1 only.
@@ -73,7 +100,11 @@ Every store is an hmr-safe singleton seeded by a snapshot request when `Feeds` m
 current by events; app-state changes re-request what they invalidate (profile/records on menu
 entry, `race.snapshot` on loading/finish). Settings and bindings are fetched by their screens;
 edits apply live (`settings.apply`; rc_game clamps and saves ≤ 1/s). Rebinding: `input.rebind` →
-rc_input capture → `input.rebindResult` (conflict warning) → rc_game stores → `bindings.changed`.
+rc_input capture → `input.rebindResult` → rc_game stores → `bindings.changed`. A conflict swaps:
+the other action receives the rebound one's previous binding (`previous`); the notice says
+"Swapped with Camera" (the other scheme named when it differs), or, without a previous binding,
+"Camera is now unbound" with that row highlighted (`rows.ts` `rebindNotice`). The notice clears on
+Reset bindings, a tab change and a scheme change.
 NEW badges come from `Profile::new_unlocks`; focusing an item sends `profile.seen`.
 
 ## Adding a screen
@@ -90,7 +121,7 @@ NEW badges come from `Profile::new_unlocks`; focusing an item sends `profile.see
 - **Events**: `app.state`, `ui.nav`, `input.device`, `input.rebindResult`, `bindings.changed`,
   `lobby.slots`, `loading.progress`, `toast`, `profile.changed`, `profile.unlocked`, `race.results`,
   `cup.standings`, `versus.score`, `race.setup`, `race.hud`, `race.event`, `viewports`, `debug.act`.
-- **Messages**: `ui.ready`, `ui.error`, `ui.sound`, `ui.stinger`, `menu.backdrop`, `race.start`,
+- **Messages**: `ui.ready`, `ui.error`, `ui.screen`, `ui.sound`, `ui.stinger`, `menu.backdrop`, `race.start`,
   `race.restart`, `race.next`, `race.rematch`, `race.nextTrack`, `race.resume`, `race.quit`,
   `lobby.open`, `lobby.close`, `settings.apply`, `input.rebind`, `input.resetBindings`,
   `input.dropPlayer`, `profile.reset`, `profile.seen`, `hud.bind`, `hud.unbind`, `app.quit`.
@@ -105,12 +136,15 @@ loading|lobby|cupEnd|unlocks|dialog|menu`, `demo hud [1-4] <scene>` (see `hud.md
 (Settings, How to play, Records), e.g. `RECHARGED_UI_SCRIPT="1 go credits" cargo run -p recharged
 -- --user-data-dir target/agent-data/<id> --screenshot <png> --screenshot-at 5 --exit-after 8`.
 Navigation and pausing go through the real input path with `--input-script`
-(`docs/design/automation.md`, e.g. `tools/scripts/keyboard_only.script`); `nav`/`pause` steps
-here are rejected with a pointer to it.
+(`docs/design/automation.md`, e.g. `tools/scripts/keyboard_only.script`; `wait screen <name>`
+waits for a screen React reported); `nav`/`pause` steps here are rejected with a pointer to it.
+`demo hud … markers` turns the colour-blind markers on for a HUD screenshot.
 
 ## Tests
 `npm test` (node --test, no deps): focus model, nav layers, router, slider/list maths, stores,
-dialogs/toasts, race draft rules, lobby choices, settings rows, formatters, glyph mapping. Pure
+dialogs/toasts, race draft rules (incl. Change track from the session's setup), lobby choices,
+settings rows and the rebind notice, HUD notice collapsing and marker outlines, formatters, glyph
+mapping. Pure
 modules import each other with explicit `.ts` extensions (tsconfig `allowImportingTsExtensions`)
 so node can run them. `npm run typecheck`, `npm run build`. Rust: `cargo test -p rc_ui` (mappings,
 profile/records/standings views, script parser, UiScale, channel round trip, `bevy.ts` freshness).
@@ -122,3 +156,7 @@ profile/records/standings views, script parser, UiScale, channel round trip, `be
   animate the text colour instead (`interpolateColor`).
 - `boxShadow: []` paints a default black shadow (bevy-react parses the empty list as one default
   shadow): conditional shadows use `undefined`.
+- Cup end's cars are the 2D thumbnails with one foot offset (16 % of the image): a car drawn
+  higher or lower in its thumbnail stands a few px above or into its block.
+- Colour-blind markers show in races only (name tags, minimap, 3P standings); the post-race tables
+  keep the colour bar (a rival's grid slot, hence its shape, changes between cup races).

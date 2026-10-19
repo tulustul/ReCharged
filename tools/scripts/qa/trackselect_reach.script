@@ -1,30 +1,38 @@
-# QA: with keyboard/gamepad the Track select options (laps, rivals, weather, time, Reverse, Mirror …)
-# are only reachable for the tracks in the last column: focusing a card selects it, and the panel is
-# only the `right` neighbour of the last column. Tries to configure Toy Town (run with --unlock-all
-# so Reverse is unlocked).
+# QA Q1 (fixed in T20b): every Track select option is reachable by keyboard/gamepad. Focusing a
+# card previews it; Confirm selects it and puts the focus on Choose car; Up reaches every option;
+# Back returns to the card. Configures Toy Town: Reverse, 1 lap, next weather and time (run with
+# --unlock-all so Reverse is unlocked).
 wait ui
-3.5 nav keyboardA confirm          # Title
-1.5 nav keyboardA down             # Quick Race
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
 0.3 nav keyboardA confirm
-2.0 nav keyboardA up
-0.3 nav keyboardA left
-0.3 nav keyboardA left             # Toy Town selected
-0.8 shot tsr_01_toy_town_selected
-0.3 nav keyboardA right            # → Sofa Circuit (now selected)
-0.3 nav keyboardA right            # → Backyard Bash (now selected)
-0.3 nav keyboardA right            # → options … of Backyard Bash
-0.3 nav keyboardA right            # Layout → Reverse
-0.8 shot tsr_02_options_reached_for_backyard
-0.3 nav keyboardA left             # leave the panel: back on the cards …
-0.8 shot tsr_03_left_from_options
-0.3 nav keyboardA down             # options panel has no up/down exit either
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.3 nav keyboardA down
-0.8 shot tsr_04_bottom_of_panel
+wait screen trackSelect
+0.3 nav keyboardA right            # Sofa Circuit (previewed)
+0.3 nav keyboardA left             # Toy Town
+0.8 shot tsr_01_toy_town_focused
+0.3 nav keyboardA confirm          # select it: the focus moves to Choose car
+0.8 shot tsr_02_choose_car_focused
+0.3 nav keyboardA up               # Time of day
+0.3 nav keyboardA right            # next time
+0.3 nav keyboardA up               # Weather
+0.3 nav keyboardA right            # next weather
+0.3 nav keyboardA up               # Items
+0.3 nav keyboardA up               # AI difficulty
+0.3 nav keyboardA up               # Rivals
+0.3 nav keyboardA up               # Laps (Toy Town: 4)
+0.3 nav keyboardA left             # 3
+0.3 nav keyboardA left             # 2
+0.3 nav keyboardA left             # 1
+0.3 nav keyboardA up               # Mirror
+0.3 nav keyboardA up               # Layout
+0.3 nav keyboardA right            # Reverse
+0.8 shot tsr_03_toy_town_configured
+0.3 nav keyboardA back             # back on the Toy Town card, options kept
+0.8 shot tsr_04_back_on_the_card
+0.3 nav keyboardA confirm          # Choose car again
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.8 shot tsr_05_car_select
 1.0 exit

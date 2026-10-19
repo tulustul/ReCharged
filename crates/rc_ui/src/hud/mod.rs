@@ -72,6 +72,8 @@ pub struct UiHudSetup {
     pub minimap: bool,
     /// Reduce flashing: no pulsing warnings or flashing meters.
     pub reduce_flashing: bool,
+    /// Colour-blind markers: racer shapes on the minimap and in the standings.
+    pub colorblind_markers: bool,
 }
 
 /// One local player's HUD values.

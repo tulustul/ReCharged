@@ -25,6 +25,7 @@ Usage: recharged [flags]
   --soak <minutes>         chain random races; assert counts return to baseline
   --soak-seed <n>          seed of the soak's random race sequence (default: from the clock)
   --bench <track>_<n>p     autopilot race with n players (+ race options): frame times as JSON
+                           (implies --unlock-all)
   --calibrate-medals       headless Time Trials on every layout -> assets/data/medals.ron
   --capture-previews       render track previews and car thumbnails
   --track-tour <track>     screenshots along the racing line (implies --quick-race <track>)
@@ -171,6 +172,8 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
         race.seed = race.seed.or(Some(BENCH_SEED));
         cfg.window = cfg.window.or(Some(BENCH_WINDOW));
         cfg.autopilot = true;
+        // The bench ignores the profile like it ignores the settings: any track, locked or not.
+        cfg.unlock_all = true;
     }
     // `--track-tour <t>` without `--quick-race` tours that track.
     let quick_track = quick_track.or_else(|| cfg.track_tour.clone());
@@ -430,6 +433,7 @@ mod tests {
     fn bench_scenarios_set_up_an_autopilot_race() {
         let cfg = ok(&["--bench", "toy_town_4p", "--weather", "rain"]);
         assert!(cfg.autopilot && cfg.is_automated());
+        assert!(cfg.unlock_all, "locked tracks bench too");
         assert_eq!(cfg.bench.as_deref(), Some("toy_town_4p"));
         let race = cfg.quick_race.expect("bench race");
         assert_eq!((race.track.as_str(), race.players), ("toy_town", Some(4)));
