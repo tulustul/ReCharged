@@ -321,4 +321,9 @@ Every script assumes a fresh `--user-data-dir` and default settings (pass `--unl
 | Q6 | fixed in T19a (oil/pad 15 s, softer launches; Goo Bomb near-miss pass: carrier explosions 64 % → 22 %) |
 | Q7 | fixed in T19a (assist auto-brake; throttle-only 1.21–1.29× the reference, 0 respawns) |
 | Q22 | Toy Town and Wrench Works default to 4 laps (8132efd) |
-| Q8, Q9, Q19, Q20, Q21 | T20c in progress |
+| Q8 | fixed in T20c (Toy Town / Sofa Circuit: moonlit night with lamp pools, warm readable sunset, brighter noon; `target/agent-data/T20c/shots/`) |
+| Q9 | fixed in T20c for the menu flow (menu warm-up: Loading → Intro 0.2–0.8 s); a cold automated `--quick-race` still takes 3.7–4.8 s in release (synchronous compilation, no menu warm-up; ARCHITECTURE §9) |
+| Q19 | fixed in T20c (`RUST_LOG=rc_audio=debug`: `audio cue <id>: <bus> bus, <dB> dB`, ≤ 1 line per cue per s) |
+| Q20 | fixed in T20c (bench max frame 7–15 ms in all 12 rows; no compiles after GO) |
+| Q21 | fixed in T20c (census counts meshes/images/materials/audio sources; GPU-only glTF meshes/textures; 10-min soak RSS 4.46 → 2.97 GB) |
+| Fog, storm lightning | fixed in T20c (fog 25 u visibility at density 1; bolts no longer hidden by the cloud dome; night flash capped by exposure) |
