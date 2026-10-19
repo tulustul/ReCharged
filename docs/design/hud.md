@@ -37,7 +37,8 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
 - Bars fill with `scaleX` + compensating `translateX` (no relayout); dots and the arrow move by
   transform bindings; the battery flash is an `interpolateColor` loop; nothing animates `opacity`
   on text.
-- Accessibility: splits carry sign **and** colour, warnings and notices carry text and icons, the
+- Accessibility: splits carry sign **and** colour (a tie at the hundredths shown is a neutral
+  `±0.00`, `layout.ts` `split`), warnings and notices carry text and icons, the
   own minimap dot is larger with a white ring (others' rings by role), Reduce flashing stops the
   meter flash and warning pulses, HUD scale scales everything big, small labels keep a floor.
 - Colour-blind markers (setting): every racer has a marker from rc_core's `RacerMarker` (rc_ui

@@ -4,7 +4,7 @@ import type { UiCup, UiDifficulty } from "../bevy";
 import { Badge } from "../components/Badge";
 import { LockIcon, TrophyIcon } from "../components/icons";
 import { Screen } from "../components/Screen";
-import { useSeen } from "../hooks";
+import { useRoomBackdrop, useSeen } from "../hooks";
 import { back, go } from "../nav/routes";
 import { useFocusNav } from "../nav/useFocusNav";
 import { sfx } from "../sound";
@@ -42,13 +42,14 @@ export function CupSelect() {
     back,
   });
   const focused = cups[nav.focus.index];
+  useRoomBackdrop();
   useSeen(focused ? { kind: "cup", id: focused.id } : null, !!focused && isFresh(p, { kind: "cup", id: focused.id }));
   return (
     <Screen
       title={cupSelect.title}
       subtitle={cupSelect.subtitle}
       hints={[
-        { action: "move", label: hint.select },
+        { action: "move", label: hint.browse },
         { action: "confirm", label: hint.confirm, onPress: () => pick(focused) },
         { action: "back", label: hint.back, onPress: back },
       ]}

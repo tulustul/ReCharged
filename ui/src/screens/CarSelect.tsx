@@ -73,7 +73,7 @@ export function CarSelect() {
       title={carSelect.title}
       kicker={mode}
       hints={[
-        { action: "move", label: hint.select },
+        { action: "move", label: hint.browse },
         { action: "confirm", label: carSelect.start, onPress: () => start(car, paintIndex) },
         { action: "back", label: hint.back, onPress: back },
       ]}

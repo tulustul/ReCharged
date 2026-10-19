@@ -1,6 +1,8 @@
-// Toasts (unlocks, Golden Batteries, saves, errors): top-right, above everything, click-through;
-// each dismisses itself after TOAST_MS of Bevy's frame clock (a shared-value driver, not a JS
-// timer), so a toast raised while the first frames stall (boot) is still seen.
+// Toasts (unlocks, Golden Batteries, saves, errors): halfway down the right edge (below headers, tab
+// bars and side-panel titles such as the Settings help; above the footer and Results buttons), above
+// everything, click-through; each dismisses itself after TOAST_MS of Bevy's frame clock (a
+// shared-value driver, not a JS timer), so a toast raised while the first frames stall (boot) is
+// still seen.
 import { useEffect } from "react";
 import { useSharedValue, withTiming } from "bevy-react";
 
@@ -11,8 +13,6 @@ import { useStore } from "../state/useStore";
 import { text } from "../theme/styles";
 import { color, frame, layer, radius, space } from "../theme/tokens";
 
-/** Below the screen headers (titles, tab bars). */
-const TOP = 210;
 /** How long a toast stays, ms. */
 const TOAST_MS = 4500;
 
@@ -20,7 +20,7 @@ export function ToastHost() {
   const list = useStore(toasts);
   if (list.length === 0) return null;
   return (
-    <root name="toasts" style={{ globalZIndex: layer.toast, alignItems: "flexEnd", padding: { top: TOP, right: frame.x / 2 } }}>
+    <root name="toasts" style={{ globalZIndex: layer.toast, alignItems: "flexEnd", justifyContent: "center", padding: { right: frame.x / 2 } }}>
       <node style={{ flexDirection: "column", gap: space.s, alignItems: "flexEnd" }}>
         {list.map((t) => (
           <ToastCard key={t.id} toast={t} />

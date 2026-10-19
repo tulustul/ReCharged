@@ -29,6 +29,10 @@ const INDOOR_THUNDER_CUTOFF_HZ: f64 = 700.0;
 const THUNDER_DELAY_S: (f32, f32) = (2.6, 0.2);
 /// Thunder level for the weakest flash, dB (a full flash is 0 dB).
 const THUNDER_WEAK_DB: f32 = -6.0;
+/// Flash intensity from which thunder is close (`thunder_1`) / medium (`thunder_2`); below it is
+/// distant (`thunder_3`). Storm strikes are uniform in 0.5–1.0 (rc_weather `STRIKE_INTENSITY`).
+const THUNDER_CLOSE: f32 = 5.0 / 6.0;
+const THUNDER_MEDIUM: f32 = 2.0 / 3.0;
 /// Rain precipitation where light rain is full / heavy rain has taken over (Rain 0.6, Storm 1.0).
 const HEAVY_RAIN: (f32, f32) = (0.6, 0.9);
 /// Wind speed where the wind loop starts / is full, u/s (Clear 2, Cloudy 5, Storm 14 + gusts).
@@ -120,11 +124,13 @@ pub(crate) fn gain(stem: &str, weather: &WeatherState) -> f32 {
 }
 
 /// Thunder variant (index into the session's thunder), delay in s and level in dB for a flash.
+/// The variants split the intensities a Storm strikes at (rc_weather: 0.5–1.0) in thirds; the
+/// weaker flashes of a blend into or out of a Storm are distant.
 pub(crate) fn thunder_for(intensity: f32) -> (usize, f32, f32) {
     let i = intensity.clamp(0.0, 1.0);
-    let variant = if i >= 0.7 {
+    let variant = if i >= THUNDER_CLOSE {
         0
-    } else if i >= 0.35 {
+    } else if i >= THUNDER_MEDIUM {
         1
     } else {
         2
@@ -407,10 +413,25 @@ mod tests {
         let (variant, delay, db) = thunder_for(1.0);
         assert_eq!(variant, 0);
         assert!((delay - 0.2).abs() < 1e-5 && db.abs() < 1e-6);
-        let (variant, delay, db) = thunder_for(0.5);
+        let (variant, delay, db) = thunder_for(0.75);
         assert_eq!(variant, 1);
         assert!(delay > 0.2 && delay < 2.6 && db < 0.0);
         let (variant, delay, db) = thunder_for(0.0);
         assert_eq!((variant, delay, db), (2, 2.6, THUNDER_WEAK_DB));
+    }
+
+    /// QA R4: Storm strikes are 0.5–1.0, so a mapping over 0–1 never chose the distant rumble.
+    #[test]
+    fn a_storm_plays_every_thunder_variant_about_equally() {
+        let mut counts = [0usize; THUNDER.len()];
+        let n = 600;
+        for k in 0..n {
+            let intensity = 0.5 + 0.5 * (k as f32 + 0.5) / n as f32;
+            counts[thunder_for(intensity).0] += 1;
+        }
+        for (stem, &count) in THUNDER.iter().zip(&counts) {
+            let share = count as f32 / n as f32;
+            assert!((0.3..0.37).contains(&share), "{stem}: {share}");
+        }
     }
 }

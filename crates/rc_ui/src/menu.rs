@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use bevy::asset::RenderAssetUsages;
+use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
 use bevy_react::prelude::*;
 use rc_core::prelude::*;
@@ -65,6 +67,9 @@ pub struct UiCar {
     pub drive: UiDrive,
     /// Thumbnail asset path (transparent PNG), if it exists.
     pub thumbnail: Option<String>,
+    /// Share of the thumbnail's height under the car (transparent rows below the wheels; 0
+    /// without a thumbnail): Cup end stands the car on its podium block by it.
+    pub thumbnail_foot: f32,
     /// Paints.
     pub paints: Vec<UiPaint>,
     /// Unlock rule.
@@ -159,6 +164,40 @@ fn existing(assets_dir: &Path, path: &str) -> Option<String> {
     (!path.is_empty() && assets_dir.join(path).is_file()).then(|| path.to_owned())
 }
 
+/// Thumbnail pixels at least this opaque are the car (anti-aliased edges are fainter).
+const OPAQUE_ALPHA: f32 = 0.5;
+
+/// Share of a PNG's height below its lowest opaque row: the transparent margin under a car in its
+/// thumbnail, which differs per car (QA B37: one constant left some cars floating above their
+/// podium block and others sunk into it). 0 when the file cannot be read.
+fn thumbnail_foot(file: &Path) -> f32 {
+    let Some(image) = std::fs::read(file).ok().and_then(|bytes| {
+        Image::from_buffer(
+            &bytes,
+            ImageType::Extension("png"),
+            CompressedImageFormats::NONE,
+            true,
+            ImageSampler::Default,
+            RenderAssetUsages::MAIN_WORLD,
+        )
+        .ok()
+    }) else {
+        return 0.0;
+    };
+    let (width, height) = (image.width(), image.height());
+    let opaque = |y: u32| {
+        (0..width).any(|x| {
+            image
+                .get_color_at(x, y)
+                .is_ok_and(|c| c.alpha() >= OPAQUE_ALPHA)
+        })
+    };
+    (0..height)
+        .rev()
+        .find(|&y| opaque(y))
+        .map_or(0.0, |lowest| (height - 1 - lowest) as f32 / height as f32)
+}
+
 impl UiCatalog {
     /// The menu view of `catalog`; image paths are checked against `assets_dir`.
     pub fn new(catalog: &Catalog, assets_dir: &Path) -> Self {
@@ -180,6 +219,7 @@ impl UiCatalog {
                     },
                     drive: car.drive.into(),
                     thumbnail: existing(assets_dir, &car_thumbnail(&car.id)),
+                    thumbnail_foot: thumbnail_foot(&assets_dir.join(car_thumbnail(&car.id))),
                     paints: car
                         .paints
                         .iter()
@@ -326,6 +366,29 @@ mod tests {
     fn missing_images_are_not_offered_to_react() {
         let ui = UiCatalog::new(&catalog(), Path::new("/nonexistent"));
         assert!(ui.cars.iter().all(|c| c.thumbnail.is_none()));
+        assert!(ui.cars.iter().all(|c| c.thumbnail_foot == 0.0));
         assert!(ui.tracks.iter().all(|t| t.preview.is_none()));
+    }
+
+    /// QA B37: the margin under each car is measured from its own thumbnail (the shipped ones
+    /// range from ≈ 10 % for the tall Dumpster to ≈ 18 %).
+    #[test]
+    fn each_thumbnail_reports_the_transparent_margin_under_its_car() {
+        let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let ui = UiCatalog::new(&catalog(), &assets);
+        for car in &ui.cars {
+            assert!(car.thumbnail.is_some(), "{} has a thumbnail", car.id);
+            assert!(
+                (0.05..0.25).contains(&car.thumbnail_foot),
+                "{}: {}",
+                car.id,
+                car.thumbnail_foot
+            );
+        }
+        let feet: Vec<f32> = ui.cars.iter().map(|c| c.thumbnail_foot).collect();
+        let (lo, hi) = feet
+            .iter()
+            .fold((1.0f32, 0.0f32), |(lo, hi), &f| (lo.min(f), hi.max(f)));
+        assert!(hi - lo > 0.05, "they differ per car: {feet:?}");
     }
 }

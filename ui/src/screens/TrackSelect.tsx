@@ -16,7 +16,7 @@ import { Panel } from "../components/Panel";
 import { Screen } from "../components/Screen";
 import { TrackArt } from "../components/TrackArt";
 import { formatTime } from "../format";
-import { useSeen } from "../hooks";
+import { useRoomBackdrop, useSeen } from "../hooks";
 import { cycle, enter } from "../nav/focus";
 import { back, go } from "../nav/routes";
 import { useFocusNav } from "../nav/useFocusNav";
@@ -108,6 +108,7 @@ export function TrackSelect({ inRace }: Props) {
     if (focusedTrack && focusedTrack.id !== d.track) draft.set(withTrack(d, focusedTrack, profile.get(), players));
   }, [focusedTrack, players]);
   useSeen(track ? { kind: "track", id: track.id } : null, !!track && isFresh(p, { kind: "track", id: track.id }));
+  useRoomBackdrop();
 
   const goLabel = inRace || versus ? trackSelect.start : trackSelect.next;
   const modeTitle = trackSelect.title[d.mode === "championship" ? "quickRace" : d.mode];
@@ -116,7 +117,7 @@ export function TrackSelect({ inRace }: Props) {
       title={modeTitle}
       subtitle={trackSelect.subtitle}
       hints={[
-        { action: "move", label: hint.select },
+        { action: "move", label: hint.browse },
         nav.focus.region === "tracks" ? { action: "confirm", label: hint.select, onPress: select } : { action: "confirm", label: goLabel, onPress: start },
         { action: "back", label: hint.back, onPress: exit },
       ]}

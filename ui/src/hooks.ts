@@ -45,8 +45,9 @@ export function useSeen(item: UiUnlockedItem | null, fresh: boolean) {
   }, [key, fresh]);
 }
 
-/** Hides the 3D showroom car while mounted (screens that cover the turntable: Garage grid, Credits
- * roll, Cup-end podium); the wide shot of the player's car returns afterwards. */
+/** Hides the 3D showroom car while mounted: screens whose content covers the turntable (Garage
+ * grid, Credits roll, Cup-end podium) or whose translucent cards it would show through (Cup select,
+ * Track select, Versus lobby). The wide shot of the player's car returns afterwards. */
 export function useRoomBackdrop() {
   useEffect(() => {
     const backdrop = (focus: "room" | "wide") => {

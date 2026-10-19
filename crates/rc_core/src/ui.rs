@@ -53,7 +53,8 @@ pub enum BackdropFocus {
     /// Close on the car (car select).
     Car,
     /// The wide shot without the car: screens whose content covers the turntable (Garage grid,
-    /// Credits roll, Cup-end podium).
+    /// Credits roll, Cup-end podium) or whose translucent cards it would show through (Cup select,
+    /// Track select, Versus lobby).
     Room,
 }
 

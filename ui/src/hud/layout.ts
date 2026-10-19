@@ -61,9 +61,13 @@ export function clock(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths % 10}`;
 }
 
-/** A Time Trial split, always signed: `"-0.42"` (ahead) / `"+0.31"` (behind). */
+/** A Time Trial split in the hundredths it shows: negative = ahead, positive = behind, 0 = a tie. */
+export const splitHundredths = (secs: number): number => Math.round(secs * 100);
+
+/** A Time Trial split, always signed: `"-0.42"` (ahead) / `"+0.31"` (behind) / `"±0.00"` (a tie). */
 export function split(secs: number): string {
-  return `${secs < 0 ? "-" : "+"}${Math.abs(secs).toFixed(2)}`;
+  const h = splitHundredths(secs);
+  return `${h < 0 ? "-" : h > 0 ? "+" : "±"}${(Math.abs(h) / 100).toFixed(2)}`;
 }
 
 /** `2` → `["2", "nd"]`: a place with its suffix drawn smaller. */

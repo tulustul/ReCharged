@@ -99,7 +99,7 @@ export function MainMenu() {
         <InfoPanel id={focused.id} />
         <Hints
           items={[
-            { action: "move", label: hint.select },
+            { action: "move", label: hint.browse },
             { action: "confirm", label: hint.confirm, onPress: () => activate(focused) },
             { action: "back", label: appStrings.quit, onPress: confirmQuit },
           ]}

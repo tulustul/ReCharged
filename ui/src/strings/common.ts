@@ -11,6 +11,8 @@ import type {
 } from "../bevy";
 
 export const hint = {
+  /** The move (↑↓ / D-pad) hint: moving the focus, never confirming. */
+  browse: "Browse",
   select: "Select",
   confirm: "Confirm",
   back: "Back",

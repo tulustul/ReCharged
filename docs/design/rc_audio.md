@@ -147,16 +147,18 @@ columns only — `kind` jumps to the target at the start of a 20 s blend, so it 
 | birds / crickets | `(1 − 0.6 × cloudiness) × (1 − min(precipitation/0.3, 1))` |
 | room beds | 1 |
 Fog: the ambience bus low-pass (1.2 kHz) is mixed in by `WeatherState::fog`.
-Thunder on `WeatherEvent::Lightning { intensity }`: ≥ 0.7 `thunder_1` (close), ≥ 0.35 `thunder_2`,
-else `thunder_3`; delay 2.6 s → 0.2 s and −6 → 0 dB with intensity; through a 700 Hz low-pass
-indoors.
+Thunder on `WeatherEvent::Lightning { intensity }`: ≥ 5/6 `thunder_1` (close), ≥ 2/3 `thunder_2`,
+else `thunder_3` (distant) — thirds of the 0.5–1.0 a Storm strikes at, so each plays about a third
+of the time (QA R4: thresholds over 0–1 never reached `thunder_3`); the weaker flashes of a blend
+into or out of a Storm are distant. Delay 2.6 s → 0.2 s and −6 → 0 dB with intensity; through a
+700 Hz low-pass indoors.
 
 ## Tests
-`cargo test -p rc_audio` — unit (22): cue log rate limit, bus composition (master × bus, mute, pause duck, clamping),
+`cargo test -p rc_audio` — unit (23): cue log rate limit, bus composition (master × bus, mute, pause duck, clamping),
 attenuation/pan maths (rolloff, fade, monotonic, nearest listener, split-screen centring), engine
 rate/level/pitch mapping, car layer mix (slip, surface, airborne, rumble, drift rate, boost), music
 state machine (menu, loading, race phases, final lap, finished, stinger hold), ambience selection
-(environment, time, indoor variants, thunder) and mix (every preset, Rain→Storm and Snow→Cloudy
+(environment, time, indoor variants, thunder; every thunder variant in a Storm) and mix (every preset, Rain→Storm and Snow→Cloudy
 blends), cue mappings (every item and race event maps to an existing file), roulette and goo
 timing. Headless (`tests/headless.rs`, 2): the whole lifecycle with no device (loading key,
 Intro → Racing, messages, pause, resume, restart, Finished, next race, quit) and the real probe

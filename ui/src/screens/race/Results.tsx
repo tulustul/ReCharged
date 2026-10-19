@@ -35,7 +35,7 @@ export function Results({ actions }: { actions: Action[] }) {
   const me = results?.entries.find((e) => e.slot === 0) ?? results?.entries.find((e) => e.slot !== null);
   const outcome = results?.outcome;
   return (
-    <Screen title={strings.title} kicker={`${race.modeName[mode]} · ${track}`} hints={[{ action: "move", label: hint.select }, { action: "confirm", label: hint.confirm, onPress: () => actions[nav.index]?.run() }]}>
+    <Screen title={strings.title} kicker={`${race.modeName[mode]} · ${track}`} hints={[{ action: "move", label: hint.browse }, { action: "confirm", label: hint.confirm, onPress: () => actions[nav.index]?.run() }]}>
       <node style={{ flexDirection: "row", gap: space.xl, flexGrow: 1, minHeight: 0 }}>
         <Panel style={{ flexGrow: 1, gap: 4 }} padding={24}>
           <Row header cells={[strings.col.pos, strings.col.name, strings.col.car, strings.col.time, strings.col.best, points ? strings.col.points : ""]} />

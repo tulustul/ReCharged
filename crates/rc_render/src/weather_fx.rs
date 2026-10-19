@@ -33,6 +33,14 @@ const SOFT_FLASH_SCALE: f32 = 0.25;
 const SOFT_FLASH_TAU_S: f32 = 0.6;
 /// Puddle amount per unit of wetness.
 const PUDDLES_PER_WETNESS: f32 = 0.85;
+/// Bevy specialises the tonemapping pipeline on the grading stages in use: white balance
+/// (temperature or tint ≠ 0) and sectional grading (a section off its default). Clouds and snow
+/// switch both on in looks that grade neither (the garden noon has no temperature), and the race's
+/// weather is planned only when it starts — after the Loading warm-up drew the menu-default clear
+/// look — so overcast races compiled a tonemapping pipeline at the Intro (QA R5), and a Dynamic
+/// change from Clear one mid-race. Every look keeps both stages in use, by this invisible amount
+/// where it would grade nothing: one tonemapping pipeline serves every environment, time and weather.
+const GRADING_IN_USE: f32 = 1e-4;
 
 pub(crate) fn build(app: &mut App) {
     app.init_resource::<Flash>().add_systems(
@@ -202,7 +210,7 @@ pub(crate) fn look(env: &EnvironmentDef, time: TimeOfDay, w: &WeatherState, flas
     };
 
     let g = &base.grading;
-    let grading = ColorGrading {
+    let mut grading = ColorGrading {
         global: ColorGradingGlobal {
             exposure: 0.0,
             temperature: g.temperature - 0.05 * s - 0.04 * snowy,
@@ -221,6 +229,7 @@ pub(crate) fn look(env: &EnvironmentDef, time: TimeOfDay, w: &WeatherState, flas
             ..section(g, s)
         },
     };
+    keep_stages_in_use(&mut grading);
 
     let window_grey = [0.55, 0.58, 0.62].map(|v| v * base.window.iter().sum::<f32>() / 3.0);
     let window = std::array::from_fn(|i| {
@@ -264,6 +273,20 @@ pub(crate) fn look(env: &EnvironmentDef, time: TimeOfDay, w: &WeatherState, flas
         wet: w.wetness,
         puddles: w.wetness * PUDDLES_PER_WETNESS,
         snow: w.snow_cover,
+    }
+}
+
+/// See [`GRADING_IN_USE`].
+fn keep_stages_in_use(grading: &mut ColorGrading) {
+    let global = &mut grading.global;
+    if global.temperature == 0.0 && global.tint == 0.0 {
+        global.temperature = GRADING_IN_USE;
+    }
+    if grading
+        .all_sections()
+        .all(|s| *s == ColorGradingSection::default())
+    {
+        grading.midtones.gamma += GRADING_IN_USE;
     }
 }
 
@@ -420,6 +443,60 @@ mod tests {
             );
         }
         assert_eq!(look(&street, TimeOfDay::Night, &storm, 0.0).flash.lux, 0.0);
+    }
+
+    /// What Bevy keys the tonemapping pipeline on (`prepare_view_tonemapping_pipelines`): hue
+    /// rotation, white balance, sectional grading.
+    fn tonemapping_key(g: &ColorGrading) -> [bool; 3] {
+        [
+            g.global.hue != 0.0,
+            g.global.temperature != 0.0 || g.global.tint != 0.0,
+            g.all_sections()
+                .any(|s| *s != ColorGradingSection::default()),
+        ]
+    }
+
+    /// QA R5: the Loading warm-up draws the menu-default clear weather, the race its own weather,
+    /// so a weather that changes the key compiled a tonemapping pipeline at the Intro.
+    #[test]
+    fn every_environment_time_and_weather_shares_one_tonemapping_pipeline() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let mut weathers: Vec<WeatherState> = (0..=10)
+            .map(|i| WeatherState {
+                cloudiness: i as f32 / 10.0,
+                ..default()
+            })
+            .collect();
+        weathers.push(WeatherState {
+            cloudiness: 0.5,
+            fog: 0.85,
+            ..default()
+        });
+        weathers.push(WeatherState {
+            cloudiness: 0.85,
+            precipitation: 0.5,
+            snowing: true,
+            snow_cover: 1.0,
+            ..default()
+        });
+        weathers.push(WeatherState::default());
+        let mut envs = 0;
+        for entry in std::fs::read_dir(assets.join("data/environments")).expect("environments") {
+            let path = entry.expect("environment file").path();
+            let id = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .expect("file name");
+            let env = EnvironmentDef::load(&assets, id).expect("environment loads");
+            for time in TimeOfDay::ALL {
+                for w in &weathers {
+                    let key = tonemapping_key(&look(&env, time, w, 0.0).grading);
+                    assert_eq!(key, [false, true, true], "{id} {time:?} {w:?}");
+                }
+            }
+            envs += 1;
+        }
+        assert!(envs >= 8, "every environment file: {envs}");
     }
 
     #[test]

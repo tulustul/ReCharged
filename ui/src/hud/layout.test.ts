@@ -29,7 +29,10 @@ test("formatters", () => {
   assert.equal(clock(5_000), "0:05.0");
   assert.equal(split(-0.4249), "-0.42");
   assert.equal(split(0.31), "+0.31");
-  assert.equal(split(0), "+0.00");
+  assert.equal(split(0), "±0.00");
+  assert.equal(split(0.004), "±0.00", "a tie at the shown precision");
+  assert.equal(split(-0.004), "±0.00");
+  assert.equal(split(0.006), "+0.01");
   assert.deepEqual(placeParts(2), ["2", "nd"]);
   assert.deepEqual(placeParts(8), ["8", "th"]);
   assert.deepEqual(placeParts(11), ["11", "th"]);

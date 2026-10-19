@@ -524,6 +524,11 @@ drive: UiDrive,
  */
 thumbnail: string | null, 
 /**
+ * Share of the thumbnail's height under the car (transparent rows below the wheels; 0
+ * without a thumbnail): Cup end stands the car on its podium block by it.
+ */
+thumbnailFoot: number, 
+/**
  * Paints.
  */
 paints: Array<UiPaint>, 

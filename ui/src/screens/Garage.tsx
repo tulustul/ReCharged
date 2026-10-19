@@ -45,7 +45,7 @@ export function Garage() {
       title={garage.title}
       subtitle={garage.subtitle(unlockedCount, cars.length)}
       hints={[
-        { action: "move", label: hint.select },
+        { action: "move", label: hint.browse },
         { action: "confirm", label: hint.select, onPress: () => pick(car) },
         { action: "back", label: hint.back, onPress: back },
       ]}

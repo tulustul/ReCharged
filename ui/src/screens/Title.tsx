@@ -15,6 +15,9 @@ import { color, frame, size } from "../theme/tokens";
 
 /** Width of the charge bar under the logo, px. */
 const BAR = 760;
+/** Top of the logo block, px: the showroom's wide shot frames the car at the screen centre, so the
+ * logo, bar and tagline sit above it (QA R6). */
+const LOGO_TOP = 90;
 
 export function Title() {
   const info = useStore(appInfo);
@@ -39,8 +42,8 @@ export function Title() {
   });
   const hero = { ...text.hero, textShadow: { color: "#06263d", offsetX: 7, offsetY: 7 } };
   return (
-    <button onClick={go} style={{ ...fill, backgroundColor: color.clear, alignItems: "center", justifyContent: "center" }}>
-      <node style={{ flexDirection: "column", alignItems: "center", gap: 26, margin: { bottom: 80 } }}>
+    <button onClick={go} style={{ ...fill, backgroundColor: color.clear, flexDirection: "column", alignItems: "center", padding: { top: LOGO_TOP } }}>
+      <node style={{ flexDirection: "column", alignItems: "center", gap: 26 }}>
         <node style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
           <BoltIcon size={128} />
           <text style={hero}>

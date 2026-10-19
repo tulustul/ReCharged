@@ -34,24 +34,32 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
   a translucent fill (the overlay UI camera has no 3D frame to blur).
 - **Showroom**: `AppStatus.showroom` mirrors rc_core `ShowroomReady` (inserted by rc_render while
   the 3D showroom draws the `MenuBackdrop` car). Screens that cover the turntable — the Garage grid,
-  the Credits roll, the Cup-end podium — set `focus: "room"` while mounted (`useRoomBackdrop`):
-  rc_render hides the car, the room stays; the wide shot of the draft's car returns after. Without it the Backdrop draws navy glows/streaks
+  the Credits roll, the Cup-end podium — and the card screens it would show through — Cup select,
+  Track select, the Versus lobby (translucent cards without blur, QA B36) — set `focus: "room"`
+  while mounted (`useRoomBackdrop`): rc_render hides the car, the room stays; the wide shot of the
+  draft's car returns after. Main menu, Title and Car select show the car; the frosted panels of
+  Records, How to play and Settings blur it. Without the showroom the Backdrop draws navy glows/streaks
   and Main menu / Car select show the car thumbnail (`assets/ui/cars/<id>.png`, only offered when it
   exists; same for track previews). The flag arrives before the 3D view is fully drawn (pipelines
   recompile after a race), so the navy layers stay 1 s and then fade out over the showroom.
+- **Title**: the logo, charge bar and tagline sit at the top (`LOGO_TOP`), clear of the car the
+  wide shot frames at the screen centre (QA R6); "Press any button" below the turntable.
 - **Transitions**: screen changes arm a `morphFilter` only while in flight (`routes.ts`): crossfade
   everywhere, the custom `chargeSwap` (a crackling cyan/volt front) only Main menu → mode.
 - **Credits**: a roll over the showroom from `strings/credits.ts` (team, tools, generators, the
   Saira OFL notice); its distance and duration follow the list (57 UI px/s).
 - **Cup end**: the top three cars (thumbnails) stand on their 1-2-3 blocks — each image overlaps
-  its block by the thumbnails' transparent foot (16 %) and is drawn above it — with name and points
-  on the block face.
+  its block by its own transparent margin under the wheels (`UiCar.thumbnailFoot`: rc_ui measures
+  the lowest opaque row of each PNG; 10–18 % in the shipped thumbnails, QA B37) and is drawn above
+  it — with name and points on the block face.
 - **Cup select**: a locked cup dims its race list and shows a lock and the unlock reason in its
   footer (where an unlocked cup shows its best trophy).
 - **Splash and toasts** run on Bevy's frame clock (shared-value drivers whose completion ends
   them), not on wall-clock JS timers: when the first frames stall (pipelines compiling
   synchronously in automated runs) the splash and a boot toast ("Save file restored") are still
   seen. Unlock toasts are skipped while Results or Cup end show (their panels list the unlocks).
+  Toasts sit on the right edge, halfway down: below the headers, tab bars and side-panel titles
+  (the Settings help), above the footer and the Results buttons.
 - **Loading**: the progress bar's glow (`boxShadow`) also compiles bevy_ui's box-shadow pipeline
   for the LDR camera split-screen races share, so their HUD glows never compile mid-race.
 
@@ -89,6 +97,9 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
   get keyboard glyphs; lobby keys per scheme (A: Space/L-Ctrl, B: Enter/Backspace). They are drawn
   (`glyphs.ts` spec → `Glyph.tsx` shapes: keycaps, face buttons by position, shoulders, D-pad,
   sticks; no platform logos), so `assets/ui/glyphs/` holds no images.
+- Footer hints: the move action reads "Browse" (`hint.browse`; Settings: "Change", values move
+  there), the confirm action names what it does (Select, Confirm, Start race …), so no footer says
+  the same word twice (QA R7).
 - Cues: hover on every focus move, select on confirm, back, toggle (cyclers/toggles), sliderTick,
   error (locked/invalid), unlock (unlock toasts).
 
@@ -156,7 +167,5 @@ profile/records/standings views, script parser, UiScale, channel round trip, `be
   animate the text colour instead (`interpolateColor`).
 - `boxShadow: []` paints a default black shadow (bevy-react parses the empty list as one default
   shadow): conditional shadows use `undefined`.
-- Cup end's cars are the 2D thumbnails with one foot offset (16 % of the image): a car drawn
-  higher or lower in its thumbnail stands a few px above or into its block.
 - Colour-blind markers show in races only (name tags, minimap, 3P standings); the post-race tables
   keep the colour bar (a rival's grid slot, hence its shape, changes between cup races).

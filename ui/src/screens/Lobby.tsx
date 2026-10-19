@@ -8,6 +8,7 @@ import { Glyph } from "../components/Glyph";
 import { ChevronIcon, ControllerIcon, KeyboardIcon } from "../components/icons";
 import { Screen } from "../components/Screen";
 import { rgbHex } from "../format";
+import { useRoomBackdrop } from "../hooks";
 import { useNav } from "../nav/input";
 import { go, back } from "../nav/routes";
 import { sfx } from "../sound";
@@ -42,6 +43,7 @@ export function Lobby() {
   useEffect(() => {
     lobbyChoices.set(syncSlots(lobbyChoices.get(), joined, cars.length));
   }, [joined.join(","), cars.length]);
+  useRoomBackdrop();
   const ready = allReady(joined, choices);
   useEffect(() => {
     if (!ready) return;

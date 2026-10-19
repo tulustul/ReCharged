@@ -51,7 +51,7 @@ export function CupStandings({ actions }: { actions: Action[] }) {
   const info = cat?.cups.find((c) => c.id === cup?.cup);
   const me = cup?.rows.find((r) => r.slot === 0);
   return (
-    <Screen title={strings.title} kicker={info?.name} hints={[{ action: "move", label: hint.select }, { action: "confirm", label: hint.confirm, onPress: () => actions[nav.index]?.run() }]}>
+    <Screen title={strings.title} kicker={info?.name} hints={[{ action: "move", label: hint.browse }, { action: "confirm", label: hint.confirm, onPress: () => actions[nav.index]?.run() }]}>
       <node style={{ flexDirection: "row", gap: space.xl, flexGrow: 1, minHeight: 0 }}>
         <node style={{ width: 520, flexDirection: "column", gap: space.l, flexShrink: 0 }}>
         <Panel style={{ gap: space.s }} padding={26}>
@@ -117,7 +117,7 @@ export function VersusScore({ actions }: { actions: Action[] }) {
   const nav = useActions(actions);
   const shown = useReveal();
   return (
-    <Screen title={vs.title} subtitle={score ? vs.subtitle(score.races) : undefined} hints={[{ action: "move", label: hint.select }, { action: "confirm", label: hint.confirm, onPress: () => actions[nav.index]?.run() }]}>
+    <Screen title={vs.title} subtitle={score ? vs.subtitle(score.races) : undefined} hints={[{ action: "move", label: hint.browse }, { action: "confirm", label: hint.confirm, onPress: () => actions[nav.index]?.run() }]}>
       <node style={{ flexDirection: "row", gap: space.xl, flexGrow: 1, minHeight: 0, alignItems: "flexStart" }}>
         <node style={{ flexGrow: 1, flexDirection: "column", gap: space.m }}>
           {(score?.rows ?? []).map((r, i) => (

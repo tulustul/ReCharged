@@ -7,7 +7,7 @@ import { formatTime } from "../format";
 import { useEnter } from "../hooks";
 import { hud as words } from "../strings/hud";
 import { color, slotColor } from "../theme/tokens";
-import { clock, fs, placeParts, split } from "./layout";
+import { clock, fs, placeParts, split, splitHundredths } from "./layout";
 import { caps, chip, num, tone } from "./look";
 import type { Moments } from "./store";
 
@@ -75,13 +75,15 @@ function TimeRow({ label, value, k, big = false, children }: { label: string; va
   );
 }
 
-/** Split vs the ghost/best: green and "-" when ahead, red and "+" when behind. */
+/** Split vs the ghost/best: green and "-" when ahead, red and "+" when behind, neutral "±0.00"
+ * on a tie (at the hundredths shown). */
 function Split({ secs, k }: { secs: number; k: number }) {
-  const ahead = secs < 0;
+  const h = splitHundredths(secs);
+  const [fill, edge, ink] = h < 0 ? ["rgba(61, 220, 132, 0.22)", tone.good, tone.good] : h > 0 ? ["rgba(255, 84, 104, 0.22)", tone.bad, tone.bad] : [tone.chip, tone.edge, color.text];
   const enter = useEnter(16, 0);
   return (
-    <node style={{ ...enter, padding: { horizontal: Math.round(10 * k), vertical: Math.round(3 * k) }, borderRadius: Math.round(8 * k), backgroundColor: ahead ? "rgba(61, 220, 132, 0.22)" : "rgba(255, 84, 104, 0.22)", border: 1, borderColor: ahead ? tone.good : tone.bad }}>
-      <text style={num(fs(24, k, 18), ahead ? tone.good : tone.bad)}>{split(secs)}</text>
+    <node style={{ ...enter, padding: { horizontal: Math.round(10 * k), vertical: Math.round(3 * k) }, borderRadius: Math.round(8 * k), backgroundColor: fill, border: 1, borderColor: edge }}>
+      <text style={num(fs(24, k, 18), ink)}>{split(secs)}</text>
     </node>
   );
 }

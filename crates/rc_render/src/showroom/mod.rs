@@ -5,8 +5,9 @@
 //!
 //! `ShowroomReady` is present exactly while the backdrop car is instanced and painted (the 3D
 //! showroom renders): a car swap keeps the previous car until the new one is ready, so it does not
-//! flicker. `BackdropFocus::Room` hides the car (screens that cover the turntable: Garage grid,
-//! Credits roll, Cup-end podium); the room stays.
+//! flicker. `BackdropFocus::Room` hides the car (screens that cover the turntable — Garage grid,
+//! Credits roll, Cup-end podium — or whose translucent cards it would show through: Cup select,
+//! Track select, Versus lobby); the room stays.
 
 mod diorama;
 

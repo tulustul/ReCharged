@@ -77,9 +77,6 @@ export function CupEnd() {
 
 const HEIGHT: Record<number, number> = { 1: 310, 2: 250, 3: 205 };
 const TONE: Record<number, string> = { 1: color.gold, 2: color.silver, 3: color.bronze };
-/** Transparent rows under the wheels in the car thumbnails (share of their height): the image
- * overlaps the block by this much, so the car stands on it. */
-const CAR_FOOT = 0.16;
 
 function Step({ row, place }: { row: UiStandingRow; place: number }) {
   const car = useStore(catalog)?.cars.find((c) => c.id === row.car);
@@ -88,8 +85,9 @@ function Step({ row, place }: { row: UiStandingRow; place: number }) {
   return (
     <node style={{ width: 330, flexDirection: "column", alignItems: "center" }}>
       {car?.thumbnail && (
-        // Above the block (zIndex) so the wheels rest on its top edge.
-        <image src={car.thumbnail} style={{ width: size, height: size, imageRendering: "trilinear", zIndex: 1, margin: { bottom: -Math.round(size * CAR_FOOT) } }} />
+        // Above the block (zIndex), overlapping it by the transparent rows under this car's
+        // wheels (measured per thumbnail by rc_ui), so the car stands on the top edge.
+        <image src={car.thumbnail} style={{ width: size, height: size, imageRendering: "trilinear", zIndex: 1, margin: { bottom: -Math.round(size * car.thumbnailFoot) } }} />
       )}
       <node
         style={{
