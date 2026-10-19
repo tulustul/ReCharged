@@ -121,14 +121,16 @@ pub(super) fn drive_values(
     mut fit: Local<Option<MinimapFit>>,
     mut values: ResMut<SharedValues>,
 ) {
-    let Some(bound) = bindings.0.as_ref() else {
-        return;
-    };
+    // Before the bindings check: React binds a few frames into the race, and returning early
+    // would swallow the new track's change (the next race would keep the last track's fit).
     if let Some(summary) = summary.as_ref()
         && (summary.is_changed() || fit.is_none())
     {
         *fit = Some(MinimapFit::of(summary));
     }
+    let Some(bound) = bindings.0.as_ref() else {
+        return;
+    };
     let mut set = |id: SharedId, v: f32| {
         if values.get(id) != Some(v) {
             values.set(id, v);
