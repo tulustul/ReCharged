@@ -325,7 +325,9 @@ Allowed presets:
 
 ### 7.3 Track rules [TRK-3]
 - Laps count only if checkpoints were passed in order. Intentional shortcuts lie inside the
-  checkpoint corridors.
+  checkpoint corridors. Checkpoints passed while outside the corridor count once the car is back
+  in it, unless the trip gained more track than the car drove (a cut): then "Missed checkpoint —
+  go back".
 - **Wrong way** warning after 2 s driving against the track direction above 5 u/s.
 - **Lost** warning when a racer is outside the legal corridor for 0.5 s, or moves above 5 u/s with
   less than 30 % of it along the track for 2 s (driving sideways, circling an open floor): an

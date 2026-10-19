@@ -43,14 +43,28 @@ auto-accelerate only in Racing, so it never stalls.
 
 ## Progress (Intro, Countdown, Racing)
 - **Projection:** `Track::project(pos, hint)` with the previous tick's `s`; global (`None`) on the
-  first tick and after a `Teleported` (respawn), when crossings and speed are skipped.
+  first tick and after a `Teleported` (respawn), when crossings and speed are skipped. Off the
+  centreline (> 3 u) or outside the corridor the global projection is checked too and wins when the
+  car is on another part of the track (in its corridor, ≤ 2 u above its surface) that is > 3 u
+  closer, or the hinted point is outside the corridor and that part's is not: off the track the
+  nearest point can slide onto a neighbouring part (a hairpin's other leg) and the hinted ±30 u
+  search never found the way back — the car counted as off the track until respawned somewhere
+  wrong. A jump forward gains nothing: the gates in between are missed (`progress.rs`
+  `rejoined`; test: a trip off the track from every 10 u of every track, both sides).
 - **Lap 0:** the grid is behind the line; a racer is on lap 0 (`next_checkpoint` 0,
   `last_valid_checkpoint` = last) until it first crosses the start line, which starts lap 1.
 - **Checkpoints:** the next gate counts when `s` passes it forward in this tick's move *and* the car
   is inside the gate: |lateral| ≤ half width + off-road margin (the legal corridor — open sides and
   floors may be driven within the margin), ≤ 4 u from the gate plane (rejects projection jumps),
   ≤ 4 u from the surface. Backward crossings validate nothing; a missed gate must be passed again.
-  Passing the next gate's `s` outside the gate sends `RaceEvent::MissedCheckpoint` once per pass:
+  **Trips outside the corridor:** gates passed out there are judged when the car is back inside
+  it: if it drove at least 80 % of the track it gained since leaving (running wide round the
+  outside drives more than the centreline; cutting an infield far less), they count; otherwise
+  they stay missed and `MissedCheckpoint` is sent then (once the car is on the track, where "go
+  back" makes sense). Only trips that span the missed gate are judged. Before this, running wide
+  past a gate and rejoining froze the racer's distance at that gate and dropped it to last.
+  Passing the next gate's `s` outside the gate within the corridor (too high or low) sends
+  `RaceEvent::MissedCheckpoint` at once, once per pass:
   it re-arms only when the car is back more than the gate depth (4 u) behind the gate, so a car
   jittering on the gate line outside it reports once (rc_ui shows the message).
 - **Laps:** validating checkpoint 0 with all others done completes a lap: `LapCompleted { lap,
