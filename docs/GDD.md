@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`) |
+| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`); v2.2 post-QA tuning: Toy Town and Wrench Works default to 4 laps (§7.1) |
 | Owner | Game designer / orchestrator |
 | Engine | Bevy 0.20, bevy-react 0.8.1 (UI), bevy_rapier3d 0.37 (physics), bevy_kira_audio 0.27 (audio) |
 | Companion docs | `docs/ARCHITECTURE.md` (technical design), `docs/PRACTICES.md` (engineering rules) |
@@ -293,11 +293,11 @@ Six environments; each has a **Forward** and a **Reverse** layout, and any layou
 
 | Track | Environment | Indoor | Diff. | Lap length | Default laps | Surfaces | Signature features |
 |---|---|---|---|---|---|---|---|
-| **Toy Town** | Toy store / playroom | yes | ★ | ~650 u | 3 | Plastic toy track, Carpet (play-mat), Wood | orange toy-track ribbon with banked turns & a helix; knockable block towers; dollhouse drive-through |
+| **Toy Town** | Toy store / playroom | yes | ★ | ~650 u | 4 | Plastic toy track, Carpet (play-mat), Wood | orange toy-track ribbon with banked turns & a helix; knockable block towers; dollhouse drive-through |
 | **Sofa Circuit** | Family house ground floor | yes | ★ | ~400 u | 5 | Wood, Carpet (rug), Tile (kitchen) | book-stack ramp onto the coffee table and jump off; tunnel under the sofa; slalom through dining-chair legs; stair ramp |
 | **Backyard Bash** | Back garden | no | ★★ | ~450 u | 5 | Grass, Dirt, Stone (patio), Wood (deck), Water (puddles) | flower-pot chicane; hose-reel spiral; sandbox jump; under the garden bench |
 | **Aisle Rush** | Supermarket after closing | yes | ★★ | ~800 u | 3 | Tile (vinyl), Ice (freezer), Cardboard | long aisle straights; icy freezer section; cardboard-box ramps; knockable can pyramids; checkout lanes |
-| **Wrench Works** | Auto-repair workshop | yes | ★★★ | ~700 u | 3 | Asphalt (concrete), Oil, Carpet (rubber mats), Wood (plywood ramps), Water (wash bay) | drive under cars on lifts; plywood ramp onto the workbench and jump; tyre-stack chicane; oil-stain slides; wash bay; paint-booth haze |
+| **Wrench Works** | Auto-repair workshop | yes | ★★★ | ~700 u | 4 | Asphalt (concrete), Oil, Carpet (rubber mats), Wood (plywood ramps), Water (wash bay) | drive under cars on lifts; plywood ramp onto the workbench and jump; tyre-stack chicane; oil-stain slides; wash bay; paint-booth haze |
 | **Maple Street** | Suburban street & front lawns | no | ★★★ | ~900 u | 3 | Asphalt, Grass (lawns), Stone (sidewalk) | drive under parked (giant) cars; curb hops; lawn shortcut; storm-drain dip; street lamps at night |
 
 Racing width ≥ 8 u; chokepoints ≥ 5 u, at most 2 per lap. Time Trial always uses 3 laps.
