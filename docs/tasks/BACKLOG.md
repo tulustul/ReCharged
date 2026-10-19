@@ -41,3 +41,5 @@ take B2, B4, B5, B8, B10–B13, B15–B17, B19, B23–B25, B27.
 | B33 | Backyard sandbox kicker flips an assisted Phantom at ~30 u/s | garden data | T19a (round 2 in progress) |
 | B34 | Goo Bomb still explodes on its carrier in most AI uses (10 of 20 hits) | rc_ai / rc_items | T19a (round 2 in progress) |
 | B35 | Assist too generous: throttle-only runs at reference pace (Silver/Gold medal pace) — target 1.2–1.3× | rc_ai assist | T19a (round 2 in progress) |
+| B36 | Track select: the showroom car shows through the translucent track cards | ui / rc_render showroom | T20b |
+| B37 | Cup end: podium thumbnails use one fixed foot offset, some cars sit a few px into/above their block | ui | T20b |
