@@ -31,7 +31,12 @@ pub(super) fn build(app: &mut App) {
             .chain()
             .in_set(VisualSet)
             .after(LookSet),
-    );
+    )
+    // The star field is made for an outdoor night session and dropped with it (it is a large
+    // cubemap, and the menu must not keep session assets: the soak census).
+    .add_systems(OnEnter(AppState::Unloading), |mut commands: Commands| {
+        commands.remove_resource::<StarMap>();
+    });
 }
 
 /// Which environment's static parts (sky, filtered IBL maps, stars) a camera carries.
@@ -47,13 +52,18 @@ struct CameraEnv {
 #[derive(Component, Debug)]
 struct EnvProbe;
 
-/// The star field, made once.
+/// The star field of the current outdoor night session.
 #[derive(Resource, Debug)]
 struct StarMap(Handle<Image>);
 
+/// A camera that renders the outdoor sky (Bevy's atmosphere) even in an indoor environment: the
+/// menu warm-up's outdoor views.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub(crate) struct ForceOutdoor;
+
 /// Switches a camera's sky / IBL maps when the environment (or its room map) changes. The
 /// environment map is filtered once, on the [`EnvProbe`].
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn apply_environment(
     mut commands: Commands,
     env: Option<Res<ActiveEnvironment>>,
@@ -68,7 +78,7 @@ fn apply_environment(
         ),
         With<EnvProbe>,
     >,
-    cameras: Query<(Entity, Option<&CameraEnv>), With<QualityCamera>>,
+    cameras: Query<(Entity, Option<&CameraEnv>, Has<ForceOutdoor>), With<QualityCamera>>,
 ) {
     let Some(env) = env else {
         return;
@@ -100,7 +110,7 @@ fn apply_environment(
             .as_ref()
             .map(|l| (l.diffuse_map.id(), l.specular_map.id())),
     };
-    for (entity, current) in &cameras {
+    for (entity, current, forced_outdoor) in &cameras {
         if current == Some(&wanted) {
             continue;
         }
@@ -112,23 +122,23 @@ fn apply_environment(
                 ..light.clone()
             });
         }
-        if !env.def.indoor {
+        if !env.def.indoor || forced_outdoor {
             camera.insert(AtmosphereSettings::default());
-            if env.time == TimeOfDay::Night {
-                let image = match &stars {
-                    Some(s) => s.0.clone(),
-                    None => {
-                        let handle = images.add(star_cubemap());
-                        commands.insert_resource(StarMap(handle.clone()));
-                        handle
-                    }
-                };
-                commands.entity(entity).insert(Skybox {
-                    image: Some(image),
-                    brightness: env.def.sky.stars,
-                    ..default()
-                });
-            }
+        }
+        if !env.def.indoor && env.time == TimeOfDay::Night {
+            let image = match &stars {
+                Some(s) => s.0.clone(),
+                None => {
+                    let handle = images.add(star_cubemap());
+                    commands.insert_resource(StarMap(handle.clone()));
+                    handle
+                }
+            };
+            commands.entity(entity).insert(Skybox {
+                image: Some(image),
+                brightness: env.def.sky.stars,
+                ..default()
+            });
         }
         commands.entity(entity).insert(wanted.clone());
     }

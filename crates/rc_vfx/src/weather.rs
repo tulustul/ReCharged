@@ -2,7 +2,7 @@
 //! plus its own [`player_layer`]; its rain or snow mesh (`assets/shaders/vfx/precip.wesl`) and
 //! its sky lightning ([`crate::lightning`]) live on that layer only, so split-screen views never
 //! see each other's precipitation. Snow vs rain follows `WeatherState::snowing` (not `kind`), density
-//! `precipitation` × the particle setting. Splashes dot wet ground ahead of local players.
+//! `precipitation` × the particle setting. Splashes on wet ground: [`crate::splashes`].
 //! Indoor tracks show weather only through their windows (rc_render): nothing here.
 
 use bevy::asset::RenderAssetUsages;
@@ -17,10 +17,7 @@ use bevy::render::render_resource::{
 use bevy::shader::ShaderRef;
 use rc_core::prelude::*;
 
-use crate::cars::{Poses, ground_plane};
 use crate::fx::{Fx, FxRng};
-use crate::particles::{Facing, Look, Particle, Shape};
-use crate::pool::Emitter;
 
 /// The precipitation shader.
 const PRECIP_SHADER: &str = "shaders/vfx/precip.wesl";
@@ -30,10 +27,6 @@ pub const MAX_DROPS: u32 = 14_000;
 const RAIN_FALL_UPS: f32 = 40.0;
 /// Snow fall speed, u/s.
 const SNOW_FALL_UPS: f32 = 4.0;
-/// Splashes per second around a local car at full rain.
-const SPLASH_RATE: f32 = 90.0;
-/// No splashes while the car's ground is steeper than this (normal's up component).
-const MIN_SPLASH_NORMAL_Y: f32 = 0.5;
 
 /// Render layer of a player's private effects: precipitation, lightning, name tags, markers.
 pub fn player_layer(slot: PlayerSlot) -> usize {
@@ -166,7 +159,6 @@ struct Precip {
 pub(crate) struct WeatherFx {
     pub(crate) mesh: Handle<Mesh>,
     clock: f32,
-    splash: Vec<(Entity, Emitter)>,
 }
 
 pub(crate) fn build(app: &mut App) {
@@ -174,10 +166,7 @@ pub(crate) fn build(app: &mut App) {
         .init_resource::<WeatherFx>()
         .add_systems(Startup, build_mesh)
         .add_observer(decorate_camera)
-        .add_systems(
-            Update,
-            (update_precip, splashes).in_set(crate::VfxSystems::Emit),
-        );
+        .add_systems(Update, update_precip.in_set(crate::VfxSystems::Emit));
 }
 
 fn build_mesh(mut meshes: ResMut<Assets<Mesh>>, mut state: ResMut<WeatherFx>) {
@@ -281,97 +270,6 @@ fn update_precip(
     }
 }
 
-const SPLASH_RING: Look = Look {
-    shape: Shape::Ring,
-    facing: Facing::Flat,
-    color: [
-        LinearRgba::new(0.85, 0.9, 0.95, 0.55),
-        LinearRgba::new(0.85, 0.9, 0.95, 0.0),
-    ],
-    size: [0.04, 0.42],
-    fade_out: 0.7,
-    ..Look::DEFAULT
-};
-
-const SPLASH_DROP: Look = Look {
-    shape: Shape::Drop,
-    facing: Facing::Velocity,
-    color: [
-        LinearRgba::new(0.85, 0.9, 0.95, 0.7),
-        LinearRgba::new(0.85, 0.9, 0.95, 0.0),
-    ],
-    size: [0.03, 0.02],
-    gravity: 22.0,
-    stretch: 0.02,
-    aspect: 1.5,
-    fade_out: 0.4,
-    ..Look::DEFAULT
-};
-
-/// Height of the plane through `point` with unit normal `normal` (not vertical) at (`x`, `z`).
-fn plane_height((point, normal): (Vec3, Vec3), x: f32, z: f32) -> f32 {
-    point.y - (normal.x * (x - point.x) + normal.z * (z - point.z)) / normal.y
-}
-
-/// Raindrops splashing on wet ground in front of every local player's car: on the plane its
-/// wheels touch (`ground_plane`, so they follow ramps and banks), none while it is airborne.
-fn splashes(
-    time: Res<Time>,
-    weather: Option<Res<WeatherState>>,
-    mut fx: ResMut<Fx>,
-    mut state: ResMut<WeatherFx>,
-    poses: Poses,
-    locals: Query<(Entity, &VehicleTelemetry), With<LocalPlayer>>,
-) {
-    let Some(w) = weather.as_deref() else {
-        return;
-    };
-    let raining = !w.outside_only && !w.snowing && w.precipitation > 0.05 && w.wetness > 0.2;
-    if !raining {
-        return;
-    }
-    let dt = time.delta_secs();
-    let rate = SPLASH_RATE * w.precipitation * fx.density;
-    state.splash.retain(|(e, _)| locals.contains(*e));
-    for (car, telemetry) in &locals {
-        if !state.splash.iter().any(|(e, _)| *e == car) {
-            state.splash.push((car, Emitter::default()));
-        }
-        let (Some(pose), Some(plane)) = (
-            poses.of(car),
-            ground_plane(telemetry).filter(|(_, n)| n.y > MIN_SPLASH_NORMAL_Y),
-        ) else {
-            continue;
-        };
-        let Some((_, emitter)) = state.splash.iter_mut().find(|(e, _)| *e == car) else {
-            continue;
-        };
-        let n = emitter.count(rate, dt);
-        let fwd = pose.rotation * Vec3::NEG_Z;
-        let yaw = fwd.z.atan2(fwd.x);
-        let flat = Quat::from_rotation_arc(Vec3::Z, plane.1);
-        for _ in 0..n {
-            let a = yaw + fx.rng.signed(1.6);
-            let r = fx.rng.range(1.5, 13.0);
-            let (x, z) = (
-                pose.translation.x + a.cos() * r,
-                pose.translation.z + a.sin() * r,
-            );
-            let at = Vec3::new(x, plane_height(plane, x, z), z) + plane.1 * 0.02;
-            let life = fx.rng.range(0.22, 0.32);
-            fx.spawn(Particle::new(SPLASH_RING, at, Vec3::ZERO, life).rotated(flat));
-            for _ in 0..2 {
-                let v = Vec3::new(
-                    fx.rng.signed(1.0),
-                    fx.rng.range(1.5, 3.0),
-                    fx.rng.signed(1.0),
-                );
-                fx.spawn(Particle::new(SPLASH_DROP, at, v, 0.28).floored(at.y));
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,15 +281,6 @@ mod tests {
             wetness: 1.0,
             ..default()
         }
-    }
-
-    #[test]
-    fn splashes_lie_on_the_ground_plane() {
-        let n = Vec3::new(0.0, 0.8, 0.6);
-        let plane = (Vec3::new(1.0, 2.0, 3.0), n);
-        assert!((plane_height(plane, 1.0, 3.0) - 2.0).abs() < 1e-6);
-        let p = Vec3::new(5.0, plane_height(plane, 5.0, -4.0), -4.0);
-        assert!((p - plane.0).dot(n).abs() < 1e-5, "{p} is on the plane");
     }
 
     #[test]

@@ -13,11 +13,21 @@ use crate::materials::{MaterialLibrary, SurfaceMaterial};
 use crate::sky::clouds::CloudLook;
 use crate::sky::sun_direction;
 
-/// Visibility (u) of the densest fog preset.
-const FOG_MIN_VISIBILITY_U: f32 = 40.0;
-/// Peak illuminance of a lightning flash outdoors / through windows (lux).
+/// Visibility (u) at fog density 1 (the Fog preset, 0.85, sees ≈ 40 u: the next corner, not the
+/// far fence).
+const FOG_MIN_VISIBILITY_U: f32 = 25.0;
+/// Fog veils the sun and the sky like a low cloud deck: the overcast amount it brings, per unit
+/// of fog density (outdoors).
+const FOG_OVERCAST: f32 = 0.9;
+/// Dense fog is a pale grey of the scene's brightness: share of that grey in the fog colour per
+/// unit of fog density, and its brightness relative to the clear-weather fog colour.
+const FOG_GREY_MIX: f32 = 0.85;
+const FOG_GREY_GAIN: f32 = 1.15;
+/// Peak illuminance of a lightning flash outdoors / through windows (lux), at most this many times
+/// the illuminance the exposure renders at mid grey: a flash at noon, not a white frame at night.
 const FLASH_LUX_OUTDOOR: f32 = 60_000.0;
 const FLASH_LUX_INDOOR: f32 = 9_000.0;
+const FLASH_MAX_EXPOSED: f32 = 2.5;
 /// *Reduce flashing*: flash scale and smoothing time constant (s).
 const SOFT_FLASH_SCALE: f32 = 0.25;
 const SOFT_FLASH_TAU_S: f32 = 0.6;
@@ -116,6 +126,21 @@ pub fn fog_visibility(base: f32, fog: f32) -> f32 {
     (a + (b - a) * t).exp()
 }
 
+/// The fog colour at density `fog`: the clear-weather colour (sky haze, often blue) turns into a
+/// pale, slightly cool grey of its own brightness, so dense fog reads as fog rather than haze.
+pub fn fog_tone(clear: Color, fog: f32) -> Color {
+    let lin = clear.to_linear();
+    let luma = (0.2126 * lin.red + 0.7152 * lin.green + 0.0722 * lin.blue) * FOG_GREY_GAIN;
+    let grey = Color::linear_rgb(luma * 0.97, luma, luma * 1.04);
+    clear.mix(&grey, fog.clamp(0.0, 1.0) * FOG_GREY_MIX)
+}
+
+/// The illuminance (lux) that exposure `ev100` renders as mid grey on a mid-grey surface (Bevy:
+/// pixel = luminance × 2^-EV / 1.2; a Lambertian albedo ρ under E lux has luminance ρE/π).
+pub fn exposed_lux(ev100: f32) -> f32 {
+    1.2 * std::f32::consts::PI * ev100.exp2()
+}
+
 /// Lightning as shown: as is, or with *Reduce flashing* a weak, smoothed glow (`prev` = last
 /// frame's value).
 pub fn filtered_flash(raw: f32, prev: f32, reduce: bool, dt: f32) -> f32 {
@@ -131,7 +156,9 @@ pub fn filtered_flash(raw: f32, prev: f32, reduce: bool, dt: f32) -> f32 {
 pub(crate) fn look(env: &EnvironmentDef, time: TimeOfDay, w: &WeatherState, flash: f32) -> Look {
     let base: &TimeLook = env.look(time);
     let indoor = env.indoor;
-    let cloud = w.cloudiness.clamp(0.0, 1.0);
+    let fog = if indoor { 0.0 } else { w.fog.clamp(0.0, 1.0) };
+    // Fog is a cloud on the ground: it dims and softens the sun and greys the sky too.
+    let cloud = w.cloudiness.clamp(0.0, 1.0).max(fog * FOG_OVERCAST);
     let s = overcast(cloud);
     let sun = sun_through_clouds(cloud);
     let snowy = if w.snowing {
@@ -142,11 +169,14 @@ pub(crate) fn look(env: &EnvironmentDef, time: TimeOfDay, w: &WeatherState, flas
 
     let key = LightLook::from_def(&base.sun, sun);
     let fill = base.fill.as_ref().map(|f| LightLook::from_def(f, 1.0));
+    // Clouds: brighter exposure for the darker scene, less sky IBL, grey flat ambient instead.
+    let exposure = base.exposure - 1.6 * s;
     let flash_lux = if indoor {
         FLASH_LUX_INDOOR
     } else {
         FLASH_LUX_OUTDOOR
-    };
+    }
+    .min(FLASH_MAX_EXPOSED * exposed_lux(exposure));
     let flash_light = LightLook {
         toward: if indoor {
             sun_direction(base.sun.elevation.max(20.0), base.sun.azimuth)
@@ -158,16 +188,17 @@ pub(crate) fn look(env: &EnvironmentDef, time: TimeOfDay, w: &WeatherState, flas
         shadows: false,
     };
 
-    // Clouds: brighter exposure for the darker scene, less sky IBL, grey flat ambient instead.
-    let exposure = base.exposure - 1.6 * s;
     let env_light = base.env_light * (1.0 - 0.35 * s);
     let cloud_ambient = if indoor { 0.0 } else { s * base.sun.lux * 0.02 };
     let fog_base = srgb(base.fog_color);
-    let fog_grey = fog_base.mix(&Color::srgb(0.62, 0.64, 0.67).mix(&fog_base, 0.3), s * 0.8);
+    let fog_grey = fog_tone(
+        fog_base.mix(&Color::srgb(0.62, 0.64, 0.67).mix(&fog_base, 0.3), s * 0.8),
+        fog,
+    );
     let fog_visibility = if indoor {
         base.fog_visibility
     } else {
-        fog_visibility(base.fog_visibility, w.fog)
+        fog_visibility(base.fog_visibility, fog)
     };
 
     let g = &base.grading;
@@ -323,11 +354,72 @@ mod tests {
     #[test]
     fn fog_shortens_visibility_from_clear_to_the_fog_preset() {
         assert!((fog_visibility(2000.0, 0.0) - 2000.0).abs() < 1e-2);
-        let fog = fog_visibility(2000.0, 0.85);
-        assert!((45.0..100.0).contains(&fog), "{fog}");
+        let fog = fog_visibility(2400.0, 0.85);
+        assert!((32.0..50.0).contains(&fog), "dense but drivable: {fog}");
         let rain = fog_visibility(2000.0, 0.15);
         assert!(rain > 500.0 && rain < 2000.0, "{rain}");
         assert!((fog_visibility(2000.0, 1.0) - FOG_MIN_VISIBILITY_U).abs() < 1e-2);
+    }
+
+    /// The Fog preset outdoors: short visibility, a dimmed and softened sun, a greyer, paler fog
+    /// colour than the clear sky haze; indoors only the window light would change.
+    #[test]
+    fn fog_reads_as_fog() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let env = EnvironmentDef::load(&assets, "garden").expect("garden loads");
+        let clear = WeatherState {
+            cloudiness: 0.1,
+            ..default()
+        };
+        let foggy = WeatherState {
+            cloudiness: 0.5,
+            fog: 0.85,
+            ..default()
+        };
+        let a = look(&env, TimeOfDay::Noon, &clear, 0.0);
+        let b = look(&env, TimeOfDay::Noon, &foggy, 0.0);
+        assert!(b.fog_visibility < 50.0, "{}", b.fog_visibility);
+        assert!(b.key.lux < 0.35 * a.key.lux, "the sun is veiled");
+        let saturation = |c: Color| {
+            let l = c.to_linear();
+            let (hi, lo) = (
+                l.red.max(l.green).max(l.blue),
+                l.red.min(l.green).min(l.blue),
+            );
+            (hi - lo) / hi.max(1e-6)
+        };
+        assert!(saturation(b.fog_color) < 0.5 * saturation(a.fog_color));
+        assert!(b.clouds.coverage > 0.7, "a grey sky: {}", b.clouds.coverage);
+    }
+
+    /// A strike lights a noon storm as before (60 klx); at sunset and at night it lights the scene
+    /// a few times as brightly as the exposure's mid grey instead of whiting the frame out (QA).
+    #[test]
+    fn lightning_flashes_without_whiting_out_the_night() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let storm = WeatherState {
+            cloudiness: 1.0,
+            ..default()
+        };
+        let street = EnvironmentDef::load(&assets, "street").expect("street loads");
+        assert_eq!(
+            look(&street, TimeOfDay::Noon, &storm, 1.0).flash.lux,
+            FLASH_LUX_OUTDOOR
+        );
+        let toys = EnvironmentDef::load(&assets, "toy_store").expect("toy store loads");
+        for (env, time) in [
+            (&street, TimeOfDay::Sunset),
+            (&street, TimeOfDay::Night),
+            (&toys, TimeOfDay::Night),
+        ] {
+            let l = look(env, time, &storm, 1.0);
+            let ratio = l.flash.lux / exposed_lux(l.exposure);
+            assert!(
+                (1.0..=FLASH_MAX_EXPOSED + 1e-3).contains(&ratio),
+                "{time:?}: {ratio}"
+            );
+        }
+        assert_eq!(look(&street, TimeOfDay::Night, &storm, 0.0).flash.lux, 0.0);
     }
 
     #[test]

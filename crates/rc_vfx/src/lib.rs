@@ -29,6 +29,7 @@ mod particles;
 mod pool;
 mod projectiles;
 mod skids;
+mod splashes;
 mod tags;
 mod warmup;
 mod weather;
@@ -67,6 +68,7 @@ impl Plugin for VfxPlugin {
         hazards::build(app);
         blasts::build(app);
         weather::build(app);
+        splashes::build(app);
         lightning::build(app);
         tags::build(app);
         warmup::build(app);

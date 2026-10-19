@@ -47,6 +47,9 @@ start paused). Default bus volumes are rc_core's (`AudioSettings::default`).
 | race cue + its `_final` | session (`Loading`) | ≈ 90 MB |
 | ambience loops (+ thunder) | session, for the track's environment and its possible weathers | 8–45 MB |
 
+The number of loaded sources (`Assets<AudioSource>`) is published as the Bevy diagnostic
+`assets/audio_sources`; rc_game's soak census checks it returns to its baseline in the menu.
+
 `OnEnter(Loading)` builds the session from `RaceConfig` + `Catalog` (cue, environment, indoor,
 time of day; weathers = the fixed preset, else the track's allowed presets). The `"audio"` key
 completes when the race loop and the ambience loops are loaded; the final-lap variant and thunder
@@ -86,6 +89,11 @@ quieter than −50 dB after attenuation are skipped; world sounds rotate through
 1.0/0.96/1.04/0.98/1.02 and through their variants (round-robin); centred HUD/musical cues stay
 in tune. A pending queue plays delayed ones (roulette ticks, shield pop). Stopped instances are
 pruned from `Assets<AudioInstance>` every 2 s.
+
+**Cue log** (`shots::CueLog`, QA Q19): every started one-shot (Sfx, Ui), stinger (Music) and
+thunder (Ambience) logs `audio cue <stem>: <bus> bus, <dB> dB` at debug level, at most one line per
+cue per second; a line that stands for several starts says `(×N since the last line)`. Shows from
+a log which cues a run triggered: `RUST_LOG=rc_audio=debug`.
 
 | Message | Cue |
 |---|---|
@@ -144,7 +152,7 @@ else `thunder_3`; delay 2.6 s → 0.2 s and −6 → 0 dB with intensity; throug
 indoors.
 
 ## Tests
-`cargo test -p rc_audio` — unit (21): bus composition (master × bus, mute, pause duck, clamping),
+`cargo test -p rc_audio` — unit (22): cue log rate limit, bus composition (master × bus, mute, pause duck, clamping),
 attenuation/pan maths (rolloff, fade, monotonic, nearest listener, split-screen centring), engine
 rate/level/pitch mapping, car layer mix (slip, surface, airborne, rumble, drift rate, boost), music
 state machine (menu, loading, race phases, final lap, finished, stinger hold), ambience selection

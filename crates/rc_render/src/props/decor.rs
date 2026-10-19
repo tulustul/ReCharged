@@ -113,7 +113,7 @@ pub(super) fn spawn_decor(
             warn!("decor: {model} does not exist; skipped");
             continue;
         }
-        let scene = server.load(GltfAssetLabel::Scene(0).from_asset(model.clone()));
+        let scene = crate::content::load_scene(&server, &model);
         load.scenes.push((scene.clone(), model, false));
         commands.spawn((
             Name::new("decor"),

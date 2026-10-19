@@ -47,6 +47,12 @@ impl Material for CloudMaterial {
         AlphaMode::Premultiplied
     }
 
+    /// Drawn before every other transparent: sorted by its centre (the world origin) it would
+    /// come after farther ones (sky lightning, windows against the sky) and cover them.
+    fn depth_bias(&self) -> f32 {
+        -1.0e6
+    }
+
     fn enable_prepass() -> bool {
         false
     }

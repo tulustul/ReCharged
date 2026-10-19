@@ -9,6 +9,7 @@ mod camera;
 mod env;
 pub(crate) mod glass;
 mod headlights;
+mod menu_warmup;
 mod room;
 mod volumetric;
 mod warmup;
@@ -34,6 +35,9 @@ pub const SHOWROOM_ENV: &str = "showroom";
 pub const FALLBACK_ENV: &str = "test";
 /// First shadow cascade's far bound (u): the car and its surroundings get the sharpest texels.
 const FIRST_CASCADE_U: f32 = 9.0;
+/// Shadow distance under the Loading warm-up camera, × its height: the far corners of the track
+/// are farther than the ground straight below.
+const WARMUP_SHADOW_REACH: f32 = 2.0;
 
 /// The environment being rendered: the menu showroom or the session's track environment.
 /// Inserted in `OnEnter(Menu)` / `OnEnter(Loading)`, removed when they end.
@@ -67,6 +71,11 @@ pub(crate) fn build(app: &mut App) {
         .add_systems(OnEnter(AppState::Loading), enter_session)
         .add_systems(OnExit(AppState::Menu), clear_environment)
         .add_systems(OnEnter(AppState::Unloading), clear_environment)
+        // A session left during Loading (quit, load error) drops its pending warm-up too.
+        .add_systems(OnExit(AppState::Loading), |mut commands: Commands| {
+            commands.remove_resource::<VisualsPending>();
+            commands.remove_resource::<warmup::Warmup>();
+        })
         .add_systems(
             Update,
             (
@@ -84,6 +93,7 @@ pub(crate) fn build(app: &mut App) {
     headlights::build(app);
     volumetric::build(app);
     warmup::build(app);
+    menu_warmup::build(app);
 }
 
 fn enter_menu(mut commands: Commands, paths: Option<Res<UserPaths>>, spawner: EnvSpawner) {
@@ -170,13 +180,16 @@ fn clear_environment(mut commands: Commands) {
 
 /// `"visuals"` is done when every texture of the library is on the CPU and the pipeline warm-up
 /// is over.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn report_ready(
     mut commands: Commands,
     server: Res<AssetServer>,
     time: Res<Time<Real>>,
-    library: Option<Res<MaterialLibrary>>,
-    track: Option<Res<rc_track::Track>>,
+    (library, track, tasks): (
+        Option<Res<MaterialLibrary>>,
+        Option<Res<rc_track::Track>>,
+        Option<Res<LoadingTasks>>,
+    ),
     queue: Res<warmup::PipelineQueue>,
     mut progress: Option<ResMut<warmup::Warmup>>,
     warmup_cameras: Query<(Has<EnvironmentMapLight>, Option<&Children>), With<WarmupCamera>>,
@@ -186,12 +199,15 @@ fn report_ready(
     if library.is_some_and(|l| l.textures_pending(&server) > 0) {
         return;
     }
+    // The scene is complete once every other loader is done (props, cars) and the warm-up cars
+    // are instanced; until then the camera already compiles what has arrived.
+    let others_done = tasks.is_some_and(|t| t.pending().all(|k| k == crate::LOADING_KEY));
     if !warmup::finished(
         progress.as_deref_mut(),
         &queue,
         time.delta_secs(),
         track.is_some(),
-        warmup::scene_ready(&warmup_cameras, &cars),
+        others_done && warmup::scene_ready(&warmup_cameras, &cars),
     ) {
         return;
     }
@@ -338,6 +354,7 @@ fn apply_shadows(
     keys: Query<(Entity, &EnvLight)>,
     added: Query<(), Added<EnvLight>>,
     map: Option<ResMut<DirectionalLightShadowMap>>,
+    warmup: Query<&Transform, With<WarmupCamera>>,
     mut last: Local<Option<(crate::quality::ShadowTier, f32)>>,
 ) {
     let Some(env) = env else {
@@ -349,7 +366,10 @@ fn apply_shadows(
         &graphics,
         crate::quality::views(game.iter().count(), players),
     );
-    let distance = env.def.shadow_distance * tier.distance_scale;
+    let distance = cascade_distance(
+        env.def.shadow_distance * tier.distance_scale,
+        warmup.iter().map(|t| t.translation.y).reduce(f32::max),
+    );
     if *last == Some((tier, distance)) && added.is_empty() {
         return;
     }
@@ -373,6 +393,13 @@ fn apply_shadows(
             commands.entity(entity).insert(config.clone());
         }
     }
+}
+
+/// The key light's shadow distance (u). While the Loading warm-up camera looks down from
+/// `warmup_height`, the cascades reach past the ground under it, so every prop's shadow pipeline
+/// compiles under the loading screen instead of when the race camera first sees it.
+fn cascade_distance(distance: f32, warmup_height: Option<f32>) -> f32 {
+    warmup_height.map_or(distance, |h| distance.max(h * WARMUP_SHADOW_REACH))
 }
 
 fn drive_clouds(

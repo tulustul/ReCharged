@@ -691,6 +691,13 @@ test (120 paused frames: no change), determinism test.
 | Load time | ≤ 3 s Loading → Intro; restart ≤ 0.5 s |
 Split-screen tiers: fewer shadow cascades, no SSAO and no volumetric fog at 3–4 players.
 
+The load budget holds for races started from the menu: once per run, about 12 s after the splash,
+rc_render's menu warm-up compiles the track-independent pipelines (cars, effects, surfaces, common
+prop materials) for every view count, indoors and outdoors, so Loading compiles only what its track
+adds (0.2–0.8 s measured). A race started before that finishes compiles the rest under its loading
+screen. Automated runs compile synchronously and skip the menu warm-up, so a cold `--quick-race` takes
+3.7–4.8 s in release; repeat loads in the same run take 0.2–0.4 s.
+
 ---
 
 ## 10. Risks & mitigations

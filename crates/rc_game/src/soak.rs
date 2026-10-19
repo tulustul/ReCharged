@@ -1,15 +1,23 @@
 //! `--soak <minutes>` (ARCHITECTURE §8): chains random races through every exit path (restart,
 //! rematch, next race, next track, pause, quit during Loading / Setup / the race, load errors)
 //! and, at every settled return to the menu, compares a census of the world — the set of resource
-//! types and the number of entities — with the one taken at the first return after a session that
-//! reached the race (by then lazily built caches exist). A difference fails the run (exit code 1)
-//! and names what was left behind (resources, and entities per component signature); otherwise it
-//! exits with success after the given minutes of wall time.
+//! types, the number of entities and the number of meshes, images, standard materials and audio
+//! sources — with the one taken at the first return after a session that reached the race (by
+//! then lazily built caches exist). A difference fails the run (exit code 1) and names what was
+//! left behind (resources, asset types, and entities per component signature); otherwise it exits
+//! with success after the given minutes of wall time.
+//!
+//! Asset types this crate cannot name (rc_audio's kira `AudioSource`) are counted through Bevy
+//! diagnostics: every diagnostic under [`ASSET_COUNT_PREFIX`] is part of the census. Font atlas
+//! textures are not: Bevy's glyph cache keeps one set per font size ever drawn (bounded by the
+//! UI's sizes), so it only grows as new screens and split-screen HUD scales appear.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use bevy::diagnostic::DiagnosticsStore;
 use bevy::ecs::resource::IsResource;
 use bevy::prelude::*;
+use bevy::text::FontAtlasSet;
 use rc_core::prelude::*;
 
 use crate::series::{CupRun, VersusSession};
@@ -21,6 +29,9 @@ const SETTLE_SECS: f32 = 2.0;
 const ACT_SECS: (f32, f32) = (0.5, 5.0);
 /// Actions per session; the next one quits to the menu (keeps menu checks frequent).
 const MAX_ACTIONS: u32 = 4;
+/// Diagnostics whose path starts with this hold an asset count for the census (e.g. rc_audio's
+/// `assets/audio_sources`).
+const ASSET_COUNT_PREFIX: &str = "assets/";
 
 /// What a settled menu contains. UI nodes, text spans, React elements and gamepads come and go
 /// legitimately (the screen React shows, plugged pads) and are not counted; neither are Bevy's state bookkeeping
@@ -35,6 +46,10 @@ struct Census {
     entities: BTreeMap<String, usize>,
     /// Resource type names.
     resources: BTreeSet<String>,
+    /// Number of assets per asset type (`Mesh`, `Image`, `StandardMaterial`, diagnostics).
+    assets: BTreeMap<String, usize>,
+    /// Images per size and format (diagnostics only: names what an image leak keeps).
+    images: BTreeMap<String, usize>,
 }
 
 type Counted = (
@@ -78,12 +93,14 @@ impl Census {
             total,
             entities,
             resources,
+            assets: asset_counts(world),
+            images: image_kinds(world),
         }
     }
 
     /// Nothing was left behind or lost.
     fn matches(&self, base: &Self) -> bool {
-        self.total == base.total && self.resources == base.resources
+        self.total == base.total && self.resources == base.resources && self.assets == base.assets
     }
 
     /// What differs from `base`, one line per difference.
@@ -97,6 +114,20 @@ impl Census {
                     false => format!("missing resource {r}"),
                 }),
         );
+        let kinds: BTreeSet<&String> = self.assets.keys().chain(base.assets.keys()).collect();
+        for kind in kinds {
+            let count = |c: &Self| c.assets.get(kind).copied().unwrap_or(0);
+            if count(self) != count(base) {
+                lines.push(format!("{} → {} {kind}", count(base), count(self)));
+            }
+        }
+        let images: BTreeSet<&String> = self.images.keys().chain(base.images.keys()).collect();
+        for kind in images {
+            let count = |c: &Self| c.images.get(kind).copied().unwrap_or(0);
+            if count(self) != count(base) {
+                lines.push(format!("  {} → {} images {kind}", count(base), count(self)));
+            }
+        }
         let signatures: BTreeSet<&String> =
             self.entities.keys().chain(base.entities.keys()).collect();
         for signature in signatures {
@@ -108,6 +139,69 @@ impl Census {
         }
         lines
     }
+}
+
+/// Asset counts of the census: meshes, images and standard materials, plus every diagnostic
+/// under [`ASSET_COUNT_PREFIX`].
+fn asset_counts(world: &World) -> BTreeMap<String, usize> {
+    fn count<A: Asset>(world: &World) -> Option<(String, usize)> {
+        let name = std::any::type_name::<A>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("?");
+        world
+            .get_resource::<Assets<A>>()
+            .map(|assets| (name.to_owned(), assets.len()))
+    }
+    let mut counts: BTreeMap<String, usize> = [
+        count::<Mesh>(world),
+        count::<Image>(world),
+        count::<StandardMaterial>(world),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if let Some(images) = counts.get_mut("Image") {
+        *images -= font_atlases(world).len().min(*images);
+    }
+    if let Some(store) = world.get_resource::<DiagnosticsStore>() {
+        for diagnostic in store.iter() {
+            let path = diagnostic.path().as_str();
+            if let (Some(kind), Some(value)) =
+                (path.strip_prefix(ASSET_COUNT_PREFIX), diagnostic.value())
+            {
+                counts.insert(kind.to_owned(), value as usize);
+            }
+        }
+    }
+    counts
+}
+
+/// Textures of Bevy's glyph cache (left out of the census, see the module doc).
+fn font_atlases(world: &World) -> BTreeSet<AssetId<Image>> {
+    let atlases = world.get_resource::<FontAtlasSet>().into_iter();
+    atlases
+        .flat_map(|set| set.values().flatten().map(|atlas| atlas.texture.id()))
+        .collect()
+}
+
+/// Images by `<width>x<height>x<layers> <format>` (font atlases left out).
+fn image_kinds(world: &World) -> BTreeMap<String, usize> {
+    let fonts = font_atlases(world);
+    let mut kinds = BTreeMap::new();
+    let images = world.get_resource::<Assets<Image>>().into_iter();
+    for (_, image) in images
+        .flat_map(|a| a.iter())
+        .filter(|(id, _)| !fonts.contains(id))
+    {
+        let size = image.texture_descriptor.size;
+        let kind = format!(
+            "{}x{}x{} {:?}",
+            size.width, size.height, size.depth_or_array_layers, image.texture_descriptor.format
+        );
+        *kinds.entry(kind).or_default() += 1;
+    }
+    kinds
 }
 
 #[derive(Resource, Debug)]
@@ -263,9 +357,10 @@ fn check_menu(world: &mut World, soak: &mut Soak) -> bool {
     let census = Census::take(world);
     let Some(base) = &soak.baseline else {
         info!(
-            "soak baseline: {} entities, {} resources",
+            "soak baseline: {} entities, {} resources, assets {:?}",
             census.entities.values().sum::<usize>(),
-            census.resources.len()
+            census.resources.len(),
+            census.assets
         );
         soak.baseline = Some(census);
         return true;
@@ -387,5 +482,44 @@ mod tests {
                 "0 → 1 entities [Window + Hovered]",
             ]
         );
+    }
+
+    #[test]
+    fn the_census_counts_assets_including_diagnostic_counts() {
+        use bevy::diagnostic::{Diagnostic, DiagnosticMeasurement, DiagnosticPath};
+        let mut world = World::new();
+        world.init_resource::<Assets<Mesh>>();
+        let path = DiagnosticPath::const_new("assets/audio_sources");
+        let mut store = DiagnosticsStore::default();
+        store.add(Diagnostic::new(path.clone()));
+        world.insert_resource(store);
+        let set_sources = |world: &mut World, value: f64| {
+            let mut store = world.resource_mut::<DiagnosticsStore>();
+            let diagnostic = store.get_mut(&path).expect("registered");
+            diagnostic.add_measurement(DiagnosticMeasurement {
+                time: bevy::platform::time::Instant::now(),
+                value,
+            });
+        };
+        set_sources(&mut world, 63.0);
+        let base = Census::take(&mut world);
+        assert_eq!(base.assets.get("Mesh"), Some(&0));
+        assert_eq!(base.assets.get("audio_sources"), Some(&63));
+        let mesh = world
+            .resource_mut::<Assets<Mesh>>()
+            .add(Mesh::from(Cuboid::default()));
+        set_sources(&mut world, 64.0);
+        let now = Census::take(&mut world);
+        assert!(
+            !now.matches(&base),
+            "a kept mesh and audio source are leaks"
+        );
+        assert_eq!(
+            now.diff(&base)[1..],
+            ["0 → 1 Mesh", "63 → 64 audio_sources"]
+        );
+        world.resource_mut::<Assets<Mesh>>().remove(&mesh);
+        set_sources(&mut world, 63.0);
+        assert!(Census::take(&mut world).matches(&base));
     }
 }

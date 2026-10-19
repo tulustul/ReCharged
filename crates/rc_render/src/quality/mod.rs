@@ -17,7 +17,7 @@ use bevy::pbr::ScreenSpaceAmbientOcclusionQualityLevel as SsaoLevel;
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
-pub(crate) use camera::{QualityCamera, loading_players, views};
+pub(crate) use camera::{QualityCamera, ViewsOverride, loading_players, views};
 
 pub(crate) fn build(app: &mut App) {
     camera::build(app);

@@ -15,6 +15,7 @@ use crate::Step;
 use crate::bank::{Bank, Session, music_path};
 use crate::buses::MusicBus;
 use crate::output::audio_on;
+use crate::shots::CueLog;
 
 /// Loops fade out over this when they stop, s.
 const FADE_OUT_S: f32 = 1.0;
@@ -125,7 +126,7 @@ fn results_jingle(
     time: Res<Time<Real>>,
     music: Res<AudioChannel<MusicBus>>,
     mut instances: ResMut<Assets<AudioInstance>>,
-    mut director: ResMut<Director>,
+    (mut director, mut log): (ResMut<Director>, ResMut<CueLog>),
 ) {
     stinger(
         MusicCue::ResultsJingle,
@@ -134,7 +135,7 @@ fn results_jingle(
         &time,
         &music,
         &mut instances,
-        &mut director,
+        (&mut director, &mut log),
     );
 }
 
@@ -145,7 +146,7 @@ fn play_stingers(
     time: Res<Time<Real>>,
     music: Res<AudioChannel<MusicBus>>,
     mut instances: ResMut<Assets<AudioInstance>>,
-    mut director: ResMut<Director>,
+    (mut director, mut log): (ResMut<Director>, ResMut<CueLog>),
 ) {
     if let Some(&MusicStinger(cue)) = requests.read().last() {
         stinger(
@@ -155,7 +156,7 @@ fn play_stingers(
             &time,
             &music,
             &mut instances,
-            &mut director,
+            (&mut director, &mut log),
         );
     }
 }
@@ -168,7 +169,7 @@ fn stinger(
     time: &Time<Real>,
     music: &AudioChannel<MusicBus>,
     instances: &mut Assets<AudioInstance>,
-    director: &mut Director,
+    (director, log): (&mut Director, &mut CueLog),
 ) {
     let Some(handle) = bank.stinger(cue) else {
         warn_once!("music stinger {cue:?} is not a resident stinger");
@@ -180,6 +181,7 @@ fn stinger(
         .get(&handle)
         .map_or(STINGER_FALLBACK_S, |s| s.sound.duration().as_secs_f64());
     director.stinger_until = time.elapsed_secs_f64() + length;
+    log.started(cue.stem(), "Music", 0.0, time.elapsed_secs_f64());
     music.play(handle);
 }
 

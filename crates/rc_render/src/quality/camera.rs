@@ -40,6 +40,11 @@ pub(crate) struct QualityCamera;
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 struct Applied(ViewQuality);
 
+/// Renders a `QualityCamera` as one of this many player views, whatever is on screen: the menu
+/// warm-up compiles the split-screen variants with it.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ViewsOverride(pub usize);
+
 pub(super) fn build(app: &mut App) {
     app.add_observer(mark::<GameCamera>)
         .add_observer(mark::<MenuCamera>)
@@ -82,18 +87,20 @@ pub(crate) fn loading_players(
     loading.then(|| config.map_or(1, humans))
 }
 
+#[allow(clippy::type_complexity)]
 fn apply_quality(
     mut commands: Commands,
     settings: Option<Res<Settings>>,
     state: Option<Res<State<AppState>>>,
     config: Option<Res<RaceConfig>>,
-    cameras: Query<(Entity, Option<&Applied>), With<QualityCamera>>,
+    cameras: Query<(Entity, Option<&Applied>, Option<&ViewsOverride>), With<QualityCamera>>,
     game: Query<(), With<GameCamera>>,
 ) {
     let graphics = settings.map(|s| s.graphics.clone()).unwrap_or_default();
     let players = loading_players(state.as_deref(), config.as_deref());
-    let quality = view_quality(&graphics, views(game.iter().count(), players));
-    for (entity, applied) in &cameras {
+    let on_screen = views(game.iter().count(), players);
+    for (entity, applied, forced) in &cameras {
+        let quality = view_quality(&graphics, forced.map_or(on_screen, |f| f.0));
         let old = applied.map(|a| a.0);
         if old == Some(quality) {
             continue;

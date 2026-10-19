@@ -15,13 +15,24 @@ use bevy::mesh::MeshTag;
 use crate::assets::VfxAssets;
 use crate::blasts::bolt_path;
 use crate::cars::FxVisual;
-use crate::fx::{Fx, sprite};
+use crate::fx::{Fx, FxRng, sprite};
 use crate::particles::{Facing, Look, Shape, pack_tag};
 use crate::weather::player_layer;
 
 /// Sky bolts strike this far from the camera (u) and last this long (s).
 const BOLT_DISTANCE_U: (f32, f32) = (150.0, 230.0);
 const BOLT_LIFE_S: f32 = 0.5;
+/// A bolt's top sits this far (radians) below the top edge of its camera's view, so the upper
+/// part — above the houses, fences and trees that hide the lower part — and the crawlers along the
+/// cloud base are in the picture; its height stays within this range (u).
+const TOP_BELOW_VIEW_EDGE: f32 = 0.06;
+const BOLT_HEIGHT_U: (f32, f32) = (45.0, 160.0);
+/// Width of the main channel, of its downward branches and of the cloud crawlers (u).
+const MAIN_WIDTH_U: f32 = 1.8;
+const BRANCH_WIDTH_U: f32 = 0.8;
+const CRAWLER_WIDTH_U: f32 = 0.9;
+/// Horizontal reach of the crawlers that fork along the cloud base from the top of the bolt (u).
+const CRAWLER_REACH_U: f32 = 55.0;
 /// *Reduce flashing*: the soft glow swells and fades over this long (s).
 const GLOW_LIFE_S: f32 = 1.0;
 
@@ -58,6 +69,37 @@ pub fn strike_brightness(t: f32) -> f32 {
         .map(|(start, amp)| amp * (-(t - start) * 16.0).exp())
         .sum::<f32>()
         .min(1.0)
+}
+
+/// Height (u) of a bolt whose ground point lies `distance` u from the camera and 6 u below its
+/// eye, for a camera pitched `pitch` (radians, + up) with vertical field of view `fov`: the top
+/// just under the view's upper edge.
+pub(crate) fn bolt_height(distance: f32, pitch: f32, fov: f32) -> f32 {
+    let top = (pitch + fov * 0.5 - TOP_BELOW_VIEW_EDGE).clamp(0.15, 1.0);
+    (6.0 + distance * top.tan()).clamp(BOLT_HEIGHT_U.0, BOLT_HEIGHT_U.1)
+}
+
+/// The paths of a sky bolt `height` u from the cloud base down to `ground` (`(points, width)`):
+/// the main channel, three branches forking downward from its upper half, and two crawlers forking
+/// almost horizontally along the cloud base from its top, where buildings and trees do not hide
+/// them.
+pub(crate) fn sky_bolt_paths(ground: Vec3, height: f32, rng: &mut FxRng) -> Vec<(Vec<Vec3>, f32)> {
+    let top = ground + Vec3::new(rng.signed(12.0), height, rng.signed(12.0));
+    let main = bolt_path(top, ground, 6, 0.2, rng);
+    let mut paths = vec![(main.clone(), MAIN_WIDTH_U)];
+    for _ in 0..3 {
+        let i = 6 + (rng.unit() * (main.len() / 2) as f32) as usize;
+        let from = main[i.min(main.len() - 2)];
+        let to = from + Vec3::new(rng.signed(25.0), -rng.range(12.0, 28.0), rng.signed(25.0));
+        paths.push((bolt_path(from, to, 4, 0.25, rng), BRANCH_WIDTH_U));
+    }
+    for _ in 0..2 {
+        let from = main[1 + (rng.unit() * 3.0) as usize];
+        let heading = Vec3::new(rng.signed(1.0), 0.0, rng.signed(1.0)).normalize_or(Vec3::X);
+        let to = from + heading * rng.range(0.5, 1.0) * CRAWLER_REACH_U + Vec3::Y * rng.signed(6.0);
+        paths.push((bolt_path(from, to, 5, 0.25, rng), CRAWLER_WIDTH_U));
+    }
+    paths
 }
 
 /// A camera-facing ribbon mesh along bolt `paths` (`(points, width)`), seen from `eye`.
@@ -105,7 +147,7 @@ fn sky_lightning(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Res<VfxAssets>,
-    cameras: Query<(&GameCamera, &GlobalTransform)>,
+    cameras: Query<(&GameCamera, &GlobalTransform, &Projection)>,
 ) {
     for ev in events.read() {
         let WeatherEvent::Lightning { intensity } = *ev else {
@@ -114,18 +156,18 @@ fn sky_lightning(
         if weather.as_deref().is_none_or(|w| w.outside_only) {
             continue;
         }
-        for (cam, at) in &cameras {
+        for (cam, at, projection) in &cameras {
             let eye = at.translation();
-            let fwd = (at.forward().as_vec3() * Vec3::new(1.0, 0.0, 1.0)).normalize_or(Vec3::NEG_Z);
+            let look = at.forward().as_vec3();
+            let fwd = (look * Vec3::new(1.0, 0.0, 1.0)).normalize_or(Vec3::NEG_Z);
             let dir = Quat::from_rotation_y(fx.rng.signed(0.6)) * fwd;
-            let ground =
-                eye + dir * fx.rng.range(BOLT_DISTANCE_U.0, BOLT_DISTANCE_U.1) - Vec3::Y * 6.0;
-            let top = ground
-                + Vec3::new(
-                    fx.rng.signed(12.0),
-                    fx.rng.range(70.0, 90.0),
-                    fx.rng.signed(12.0),
-                );
+            let distance = fx.rng.range(BOLT_DISTANCE_U.0, BOLT_DISTANCE_U.1);
+            let ground = eye + dir * distance - Vec3::Y * 6.0;
+            let fov = match projection {
+                Projection::Perspective(p) => p.fov,
+                _ => std::f32::consts::FRAC_PI_4,
+            };
+            let height = bolt_height(distance, look.y.clamp(-1.0, 1.0).asin(), fov);
             let layer = RenderLayers::layer(player_layer(cam.slot));
             if fx.calm {
                 // A soft glow low over the horizon (where the view sees it) instead of a bolt.
@@ -148,25 +190,11 @@ fn sky_lightning(
                 ));
                 continue;
             }
-            let (mesh, peak) = {
-                let main = bolt_path(top, ground, 6, 0.2, &mut fx.rng);
-                let mut paths = vec![(main.clone(), 1.1)];
-                for _ in 0..3 {
-                    let i = 6 + (fx.rng.unit() * (main.len() / 2) as f32) as usize;
-                    let from = main[i.min(main.len() - 2)];
-                    let to = from
-                        + Vec3::new(
-                            fx.rng.signed(25.0),
-                            -fx.rng.range(12.0, 28.0),
-                            fx.rng.signed(25.0),
-                        );
-                    paths.push((bolt_path(from, to, 4, 0.25, &mut fx.rng), 0.5));
-                }
-                (
-                    bolt_mesh(&paths, eye),
-                    LinearRgba::rgb(9.0, 10.0, 16.0) * intensity.max(0.4),
-                )
-            };
+            let paths = sky_bolt_paths(ground, height, &mut fx.rng);
+            let (mesh, peak) = (
+                bolt_mesh(&paths, eye),
+                LinearRgba::rgb(9.0, 10.0, 16.0) * intensity.max(0.4),
+            );
             let material = materials.add(bolt_material(peak));
             commands.spawn((
                 Name::new("Sky lightning"),
@@ -227,6 +255,53 @@ fn fade_glows(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The top sits just under the view's upper edge: a chase camera pitched 10° down with a 59°
+    /// vertical field of view sees up to ≈ 19° above the horizon.
+    #[test]
+    fn sky_bolts_top_out_just_under_the_view_edge() {
+        let (pitch, fov) = ((-10f32).to_radians(), 58.7f32.to_radians());
+        let h = bolt_height(190.0, pitch, fov);
+        let elevation = ((h - 6.0) / 190.0).atan().to_degrees();
+        assert!((14.0..19.3).contains(&elevation), "top at {elevation}°");
+        assert_eq!(
+            bolt_height(190.0, 1.4, fov),
+            BOLT_HEIGHT_U.1,
+            "looking up: capped"
+        );
+        assert_eq!(bolt_height(150.0, -1.4, fov), bolt_height(150.0, -1.0, fov));
+    }
+
+    #[test]
+    fn sky_bolts_strike_the_ground_and_crawl_along_the_cloud_base() {
+        let mut rng = FxRng::new(11);
+        let ground = Vec3::new(10.0, -6.0, -180.0);
+        for _ in 0..20 {
+            let paths = sky_bolt_paths(ground, 70.0, &mut rng);
+            assert_eq!(paths.len(), 6, "main, 3 branches, 2 crawlers");
+            let (main, width) = &paths[0];
+            assert_eq!(*width, MAIN_WIDTH_U);
+            assert_eq!(
+                main.last(),
+                Some(&ground),
+                "the main channel strikes the ground point"
+            );
+            assert!(
+                (main[0].y - ground.y - 70.0).abs() < 1e-4,
+                "its top at the given height"
+            );
+            for (crawler, _) in &paths[4..] {
+                let (a, b) = (crawler[0], *crawler.last().expect("points"));
+                let reach = Vec2::new(b.x - a.x, b.z - a.z).length();
+                assert!(
+                    reach > 0.4 * CRAWLER_REACH_U,
+                    "crawlers go sideways: {reach}"
+                );
+                assert!((b.y - a.y).abs() < 10.0, "…along the cloud base");
+                assert!(a.y - ground.y > 60.0, "…from the top");
+            }
+        }
+    }
 
     #[test]
     fn lightning_strikes_flicker_then_fade() {

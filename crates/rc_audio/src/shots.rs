@@ -2,7 +2,8 @@
 //! round-robin variants, a pitch rotation for world sounds — musical cues stay in tune), the
 //! [`Pending`] queue for delayed ones, impacts / landings / respawns, race events (local
 //! players' HUD cues play centred) and UI cues. Stopped kira instances are pruned periodically
-//! (the plugin never does).
+//! (the plugin never does). Every started one-shot and stinger is logged at debug level
+//! ([`CueLog`]: cue, bus, volume; at most one line per cue per second).
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Duration;
@@ -37,6 +38,8 @@ const LANDING_QUIET_DB: f32 = -14.0;
 const FLIP_DB: f32 = -8.0;
 /// Soft-lock countdown beeps, dB.
 const ENDS_IN_DB: f32 = -6.0;
+/// The cue log writes at most one line per cue per this many seconds (repeats are counted).
+const LOG_EVERY_S: f64 = 1.0;
 
 const SOFT_IMPACTS: [&str; 3] = ["impact_soft_1", "impact_soft_2", "impact_soft_3"];
 const HARD_IMPACTS: [&str; 3] = ["impact_hard_1", "impact_hard_2", "impact_hard_3"];
@@ -84,6 +87,37 @@ pub(crate) struct Limiter {
     pitch: usize,
 }
 
+/// Debug log of started one-shots and stingers, so every cue a run triggered can be shown from
+/// its log (`RUST_LOG=rc_audio=debug`): at most one line per cue per [`LOG_EVERY_S`], counting
+/// the starts it stands for.
+#[derive(Resource, Default)]
+pub(crate) struct CueLog(HashMap<&'static str, (f64, u32)>);
+
+impl CueLog {
+    /// Records a start of `cue` at real-time second `now`; `Some(starts since the last line)`
+    /// when a line is due.
+    fn note(&mut self, cue: &'static str, now: f64) -> Option<u32> {
+        let (last, starts) = self.0.entry(cue).or_insert((f64::NEG_INFINITY, 0));
+        *starts += 1;
+        (now - *last >= LOG_EVERY_S).then(|| {
+            *last = now;
+            std::mem::take(starts)
+        })
+    }
+
+    /// Logs a start of `cue` on `bus` at `db` (rate-limited).
+    pub(crate) fn started(&mut self, cue: &'static str, bus: &str, db: f32, now: f64) {
+        if let Some(starts) = self.note(cue, now) {
+            let repeats = if starts > 1 {
+                format!(" (×{starts} since the last line)")
+            } else {
+                String::new()
+            };
+            debug!("audio cue {cue}: {bus} bus, {db:.1} dB{repeats}");
+        }
+    }
+}
+
 /// Plays SFX and UI one-shots.
 #[derive(SystemParam)]
 pub(crate) struct Shots<'w> {
@@ -93,6 +127,7 @@ pub(crate) struct Shots<'w> {
     ears: Res<'w, Ears>,
     time: Res<'w, Time<Real>>,
     limiter: ResMut<'w, Limiter>,
+    log: ResMut<'w, CueLog>,
 }
 
 impl Shots<'_> {
@@ -127,6 +162,7 @@ impl Shots<'_> {
             return;
         };
         starts.push_back(now);
+        self.log.started(stem, "Sfx", db + place.db, now);
         let mut cmd = self.sfx.play(source);
         cmd.with_volume(Decibels(db + place.db))
             .with_panning(place.pan);
@@ -139,6 +175,8 @@ impl Shots<'_> {
     /// A UI cue (UI bus: never paused, never attenuated).
     pub(crate) fn play_ui(&mut self, stem: &'static str) {
         if let Some(source) = self.bank.sfx(stem) {
+            let now = self.now();
+            self.log.started(stem, "Ui", 0.0, now);
             self.ui.play(source);
         }
     }
@@ -164,6 +202,7 @@ impl Pending {
 
 pub(crate) fn build(app: &mut App) {
     app.init_resource::<Limiter>()
+        .init_resource::<CueLog>()
         .init_resource::<Pending>()
         .add_systems(
             Update,
@@ -297,6 +336,21 @@ mod tests {
         assert_eq!(impact_cue(0.45).unwrap().0, HARD_IMPACTS);
         assert_eq!(landing_db(0.0), None);
         assert_eq!(landing_db(1.0), Some(0.0));
+    }
+
+    #[test]
+    fn the_cue_log_writes_one_line_per_cue_per_second_and_counts_repeats() {
+        let mut log = CueLog::default();
+        assert_eq!(log.note("lap_chime", 10.0), Some(1), "first start");
+        assert_eq!(log.note("lap_chime", 10.2), None);
+        assert_eq!(log.note("impact_soft_1", 10.3), Some(1), "per cue");
+        assert_eq!(log.note("lap_chime", 10.5), None);
+        assert_eq!(
+            log.note("lap_chime", 11.0),
+            Some(3),
+            "the line stands for 3 starts"
+        );
+        assert_eq!(log.note("lap_chime", 12.5), Some(1));
     }
 
     #[test]

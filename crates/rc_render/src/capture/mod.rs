@@ -33,9 +33,12 @@ const TOUR_STEP_U: f32 = 25.0;
 /// Tour eye height above the racing line, and how far ahead it looks (u).
 const TOUR_EYE_U: f32 = 1.6;
 const TOUR_AHEAD_U: f32 = 8.0;
-/// Tour poses keep this far (arc length, u) from item rows: closer, the eye sits inside the
+/// Tour poses keep this far (arc length, u) past item rows: closer, the eye sits inside the
 /// Volt Cubes' translucent volumes and the shot is washed out.
 const TOUR_ITEM_CLEARANCE_U: f32 = 3.0;
+/// …and this far before them, so the cubes are not right in front of the eye either (B1): the
+/// look-ahead distance plus a margin.
+const TOUR_ITEM_AHEAD_U: f32 = TOUR_AHEAD_U + 4.0;
 /// Vertical field of view of tour shots: the game's default 90° horizontal at 16:9.
 const TOUR_FOV_DEG: f32 = 58.7;
 /// Size of every capture (px).
@@ -177,20 +180,27 @@ pub(crate) fn preview_pose(
     pose_at(far)
 }
 
-/// Arc length of the tour shot planned at `s`: moved forward past jump gaps and item rows.
+/// Arc length of the tour shot planned at `s`: moved forward past jump gaps and item rows (a row
+/// just behind the eye or within the look-ahead in front of it).
 fn tour_s(track: &Track, s: f32) -> f32 {
     let len = track.length();
     let near_items = |s: f32| {
-        track.item_rows().iter().any(|row| {
-            let d = (s - row.s).rem_euclid(len);
-            d.min(len - d) < TOUR_ITEM_CLEARANCE_U
-        })
+        track
+            .item_rows()
+            .iter()
+            .any(|row| !clear_of_row((s - row.s).rem_euclid(len), len))
     };
     let mut s = s;
     while (track.frame_at(s).in_gap || near_items(s)) && s < len * 2.0 {
         s += 1.0;
     }
     s
+}
+
+/// A tour eye `behind` u past an item row (arc length, wrapped into 0..`len`) neither stands in
+/// it nor has it within its look-ahead.
+fn clear_of_row(behind: f32, len: f32) -> bool {
+    behind >= TOUR_ITEM_CLEARANCE_U && len - behind >= TOUR_ITEM_AHEAD_U
 }
 
 /// Tour camera at arc length `s` (see [`tour_s`]): above the racing line, looking along it.
@@ -403,7 +413,7 @@ fn frame_stats(frames: &mut [f32]) -> (f32, f32, f32) {
 mod tests {
     use super::*;
 
-    /// Tour shots never stand in a jump gap or inside an item row's cubes.
+    /// Tour shots never stand in a jump gap, inside an item row's cubes or just before them.
     #[test]
     fn tour_shots_keep_clear_of_gaps_and_item_rows() {
         let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
@@ -415,13 +425,17 @@ mod tests {
             let s = tour_s(&track, i as f32 * TOUR_STEP_U);
             assert!(!track.frame_at(s).in_gap, "shot {i} in a gap");
             for row in track.item_rows() {
-                let d = (s - row.s).rem_euclid(len);
+                let behind = (s - row.s).rem_euclid(len);
+                assert!(behind >= TOUR_ITEM_CLEARANCE_U, "shot {i} at an item row");
                 assert!(
-                    d.min(len - d) >= TOUR_ITEM_CLEARANCE_U,
-                    "shot {i} at an item row"
+                    len - behind >= TOUR_ITEM_AHEAD_U,
+                    "shot {i}: an item row right ahead"
                 );
             }
         }
+        assert!(clear_of_row(10.0, 600.0));
+        assert!(!clear_of_row(1.0, 600.0), "standing in the row");
+        assert!(!clear_of_row(595.0, 600.0), "the row 5 u ahead");
     }
 
     #[test]

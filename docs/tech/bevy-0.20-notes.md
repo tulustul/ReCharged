@@ -931,6 +931,10 @@ fn window_controls(keys: Res<ButtonInput<KeyCode>>, mut window: Single<&mut Wind
 - `fn main() -> AppExit { App::new()…run() }` is allowed.
 - Window-close exit systems run in `Last` (0.19+).
 - `CursorOptions` is its own component (`Single<&mut CursorOptions, With<PrimaryWindow>>`).
+- Ctrl+C: `TerminalCtrlCHandlerPlugin` installs its handler only over the default SIGINT disposition.
+  A game started as a background job of a non-interactive shell (`cmd &` in a script) inherits
+  SIGINT ignored, so Bevy logs "Skipping installing `Ctrl+C` handler…" and SIGINT does nothing.
+  Stop such runs another way (window close, SIGTERM); in a foreground terminal, Ctrl+C works.
 
 ---
 
@@ -1223,6 +1227,30 @@ fn rapier_headless_ball_falls_and_rests() {
   - Big draw/culling speedups (useful with 4 views).
   - `ShadowLodOrigin` for split screen.
   - BSN `bsn!` scenes (optional; plain tuples keep working).
+
+---
+
+## 20. Pipeline compilation and other findings (T20c) [G]
+
+Found while warming up pipelines (rc_render `lighting/{warmup,menu_warmup}.rs`, `docs/design/rc_render.md`).
+
+- **Blit pipelines compile blocking.** `prepare_view_upscaling_pipelines` compiles a camera's blit
+  synchronously, behind the whole async queue, and the blit depends on the camera's place among the
+  cameras of its target. A warm-up camera added before (or writing to) a window camera's target
+  changes that camera's blit and freezes the frame. Warm-up cameras use a higher `order` and
+  `CameraOutputMode::Skip`.
+- **An arriving shader asset blocks extract** while compile tasks hold the shader cache: start a
+  warm-up once shader assets have stopped arriving.
+- **Light-probe images reach the render world a frame late**: a view drawn in its first frames
+  compiles variants without `ENVIRONMENT_MAP`, a useless second set. Draw once the view is final.
+- **Transparent sorting** uses the world AABB centre plus `Material::depth_bias`; for a custom
+  material the bias changes only the sort, not the depth. A large dome centred at the origin sorts
+  after everything inside it: give it a large negative bias (rc_render `CloudMaterial`).
+- **Unlit `StandardMaterial` output ignores exposure**: emissive-only looks need their own scale.
+- **Two cameras with different MSAA on one window** are a wgpu validation error.
+- **`RenderAssetUsages::RENDER_WORLD`** (glTF `load_meshes` / `load_materials`, `ImageLoaderSettings::asset_usage`)
+  drops the main-world copies after upload; load a file with one setting everywhere (rc_render
+  `content::load_scene`).
 
 ---
 

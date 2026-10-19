@@ -10,8 +10,16 @@ showroom) is described in `docs/design/rc_render.md`.
 `ActiveEnvironment` and a `MaterialLibrary` rebuilt for that environment, then builds the track
 meshes, dresses the props, spawns the decor, queues the car scenes of `RaceConfig` (racers + Time
 Trial ghost) and completes the key when every scene is loaded. A car scene that fails (missing or
-broken glb) fails the loading with its path; a prop scene that fails only logs. Scene handles are
-cached for the app's lifetime, so restarts and next races reuse them.
+broken glb) fails the loading with its path; a prop scene that fails only logs.
+
+**Memory (QA Q21).** Every glb goes through `content::load_scene`: meshes and textures are kept
+only on the GPU (`RenderAssetUsages::RENDER_WORLD`; nothing reads model vertices or texels on the
+CPU — colliders come from the prop RON files). Prop and decor scenes, fallback meshes and dimmed
+lamp materials live for the session (restarts reuse them) and are dropped in `Unloading`, together
+with the content load list, so the menu never keeps a visited track's models (the soak census
+counts meshes, images and materials). Car scenes and every catalog paint are loaded once, when the
+catalog arrives, and kept for the app (the showroom and every race use them; counts never depend
+on which cars a session showed).
 
 ## Track (`track_visuals/`)
 | Part | Material (library) | Shadows |
@@ -124,8 +132,8 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
   done
   ```
 - `--track-tour <track>`: a shot every 25 u along the racing line (moved forward past jump gaps
-  and ≥ 3 u away from item rows, so the eye is never inside the Volt Cubes), eye 1.6 u above it, looking
-  8 u ahead along it (shots in a jump gap move past it) →
+  and item rows: ≥ 3 u past a row and ≥ 12 u before the next, so the eye is never inside the Volt
+  Cubes nor right behind them — B1), eye 1.6 u above it, looking 8 u ahead along it →
   `<user data>/captures/tour_<track>_<variant>/NNN.png`. Pass the same track to `--quick-race`.
 
 ## Verify
@@ -138,11 +146,11 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
   --screenshot-at 8 --screenshot <png> --exit-after 10`; tours as above.
 
 ## Known limitations
-- Pipelines compile during Loading (the rendering core's warm-up camera, with one car per racer
-  parented to it, plus every effect material from rc_vfx); variants first needed later still
-  compile once mid-race — seen: cars entering a shadow-casting lamp's cube map at night (three
-  depth-only pipelines) and, in split-screen, the overlay's sprite/blit variants at the start
-  (≈ 30 ms frames).
+- Pipelines compile in the menu (human runs: every catalog car, effect and common material per
+  view variant) and during Loading (the rendering core's warm-up camera, with one car per racer
+  parented to it, plus every effect material from rc_vfx); the night lamps' cube-map shadow
+  variants are covered (B28). A split-screen quick race (no menu, so no overlay replica) still
+  compiles the overlay's sprite/blit variants at the start of the Intro (2 small pipelines).
 - Barrier styles are a code table (`ponytail`: move into the environment files when artists need
   more than one style per environment).
 - Prop glbs that fail to parse stay invisible (no fallback swap); a missing file uses the fallback.

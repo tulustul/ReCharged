@@ -189,8 +189,12 @@ pub(crate) fn emission_scale(name: &str, env: &ActiveEnvironment) -> Option<f32>
     (scale < 1.0).then_some(scale)
 }
 
-/// A prop or decor scene is instanced: dims its lamp materials to the time of day. Dimmed copies
-/// are shared by every instance (`Local` cache), so instances keep batching.
+/// Dimmed copies of lamp materials by (source material, scale), shared by every instance so they
+/// keep batching; dropped in `Unloading` (they hold the session's prop textures).
+#[derive(Resource, Debug, Default)]
+pub(super) struct DimmedBulbs(HashMap<(AssetId<StandardMaterial>, u32), Handle<StandardMaterial>>);
+
+/// A prop or decor scene is instanced: dims its lamp materials to the time of day.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(super) fn dim_bulbs(
     ready: On<WorldInstanceReady>,
@@ -200,7 +204,7 @@ pub(super) fn dim_bulbs(
     bulbs: Query<(&GltfMaterialName, &MeshMaterial3d<StandardMaterial>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
-    mut dimmed: Local<HashMap<(AssetId<StandardMaterial>, u32), Handle<StandardMaterial>>>,
+    mut dimmed: ResMut<DimmedBulbs>,
 ) {
     let Some(env) = env else {
         return;
@@ -216,7 +220,7 @@ pub(super) fn dim_bulbs(
             continue;
         };
         let key = (current.id(), scale.to_bits());
-        let handle = match dimmed.get(&key) {
+        let handle = match dimmed.0.get(&key) {
             Some(h) => h.clone(),
             None => {
                 let Some(mut m) = materials.get(&current.0).cloned() else {
@@ -224,7 +228,7 @@ pub(super) fn dim_bulbs(
                 };
                 m.emissive *= scale;
                 let h = materials.add(m);
-                dimmed.insert(key, h.clone());
+                dimmed.0.insert(key, h.clone());
                 h
             }
         };

@@ -15,6 +15,7 @@ use crate::Step;
 use crate::bank::Session;
 use crate::buses::{AmbienceBus, BusControls, SILENCE_DB, gain_db, tween_ms};
 use crate::output::audio_on;
+use crate::shots::CueLog;
 
 /// Thunder one-shots: close, medium, distant.
 pub(crate) const THUNDER: [&str; 3] = ["thunder_1", "thunder_2", "thunder_3"];
@@ -229,6 +230,7 @@ fn play_thunder(
     time: Res<Time<Real>>,
     bus: Res<AudioChannel<AmbienceBus>>,
     mut amb: ResMut<Ambience>,
+    mut log: ResMut<CueLog>,
 ) {
     let now = time.elapsed_secs_f64();
     let Some(session) = session else { return };
@@ -237,6 +239,7 @@ fn play_thunder(
             return true;
         }
         if let Some(handle) = session.thunder.get(variant).cloned() {
+            log.started(THUNDER[variant.min(THUNDER.len() - 1)], "Ambience", db, now);
             let mut play = bus.play(handle);
             play.with_volume(Decibels(db));
             if session.env.indoor {

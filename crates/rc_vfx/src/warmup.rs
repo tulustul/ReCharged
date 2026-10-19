@@ -1,14 +1,20 @@
 //! Pipeline warm-up (ARCHITECTURE §9: no hitch from Loading into the Intro). Bevy compiles a
 //! render pipeline the first time a material/mesh combination is drawn; rc_render's hidden
-//! warm-up camera draws the session's scene under the loading screen until no pipeline is left to
-//! compile. These entities add one instance of every effect material to it (particles and
-//! sprites, Volt Cube glass, oil and name tags, skid marks, energy shells, item parts, lightning,
-//! precipitation), so none of them compiles in the Intro or mid-race. They are never culled, so
-//! whichever 3D camera renders during Loading draws them, and they go with the loading screen.
+//! warm-up cameras draw a race's scene in the menu (every view variant, once per run) and under
+//! the loading screen until no pipeline is left to compile. These entities add one instance of
+//! every effect material to what they draw (particles and sprites, Volt Cube glass, oil and name
+//! tags, skid marks, energy shells, item parts, lightning, precipitation), so none of them
+//! compiles in the Intro or mid-race. They are never culled, so every 3D camera of the menu and of
+//! Loading draws them; they exist in every Loading and, in human runs, in every menu once the
+//! showroom is ready (its camera's view is final then: earlier its first frames would compile
+//! variants without the environment map; far below the showroom, where rc_render's menu warm-up
+//! scene is) and shader assets have stopped arriving. Automated runs skip the menu warm-up
+//! (synchronous compilation), so these too.
 
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::NotShadowCaster;
 use bevy::prelude::*;
+use bevy::shader::Shader;
 use rc_core::prelude::*;
 
 use crate::assets::VfxAssets;
@@ -19,24 +25,76 @@ use crate::{lightning, skids};
 
 /// Scale of the warm-up instances (they only need to be drawn, not seen).
 const SCALE: f32 = 0.01;
+/// Where the menu's instances sit: rc_render's menu warm-up scene, far below the showroom.
+const MENU_AT: Vec3 = Vec3::new(0.0, -600.0, 0.0);
+/// The menu's instances wait until no shader asset has arrived for this long (s), as rc_render's
+/// menu warm-up does: a shader arriving while compile tasks hold Bevy's shader cache stalls the
+/// frame until they are done.
+const SHADERS_QUIET_S: f32 = 1.0;
+
+/// Marks the warm-up instances.
+#[derive(Component, Debug, Clone, Copy)]
+struct WarmupInstance;
 
 pub(crate) fn build(app: &mut App) {
-    app.add_systems(OnEnter(AppState::Loading), spawn);
+    app.add_systems(OnEnter(AppState::Loading), |c: Commands, a: Params| {
+        spawn(c, a, AppState::Loading, Vec3::ZERO)
+    })
+    .add_systems(
+        Update,
+        spawn_in_menu.run_if(in_state(AppState::Menu).and_then(resource_exists::<ShowroomReady>)),
+    );
 }
 
-/// `OnEnter(Loading)`: one never-culled instance of every effect mesh/material pair.
-fn spawn(
-    mut commands: Commands,
-    assets: Res<VfxAssets>,
-    weather: Res<WeatherFx>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut precips: ResMut<Assets<PrecipMaterial>>,
+/// The menu's instances, once per visit, in human runs.
+fn spawn_in_menu(
+    commands: Commands,
+    params: Params,
+    automation: Option<Res<AutomationConfig>>,
+    existing: Query<(), With<WarmupInstance>>,
+    (time, mut shaders, mut quiet): (
+        Res<Time<Real>>,
+        MessageReader<AssetEvent<Shader>>,
+        Local<f32>,
+    ),
 ) {
-    let at = Transform::from_scale(Vec3::splat(SCALE));
+    *quiet = if shaders.read().count() > 0 {
+        0.0
+    } else {
+        *quiet + time.delta_secs()
+    };
+    if *quiet >= SHADERS_QUIET_S
+        && existing.is_empty()
+        && !automation.is_some_and(|a| a.is_automated())
+    {
+        spawn(commands, params, AppState::Menu, MENU_AT);
+    }
+}
+
+/// What the warm-up instances are made of.
+#[derive(bevy::ecs::system::SystemParam)]
+struct Params<'w> {
+    assets: Res<'w, VfxAssets>,
+    weather: Res<'w, WeatherFx>,
+    meshes: ResMut<'w, Assets<Mesh>>,
+    materials: ResMut<'w, Assets<StandardMaterial>>,
+    precips: ResMut<'w, Assets<PrecipMaterial>>,
+}
+
+/// One never-culled instance of every effect mesh/material pair at `origin`, scoped to `state`.
+fn spawn(mut commands: Commands, params: Params, state: AppState, origin: Vec3) {
+    let Params {
+        assets,
+        weather,
+        mut meshes,
+        mut materials,
+        mut precips,
+    } = params;
+    let at = Transform::from_translation(origin).with_scale(Vec3::splat(SCALE));
     let scope = (
         Name::new("Effects warm-up"),
-        DespawnOnExit(AppState::Loading),
+        WarmupInstance,
+        DespawnOnExit(state),
     );
     let pbr = |mesh: &Handle<Mesh>, material: Handle<StandardMaterial>| {
         (
@@ -82,7 +140,7 @@ fn spawn(
     commands.spawn((
         Mesh3d(weather.mesh.clone()),
         MeshMaterial3d(precips.add(PrecipMaterial::default())),
-        Transform::default(),
+        Transform::from_translation(origin),
         NotShadowCaster,
         NoFrustumCulling,
         scope,

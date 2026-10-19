@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use rc_core::prelude::*;
 use rc_track::{PropDef, Track};
 
-use crate::content::{ContentLoad, mesh_from_data};
+use crate::content::{ContentLoad, load_scene, mesh_from_data};
 use crate::lighting::ActiveEnvironment;
 use crate::materials::{MaterialLibrary, SurfaceMaterial};
 use lamps::PropLamps;
@@ -40,7 +40,8 @@ pub(crate) struct PropDressed;
 #[derive(Component, Debug, Clone, Copy, Default)]
 pub(crate) struct PropModel;
 
-/// Prop scenes and fallback meshes by kind, kept for the app's lifetime.
+/// Prop scenes and fallback meshes by kind, kept for the session (restarts reuse them; dropped in
+/// `Unloading` so the menu does not keep every visited track's models).
 #[derive(Resource, Debug, Default)]
 struct PropAssets {
     scenes: HashMap<String, Handle<WorldAsset>>,
@@ -50,8 +51,16 @@ struct PropAssets {
 pub(crate) fn build(app: &mut App) {
     app.init_resource::<PropAssets>()
         .init_resource::<PropLamps>()
+        .init_resource::<lamps::DimmedBulbs>()
         .add_observer(lamps::dim_bulbs)
         .add_systems(OnEnter(AppState::Loading), lamps::read_lamps)
+        .add_systems(
+            OnEnter(AppState::Unloading),
+            |mut assets: ResMut<PropAssets>, mut dimmed: ResMut<lamps::DimmedBulbs>| {
+                *assets = PropAssets::default();
+                *dimmed = lamps::DimmedBulbs::default();
+            },
+        )
         .add_systems(
             Update,
             decor::spawn_decor
@@ -151,9 +160,7 @@ fn dress_props(
             let scene = assets
                 .scenes
                 .entry(prop.kind.clone())
-                .or_insert_with(|| {
-                    server.load(GltfAssetLabel::Scene(0).from_asset(def.model.clone()))
-                })
+                .or_insert_with(|| load_scene(&server, &def.model))
                 .clone();
             if !load.scenes.iter().any(|(h, ..)| *h == scene) {
                 load.scenes.push((scene.clone(), def.model.clone(), false));

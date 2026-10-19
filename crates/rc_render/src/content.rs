@@ -12,6 +12,7 @@
 //! [`capture`]: crate::capture
 
 use bevy::asset::{LoadState, RenderAssetUsages};
+use bevy::gltf::GltfLoaderSettings;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use rc_core::prelude::*;
@@ -28,13 +29,12 @@ pub struct ContentVisualsPlugin;
 impl Plugin for ContentVisualsPlugin {
     fn build(&self, app: &mut App) {
         LoadingTasks::register(app, LOADING_KEY);
+        // Reset when a session starts and when it ends: its scene handles must not keep the last
+        // track's models loaded in the menu (Q21).
+        let reset = |mut load: ResMut<ContentLoad>| *load = ContentLoad::default();
         app.init_resource::<ContentLoad>()
-            .add_systems(
-                OnEnter(AppState::Loading),
-                |mut load: ResMut<ContentLoad>| {
-                    *load = ContentLoad::default();
-                },
-            )
+            .add_systems(OnEnter(AppState::Loading), reset)
+            .add_systems(OnEnter(AppState::Unloading), reset)
             .add_systems(
                 Update,
                 report_loaded
@@ -94,6 +94,20 @@ fn report_loaded(
     info!("content: track, {} scenes ready", load.scenes.len());
     load.reported = true;
     done.write(LoadingDone(LOADING_KEY));
+}
+
+/// Loads a glb's first scene with its meshes and textures kept only on the GPU: nothing reads
+/// model vertices or texels on the CPU (colliders come from the prop RON files), and the main-world
+/// copies of every prop and car were most of the game's RSS (Q21). Every glb load goes through
+/// here, so a file is never requested with two different settings.
+pub(crate) fn load_scene(server: &AssetServer, path: &str) -> Handle<WorldAsset> {
+    server
+        .load_builder()
+        .with_settings(|s: &mut GltfLoaderSettings| {
+            s.load_meshes = RenderAssetUsages::RENDER_WORLD;
+            s.load_materials = RenderAssetUsages::RENDER_WORLD;
+        })
+        .load(GltfAssetLabel::Scene(0).from_asset(path.to_owned()))
 }
 
 /// A Bevy mesh of rc_track-style buffers (world-unit UVs; tangents for the library's normal

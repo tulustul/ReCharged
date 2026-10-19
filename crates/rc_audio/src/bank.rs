@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 use bevy::asset::LoadState;
+use bevy::diagnostic::{Diagnostic, DiagnosticPath, Diagnostics, RegisterDiagnostic};
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use rc_core::prelude::*;
@@ -119,8 +120,15 @@ pub(crate) struct Session {
     reported: bool,
 }
 
+/// Number of loaded audio sources, a Bevy diagnostic: the soak census (rc_game counts every
+/// `assets/*` diagnostic; it cannot name kira's `AudioSource`) checks it returns to baseline in
+/// the menu.
+const AUDIO_SOURCES: DiagnosticPath = DiagnosticPath::const_new("assets/audio_sources");
+
 pub(crate) fn build(app: &mut App) {
     app.init_resource::<Bank>()
+        .register_diagnostic(Diagnostic::new(AUDIO_SOURCES).with_max_history_length(1))
+        .add_systems(Update, count_sources.in_set(Step::Load))
         .add_systems(
             Update,
             load_resident
@@ -136,6 +144,10 @@ pub(crate) fn build(app: &mut App) {
                 .run_if(in_state(AppState::Loading)),
         )
         .add_systems(OnEnter(AppState::Unloading), end_session);
+}
+
+fn count_sources(sources: Res<Assets<AudioSource>>, mut diagnostics: Diagnostics) {
+    diagnostics.add_measurement(&AUDIO_SOURCES, || sources.len() as f64);
 }
 
 pub(crate) fn sfx_path(stem: &str) -> String {

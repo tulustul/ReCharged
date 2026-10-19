@@ -34,7 +34,7 @@ const BLINK_HZ: f32 = 6.0;
 const WHEELS: [&str; 4] = ["wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"];
 /// Pipeline warm-up: the session's car models sit this far in front of the warm-up camera, in a
 /// row this wide (u), inside its view.
-const WARMUP_DISTANCE_U: f32 = 14.0;
+pub(crate) const WARMUP_DISTANCE_U: f32 = 14.0;
 const WARMUP_SPREAD_U: f32 = 6.0;
 
 /// A car model: the car's glb is instanced as children of this entity, painted with `paint`,
@@ -75,7 +75,9 @@ pub(crate) struct CarParts {
     braking: bool,
 }
 
-/// Car scenes by car, kept for the app's lifetime (restarts and next races reuse them).
+/// Car scenes by car, kept for the app's lifetime (restarts and next races reuse them). Every
+/// catalog car is loaded once the catalog exists (with all its paints), so asset counts do not
+/// depend on which cars a session showed (the soak census) and the menu warm-up has every model.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct CarScenes(HashMap<CarId, (Handle<WorldAsset>, String)>);
 
@@ -89,7 +91,7 @@ impl CarScenes {
     ) -> Option<&(Handle<WorldAsset>, String)> {
         if !self.0.contains_key(car) {
             let model = catalog.car(car)?.model.clone();
-            let handle = server.load(GltfAssetLabel::Scene(0).from_asset(model.clone()));
+            let handle = crate::content::load_scene(server, &model);
             self.0.insert(car.clone(), (handle, model));
         }
         self.0.get(car)
@@ -105,6 +107,7 @@ pub(crate) fn build(app: &mut App) {
         .add_systems(
             Update,
             (
+                preload_catalog_cars.run_if(resource_added::<Catalog>),
                 preload_session_cars.run_if(in_state(AppState::Loading)),
                 (
                     wheels::drive_wheels,
@@ -185,6 +188,22 @@ fn warm_up_cars(
         ));
         if ghost {
             model.insert(GhostLook);
+        }
+    }
+}
+
+/// Every car scene and paint of the catalog, once (see [`CarScenes`]).
+fn preload_catalog_cars(
+    catalog: Res<Catalog>,
+    server: Res<AssetServer>,
+    mut scenes: ResMut<CarScenes>,
+    mut library: ResMut<MaterialLibrary>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for car in &catalog.cars {
+        scenes.get(&car.id, &catalog, &server);
+        for paint in &car.paints {
+            library.car_paint(&mut materials, car, paint.id);
         }
     }
 }
