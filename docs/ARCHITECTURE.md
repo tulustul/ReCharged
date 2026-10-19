@@ -183,7 +183,7 @@ PreUpdate
                          requests, rebind capture
 FixedUpdate (60 Hz; every SimSet gated on PauseState::Running, i.e. only in a running race)
   SimSet::Drivers        rc_input → CarControl (LocalPlayer & !AiDriver);  rc_ai → CarControl (AiDriver)
-  SimSet::Assist         rc_ai steering assist: may change only `steer` of LocalPlayer racers with assist on
+  SimSet::Assist         rc_ai steering assist: may change `steer`, and lower `throttle` / raise `brake` before corners (auto-brake), of LocalPlayer racers with assist on
   SimSet::Effects        rc_items: ApplyEffect → StatusEffects (stacking rules), timers, shield pops
   SimSet::Items          rc_items: roulette, item use, projectile motion, hazards, pickups, hit detection
                          (kept here, not in PostPhysics, to avoid ambiguities with rc_vehicle)
@@ -288,7 +288,7 @@ Spawned by rc_race in `OnEnter(RaceAttempt)`, scoped `DespawnOnExit(RaceAttempt)
 | `Racer { index, name, car, paint, color }` | race | all | identity |
 | `LocalPlayer(PlayerSlot)` | race | input, camera, ui, audio, vfx | human (or autopilot) slot |
 | `AiDriver { rival, difficulty }` | race | ai | AI-driven |
-| `CarControl { throttle, brake, steer, drift, boost, use_item, look_back, reset_held }` | input (`LocalPlayer`, `!AiDriver`) / ai (`AiDriver`); assist may adjust `steer` (§3.2) | vehicle, items, race | driving intent; `use_item` is an edge consumed in the tick; `reset_held` is a level — rc_race times the hold in fixed ticks |
+| `CarControl { throttle, brake, steer, drift, boost, use_item, look_back, reset_held }` | input (`LocalPlayer`, `!AiDriver`) / ai (`AiDriver`); assist may adjust `steer`, `throttle`, `brake` (§3.2) | vehicle, items, race | driving intent; `use_item` is an edge consumed in the tick; `reset_held` is a level — rc_race times the hold in fixed ticks |
 | `VehicleTelemetry { speed, forward_speed, rpm, throttle_load, grounded_wheels, airborne_time, slip_angle, drifting, surface, wheels: [WheelState;4], boosting, up_dot, clean_landing }` | vehicle | render, vfx, audio, ui, ai, race | physical state |
 | `Charge(f32)` (0–1) | vehicle | ui, ai, vfx, audio | battery meter |
 | `RaceProgress { lap, next_checkpoint, distance, total_distance, rank, finished, lap_times, best_lap, wrong_way, last_valid_checkpoint, off_track_time }` | race | ui, ai, items, game, audio, camera | standing in the race |
@@ -460,8 +460,9 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
   item decisions (GDD §8.1) with reaction delays, perfect-start chance, stuck recovery
   (reverse, then hold reset), `CatchUp`.
 - Autopilot: an `AiDriver` on a `LocalPlayer` racer (from `RaceConfig`).
-- Steering assist (`SimSet::Assist`): blends only `steer` toward the racing line for LocalPlayer
-  racers with assist on.
+- Steering assist (`SimSet::Assist`): blends `steer` toward the racing line and brakes gently
+  before corners taken too fast (speed only ever goes down; the player's own brake/steer wins), for
+  LocalPlayer racers with assist on.
 - Data `assets/data/ai.ron`; dev hot reload.
 - Tests: headless AI-only race completes 3 laps on every layout within 1.5× the expected time with
   ≤ 2 respawns per lap (`#[ignore]`, run by QA); unit tests for steering/speed maths.

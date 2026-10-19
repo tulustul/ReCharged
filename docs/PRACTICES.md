@@ -86,7 +86,8 @@ Read this **before** writing code.
 - Put every system in the `rc_core` set for its stage (ARCHITECTURE §3.2). Gameplay logic runs in
   `FixedUpdate` only; presentation in `Update`.
 - **One writer per component/resource** (ARCHITECTURE §4 tables). The only exception: the
-  steering-assist pass may change `CarControl.steer` of human racers in `SimSet::Assist`.
+  steering-assist pass may change `CarControl.steer` (and lower throttle / raise brake before
+  corners) of human racers in `SimSet::Assist`.
 - Cross-crate communication: `rc_core` components, resources and **messages**. Observers
   (`On<Add<Racer>>`) decorate entities spawned by other crates and handle local immediate
   reactions — not a hidden cross-crate call mechanism.

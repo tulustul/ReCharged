@@ -564,8 +564,8 @@ All settings apply live and persist (written at most once per second).
 | Controls | binding lists per scheme (keyboard A, keyboard B, gamepad) with rebinding & reset; steering dead zone; steering sensitivity; vibration on/off & intensity |
 | Accessibility | reduce flashing; colour-blind friendly racer markers; steering assist; auto-accelerate |
 
-- **Steering assist**: gently steers toward the racing line, and after a crash or respawn turns
-  the car back toward the track direction; off-track auto-respawn after 2 s instead of 3 s.
+- **Steering assist**: gently steers toward the racing line and brakes gently before corners taken
+  too fast, and after a crash or respawn turns the car back toward the track direction; off-track auto-respawn after 2 s instead of 3 s.
 - Split-screen applies a lower effective quality tier automatically.
 
 ---
