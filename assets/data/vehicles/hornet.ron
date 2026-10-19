@@ -1,4 +1,4 @@
-// hornet: rally hatch: all-rounder, rally-style drifts.
+// hornet: lifted hot rod: all-rounder, rally-style drifts.
 // Stars (catalog.ron): speed 3, accel 4, handling 4, weight 3. Geometry: car-dimensions.md.
 // Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
 (

@@ -15,17 +15,18 @@ at `y = wheel radius`, `x = ±track/2`.
 |---|---|---|---|---|---|---|---|---|---|
 | sparky | buggy, roll cage | 2.00 | 1.25 | 0.75 | 1.30 | 1.10 / 1.10 | 0.30 / 0.32 | 0.22 / 0.25 | 0.22 |
 | dumpster | monster truck | 2.20 | 1.45 | 1.10 | 1.35 | 1.25 / 1.25 | 0.42 / 0.42 | 0.32 / 0.32 | 0.40 |
-| zip | mini touring | 1.90 | 1.00 | 0.50 | 1.20 | 0.88 / 0.88 | 0.20 / 0.20 | 0.16 / 0.18 | 0.08 |
-| torque | muscle car | 2.15 | 1.15 | 0.60 | 1.35 | 0.98 / 1.02 | 0.24 / 0.26 | 0.18 / 0.26 | 0.10 |
-| hornet | rally hatch | 1.85 | 1.10 | 0.70 | 1.20 | 0.96 / 0.96 | 0.24 / 0.24 | 0.18 / 0.18 | 0.16 |
-| phantom | sports coupe, wing | 2.05 | 1.12 | 0.50 | 1.30 | 0.98 / 1.00 | 0.22 / 0.23 | 0.18 / 0.22 | 0.08 |
+| zip | mini truggy | 1.80 | 1.10 | 0.72 | 1.14 | 0.98 / 0.98 | 0.26 / 0.26 | 0.20 / 0.22 | 0.17 |
+| torque | wasteland muscle car | 2.15 | 1.15 | 0.70 | 1.35 | 0.98 / 1.02 | 0.24 / 0.26 | 0.18 / 0.26 | 0.10 |
+| hornet | lifted hot rod | 1.85 | 1.10 | 0.70 | 1.20 | 0.96 / 0.96 | 0.24 / 0.24 | 0.18 / 0.18 | 0.16 |
+| phantom | GT coupe, wing | 2.05 | 1.12 | 0.58 | 1.30 | 0.98 / 1.00 | 0.22 / 0.23 | 0.18 / 0.22 | 0.08 |
 | volt_gt | hypercar | 2.10 | 1.15 | 0.46 | 1.32 | 1.00 / 1.02 | 0.22 / 0.23 | 0.19 / 0.24 | 0.07 |
 | bolt | open-wheel formula | 2.20 | 1.15 | 0.42 | 1.40 | 1.04 / 1.06 | 0.22 / 0.24 | 0.18 / 0.26 | 0.06 |
 
 - Length / Width / Height are the **body's** bounding box **excluding wheels and antenna** (the
   physics chassis collider lives inside it). Overall width = max(track) + wheel width; wheels of
   open-wheel cars (bolt, volt_gt rear) may rise above the body height.
-- Exception: phantom's rear wing (on its stands) may rise to **0.56** above the 0.50 body envelope.
+- Exceptions: thin add-ons may rise above the body height: phantom's rear wing (on its stands) to
+  **0.64**, bolt's to **0.56**, torque's roof harpoon gun and exhaust stacks to **0.78**.
 - Ground clearance = lowest chassis point above the ground at rest.
 - The physics may use a simplified collider (box/convex hull) inside the body envelope; wheels are
   ray/shape casts, not colliders.

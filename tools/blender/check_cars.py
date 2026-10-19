@@ -20,10 +20,8 @@ WHEELS = ['wheel_fl', 'wheel_fr', 'wheel_rl', 'wheel_rr']
 MATERIALS = {'paint', 'paint_accent', 'light_head', 'light_tail', 'light_brake', 'rubber',
              'plastic', 'metal', 'glass', 'chrome'}
 TOL = 0.01
-# flexible parts allowed below the chassis clearance: hornet's rally mud flaps (signature)
-LOW_PARTS = {'hornet': 0.09}
-# car-dimensions.md footnote: phantom's rear wing (on its stands) may rise to 0.56
-WING_TOP = {'phantom': 0.56}
+# car-dimensions.md footnote: thin add-ons above the body envelope (wings on stands, roof gun)
+WING_TOP = {'phantom': 0.64, 'bolt': 0.56, 'torque': 0.78}
 
 
 def dims():
@@ -134,7 +132,7 @@ def check(car, D):
         errs.append(f'body height {hi[1]:.3f} > {top}')
     if hi[0] - lo[0] > D['width'] + 0.02:
         errs.append(f'body width {hi[0] - lo[0]:.3f} > {D["width"]}')
-    if lo[1] < min(D['clearance'] - 0.015, LOW_PARTS.get(car, 1.0)):
+    if lo[1] < D['clearance'] - 0.015:
         errs.append(f'lowest body point {lo[1]:.3f} < clearance {D["clearance"]}')
     w, h, color = png_info(png)
     if (w, h, color) != (512, 512, 6):

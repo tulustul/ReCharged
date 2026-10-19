@@ -43,13 +43,13 @@ thumbnail 512² RGBA.
 | Car | Look / signature | Default paint / accent | Rims, tyres | Number | Triangles |
 |---|---|---|---|---|---|
 | sparky | buggy: slim cowl, yellow roll cage with 4-lamp roof bar, driver, exposed motor and gearbox, big rear wing, long arms + gold coil-overs | electric blue `#1E5EE6` / yellow `#F2C318` | white 6-spoke, knobby pins | 7 | 23 476 |
-| dumpster | monster truck: pickup cab + dumpster-bin bed (black lid, hazard chevrons), roof light bar, chrome bull bar + stacks, portal axles, 4-links, coil-overs | dumpster green `#257A34` / hazard yellow `#F2BE12` | chrome 5-spoke beadlock, chevron lugs | 13 | 24 121 |
-| zip | mini touring sedan: box flares, white twin stripes, wing on stands, splitter, diffuser, black tail panel | turquoise `#12B5CF` / white `#F4F4F2` | silver 8-spoke, street | 3 | 22 673 |
-| torque | muscle fastback: haunches over fat rear tyres, chrome supercharger + scoop, quad lamps, chrome bumpers, ducktail, twin pipes | candy red `#C8161E` / white `#F4F4F0` | chrome 5-spoke, white-letter street tyres | 88 | 24 610 |
-| hornet | rally hatch: black roof + bonnet stripe, roof scoop, roof spoiler, white mud flaps behind every wheel, 4 rally lamps, skid plate | hornet yellow `#EAA80A` / black `#1D1D20` | white 8-spoke, gravel blocks | 5 | 24 295 |
-| phantom | low GT coupe: wide haunches, full-width dual-element wing high on swan necks (to 0.56) with tall endplates, canards, diffuser, slim LED lamps | violet metallic `#3F1F80` / carbon black `#1E1E22` | gold 6-spoke, street | 9 | 22 483 |
-| volt_gt | hypercar: teardrop canopy with black roof, side intakes, louvred engine cover and haunches, cyan `glow` DRL band, rocker strips, rear band, cover lines | pearl white `#E9EDF0` / black `#17181B`, glow cyan | graphite turbine, street | 1 | 22 405 |
-| bolt | futuristic formula: needle nose, canopy + airbox, sidepods, shark fin with glow edge, wide front wing, twin-fin rear wing, exposed wishbones | hot magenta `#E01E78` / black `#17181B`, glow cyan | black turbine, slicks with glowing sidewall rings | 0 | 18 954 |
+| dumpster | red/black short-bed pickup monster truck: tall boxy cab with window nets, black flares/rockers, angular black/silver slashes, ribbed bed cover, LED fascia + light-bar bumper, exposed A-arms with red coil-overs | Race Red `#BE1621` / charcoal `#1D1D20` | black 6-spoke rims with red ring, chevron tyres | — | 24 146 |
+| zip | mini truggy: narrow lime wedge shell between the wheels, cab-forward canopy with black roof, black lower sides with white/grey swooshes and side scoop, red shocks/hubs/rear tower, tubular front bumper, big wing on stands | Lime `#8BD12A` / black `#1D1D20` | black dish rims with red nuts, pin-spike tyres | — | 24 589 |
+| torque | rusty wasteland interceptor fastback: steel blower + twin scoops, spiked dozer blade, mesh-caged windows, riveted scrap plates, J stacks above the roof, boot fuel tanks, spiked ducktail, roof harpoon gun (to 0.78) | Rust Bucket `#3F2419` / charcoal `#2E2B28` | rusty steel 8-hole dish rims with spiked hubs, block tyres | — | 24 966 |
+| hornet | lifted '30s three-window hot rod coupe: chrome shield grille, stalk headlamps, black pontoon fenders + running boards, tilted spare on the deck, chrome nerf bars, red coil-overs | Hot Rod Yellow `#EAA80A` / gloss black `#1D1D20` | grey steel 8-hole dish rims, block all-terrain tyres | 5 | 24 186 |
+| phantom | widebody GT86 time-attack 2+2 coupe: long louvred black bonnet, fastback greenhouse, bolt-on box overfenders, splitter + canards, finned diffuser, swan-neck GT wing (to 0.64), black slash livery | Rally Blue `#1F5FE0` / gloss black `#1D1D20` | gunmetal 10-spoke rims, red calipers, street tyres | 13 | 24 232 |
+| volt_gt | P1-style mid-engine hypercar: teardrop canopy into a black roof spine + snorkel, swept smile headlights, huge side scoops, skeletal mesh tail with C-shaped taillights, centre exhaust, finned diffuser, active wing on pylons | Volt Yellow `#F2B705` / carbon `#1E1E22` | grey 10-spoke rims, street tyres | 17 | 23 761 |
+| bolt | modern F1: needle nose + 3-element front wing, halo + helmet, airbox, undercut black sidepods, shark fin, big rear wing on swan-neck pylon (to 0.56) over diffuser, red push-rod wishbones | Race Red `#D8262B` / carbon black `#1D1D20` | grey 10-spoke rims with red nuts, fat slicks | 1 | 20 464 |
 
 Suggested 4 base paints per car (base / accent) for `catalog.ron`:
 
@@ -66,8 +66,8 @@ Suggested 4 base paints per car (base / accent) for `catalog.ron`:
 
 ## Deviations and notes
 
-- **Hornet's mud flaps** hang below the 0.16 chassis clearance (to 0.10). They are the car's
-  signature, flexible, and not part of the chassis; the validator whitelists them.
+- Concepts: `docs/concept-arts/` (zip = truggy, torque = interceptor, hornet = hot rod, phantom =
+  widebody GT, volt_gt = hypercar, bolt = F1, dumpster = RC-X monster truck).
 - **Volt GT** rear tyre tops reach the 0.46 body height (allowed by `car-dimensions.md`); they
   show through louvre slots on the haunches. Its fenders are capped at the body height.
 - **Bolt**: open wheels rise above the 0.42 body height (allowed).

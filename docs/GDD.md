@@ -141,9 +141,9 @@ knock-back but reduces air control and makes landings cost more speed.
 |---|---|---|---|---|---|---|---|---|
 | **Sparky** | Rookie | Off-road buggy, roll cage, big knobbly tyres | 4WD | 2 | 3 | 4 | 2 | start |
 | **Dumpster** | Rookie | Monster truck, huge tyres, long travel | 4WD | 2 | 2 | 2 | 5 | start |
-| **Zip** | Rookie | Tiny touring car, low and light | RWD | 2 | 4 | 3 | 1 | start |
-| **Torque** | Pro | Muscle car, wide rear tyres | RWD | 4 | 3 | 2 | 4 | Rookie Cup podium |
-| **Hornet** | Pro | Rally hatchback, roof scoop, mud flaps | 4WD | 3 | 4 | 4 | 3 | Rookie Cup podium |
+| **Zip** | Rookie | Mini truggy, light and springy | RWD | 2 | 4 | 3 | 1 | start |
+| **Torque** | Pro | Wasteland muscle car, blower, plow | RWD | 4 | 3 | 2 | 4 | Rookie Cup podium |
+| **Hornet** | Pro | Lifted hot-rod coupe, chunky tyres, spare wheel | 4WD | 3 | 4 | 4 | 3 | Rookie Cup podium |
 | **Phantom** | Elite | Low sports coupe, big wing | RWD | 4 | 4 | 4 | 3 | Pro Cup podium |
 | **Volt GT** | Elite | Hypercar, glowing accent strips | 4WD | 5 | 4 | 3 | 2 | Elite Cup podium |
 | **Bolt** | Secret | Futuristic open-wheel "formula" with fins | RWD | 5 | 5 | 3 | 1 | all 6 Golden Batteries |

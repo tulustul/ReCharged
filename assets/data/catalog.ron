@@ -31,8 +31,8 @@
             drive: Awd,
             model: "models/cars/dumpster.glb",
             paints: [
-                (id: 0, name: "Swamp Green", base: (0.243, 0.557, 0.18), accent: (0.949, 0.765, 0.094), metallic: 0.0, roughness: 0.38, set: Base),
-                (id: 1, name: "Fire Red", base: (0.788, 0.157, 0.176), accent: (0.102, 0.102, 0.102), metallic: 0.0, roughness: 0.38, set: Base),
+                (id: 0, name: "Race Red", base: (0.745, 0.086, 0.129), accent: (0.114, 0.114, 0.125), metallic: 0.0, roughness: 0.38, set: Base),
+                (id: 1, name: "Swamp Green", base: (0.243, 0.557, 0.18), accent: (0.949, 0.765, 0.094), metallic: 0.0, roughness: 0.38, set: Base),
                 (id: 2, name: "Hazard Yellow", base: (0.949, 0.765, 0.094), accent: (0.102, 0.102, 0.102), metallic: 0.0, roughness: 0.38, set: Base),
                 (id: 3, name: "Midnight Purple", base: (0.357, 0.165, 0.62), accent: (0.478, 0.8, 0.122), metallic: 0.0, roughness: 0.38, set: Base),
                 (id: 4, name: "Neon", base: (0.169, 1.0, 0.416), accent: (1.0, 0.18, 0.753), metallic: 0.0, roughness: 0.3, set: Neon),
@@ -51,7 +51,7 @@
             drive: Rwd,
             model: "models/cars/zip.glb",
             paints: [
-                (id: 0, name: "Lagoon", base: (0.071, 0.71, 0.812), accent: (0.957, 0.957, 0.949), metallic: 0.0, roughness: 0.32, set: Base),
+                (id: 0, name: "Lime", base: (0.545, 0.82, 0.165), accent: (0.114, 0.114, 0.125), metallic: 0.0, roughness: 0.32, set: Base),
                 (id: 1, name: "Bubblegum", base: (0.949, 0.353, 0.659), accent: (0.957, 0.957, 0.949), metallic: 0.0, roughness: 0.32, set: Base),
                 (id: 2, name: "Snow", base: (0.941, 0.941, 0.933), accent: (0.843, 0.149, 0.18), metallic: 0.0, roughness: 0.32, set: Base),
                 (id: 3, name: "Tangerine", base: (0.949, 0.541, 0.106), accent: (0.102, 0.102, 0.102), metallic: 0.0, roughness: 0.32, set: Base),
@@ -71,10 +71,10 @@
             drive: Rwd,
             model: "models/cars/torque.glb",
             paints: [
-                (id: 0, name: "Muscle Red", base: (0.722, 0.114, 0.141), accent: (0.957, 0.957, 0.949), metallic: 0.0, roughness: 0.34, set: Base),
+                (id: 0, name: "Rust Bucket", base: (0.247, 0.141, 0.098), accent: (0.18, 0.169, 0.157), metallic: 0.0, roughness: 0.75, set: Base),
                 (id: 1, name: "Midnight Black", base: (0.11, 0.11, 0.125), accent: (0.949, 0.765, 0.094), metallic: 0.0, roughness: 0.34, set: Base),
                 (id: 2, name: "Grabber Blue", base: (0.165, 0.545, 0.878), accent: (0.102, 0.102, 0.102), metallic: 0.0, roughness: 0.34, set: Base),
-                (id: 3, name: "Sunset Orange", base: (0.91, 0.4, 0.11), accent: (0.11, 0.11, 0.125), metallic: 0.0, roughness: 0.34, set: Base),
+                (id: 3, name: "Muscle Red", base: (0.722, 0.114, 0.141), accent: (0.957, 0.957, 0.949), metallic: 0.0, roughness: 0.34, set: Base),
                 (id: 4, name: "Neon", base: (0.169, 1.0, 0.416), accent: (1.0, 0.18, 0.753), metallic: 0.0, roughness: 0.3, set: Neon),
                 (id: 5, name: "Carbon", base: (0.165, 0.173, 0.188), accent: (0.843, 0.149, 0.18), metallic: 0.25, roughness: 0.3, set: Carbon),
                 (id: 6, name: "Gold", base: (0.831, 0.647, 0.216), accent: (0.11, 0.11, 0.125), metallic: 0.9, roughness: 0.22, set: Gold),
@@ -91,7 +91,7 @@
             drive: Awd,
             model: "models/cars/hornet.glb",
             paints: [
-                (id: 0, name: "Rally Yellow", base: (0.949, 0.765, 0.094), accent: (0.102, 0.102, 0.102), metallic: 0.0, roughness: 0.36, set: Base),
+                (id: 0, name: "Hot Rod Yellow", base: (0.918, 0.659, 0.039), accent: (0.102, 0.102, 0.102), metallic: 0.0, roughness: 0.36, set: Base),
                 (id: 1, name: "Arctic White", base: (0.941, 0.941, 0.933), accent: (0.118, 0.384, 0.941), metallic: 0.0, roughness: 0.36, set: Base),
                 (id: 2, name: "Forest Green", base: (0.18, 0.49, 0.29), accent: (0.949, 0.765, 0.094), metallic: 0.0, roughness: 0.36, set: Base),
                 (id: 3, name: "Royal Blue", base: (0.153, 0.278, 0.722), accent: (0.957, 0.957, 0.949), metallic: 0.0, roughness: 0.36, set: Base),
@@ -111,7 +111,7 @@
             drive: Rwd,
             model: "models/cars/phantom.glb",
             paints: [
-                (id: 0, name: "Phantom Silver", base: (0.725, 0.745, 0.776), accent: (0.11, 0.11, 0.125), metallic: 0.5, roughness: 0.38, set: Base),
+                (id: 0, name: "Rally Blue", base: (0.122, 0.373, 0.878), accent: (0.114, 0.114, 0.125), metallic: 0.5, roughness: 0.38, set: Base),
                 (id: 1, name: "Crimson", base: (0.62, 0.078, 0.125), accent: (0.11, 0.11, 0.125), metallic: 0.5, roughness: 0.38, set: Base),
                 (id: 2, name: "Deep Violet", base: (0.29, 0.165, 0.549), accent: (0.957, 0.957, 0.949), metallic: 0.5, roughness: 0.38, set: Base),
                 (id: 3, name: "Graphite", base: (0.227, 0.239, 0.267), accent: (0.949, 0.416, 0.106), metallic: 0.5, roughness: 0.38, set: Base),
@@ -131,7 +131,7 @@
             drive: Awd,
             model: "models/cars/volt_gt.glb",
             paints: [
-                (id: 0, name: "Electric White", base: (0.914, 0.925, 0.937), accent: (0.098, 0.851, 1.0), metallic: 0.45, roughness: 0.36, set: Base),
+                (id: 0, name: "Volt Yellow", base: (0.949, 0.718, 0.02), accent: (0.118, 0.118, 0.133), metallic: 0.45, roughness: 0.36, set: Base),
                 (id: 1, name: "Volt Black", base: (0.082, 0.09, 0.11), accent: (0.098, 0.851, 1.0), metallic: 0.45, roughness: 0.36, set: Base),
                 (id: 2, name: "Plasma Blue", base: (0.102, 0.357, 0.847), accent: (0.957, 0.957, 0.949), metallic: 0.45, roughness: 0.36, set: Base),
                 (id: 3, name: "Acid Green", base: (0.545, 0.863, 0.118), accent: (0.082, 0.09, 0.11), metallic: 0.45, roughness: 0.36, set: Base),
@@ -151,8 +151,8 @@
             drive: Rwd,
             model: "models/cars/bolt.glb",
             paints: [
-                (id: 0, name: "Bolt Cyan", base: (0.098, 0.784, 0.941), accent: (0.082, 0.09, 0.11), metallic: 0.4, roughness: 0.34, set: Base),
-                (id: 1, name: "Overdrive Red", base: (0.878, 0.141, 0.18), accent: (0.957, 0.957, 0.949), metallic: 0.4, roughness: 0.34, set: Base),
+                (id: 0, name: "Race Red", base: (0.847, 0.149, 0.169), accent: (0.114, 0.114, 0.125), metallic: 0.4, roughness: 0.34, set: Base),
+                (id: 1, name: "Bolt Cyan", base: (0.098, 0.784, 0.941), accent: (0.082, 0.09, 0.11), metallic: 0.4, roughness: 0.34, set: Base),
                 (id: 2, name: "Stealth", base: (0.133, 0.141, 0.161), accent: (0.098, 0.851, 1.0), metallic: 0.4, roughness: 0.34, set: Base),
                 (id: 3, name: "Solar", base: (0.961, 0.702, 0.129), accent: (0.082, 0.09, 0.11), metallic: 0.4, roughness: 0.34, set: Base),
                 (id: 4, name: "Neon", base: (0.169, 1.0, 0.416), accent: (1.0, 0.18, 0.753), metallic: 0.0, roughness: 0.3, set: Neon),

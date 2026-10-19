@@ -1,4 +1,4 @@
-// zip: tiny touring car: light, nimble in the air, easy to knock about.
+// zip: mini truggy: light, nimble in the air, easy to knock about.
 // Stars (catalog.ron): speed 2, accel 4, handling 3, weight 1. Geometry: car-dimensions.md.
 // Units: u, s, u/s, u/s², degrees, Hz. Tuning notes: docs/design/rc_vehicle.md.
 (
@@ -8,16 +8,16 @@
     accel_time: 2.75, // Accel 4★: 0 → 99 % of top speed
     reverse_speed: 11.0,
     brake_decel: 40.0,
-    body: (length: 1.90, width: 1.00, height: 0.50, clearance: 0.08),
-    wheelbase: 1.20,
-    front: (track: 0.88, radius: 0.20, width: 0.16),
-    rear: (track: 0.88, radius: 0.20, width: 0.18),
+    body: (length: 1.80, width: 1.10, height: 0.72, clearance: 0.17),
+    wheelbase: 1.14,
+    front: (track: 0.98, radius: 0.26, width: 0.20),
+    rear: (track: 0.98, radius: 0.26, width: 0.22),
     mass: 2.0, // Weight 1★
-    com_height: 0.17,
-    suspension: (bump: 0.06, droop: 0.05, frequency: 3.2, damping: 0.50),
+    com_height: 0.26,
+    suspension: (bump: 0.12, droop: 0.09, frequency: 2.6, damping: 0.45),
     tyres: (grip: 1.25, rear_grip: 1.33, traction: 2.1, drift_grip: 0.60), // Handling 3★
     steering: (lock_deg: 31.0, counter_steer: 0.50, drift_angle_deg: 22.0, stability: 0.7),
     air_control: 1.00,
-    landing_loss: 0.04,
+    landing_loss: 0.05,
     downforce: 0.20,
 )

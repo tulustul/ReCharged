@@ -14,7 +14,7 @@ Built with **Rust + [Bevy 0.20](https://bevy.org)**, **[bevy-react](https://gith
 scripts in `tools/`.
 
 ## Features
-- 8 RC cars (buggy, monster truck, touring, muscle, rally hatch, coupe, hypercar, secret formula)
+- 8 RC cars (buggy, monster truck, truggy, wasteland muscle, lifted hot rod, GT coupe, hypercar, secret formula)
   with ray-cast suspension physics, drift assists, air control and auto-righting.
 - 6 tracks × Forward / Reverse × Mirror = 24 layouts, each with jumps, shortcuts and a hidden
   Golden Battery.

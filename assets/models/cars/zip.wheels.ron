@@ -1,9 +1,9 @@
 (
     car: "zip",
     wheels: [ // order: fl, fr, rl, rr; centre in car space (Bevy axes), radius, width
-        (name: "wheel_fl", center: (-0.440, 0.200, -0.600), radius: 0.200, width: 0.160),
-        (name: "wheel_fr", center: (0.440, 0.200, -0.600), radius: 0.200, width: 0.160),
-        (name: "wheel_rl", center: (-0.440, 0.200, 0.600), radius: 0.200, width: 0.180),
-        (name: "wheel_rr", center: (0.440, 0.200, 0.600), radius: 0.200, width: 0.180),
+        (name: "wheel_fl", center: (-0.490, 0.260, -0.570), radius: 0.260, width: 0.200),
+        (name: "wheel_fr", center: (0.490, 0.260, -0.570), radius: 0.260, width: 0.200),
+        (name: "wheel_rl", center: (-0.490, 0.260, 0.570), radius: 0.260, width: 0.220),
+        (name: "wheel_rr", center: (0.490, 0.260, 0.570), radius: 0.260, width: 0.220),
     ],
 )

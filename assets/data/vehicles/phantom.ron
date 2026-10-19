@@ -8,7 +8,7 @@
     accel_time: 2.75, // Accel 4★: 0 → 99 % of top speed
     reverse_speed: 13.0,
     brake_decel: 40.0,
-    body: (length: 2.05, width: 1.12, height: 0.50, clearance: 0.08),
+    body: (length: 2.05, width: 1.12, height: 0.58, clearance: 0.08),
     wheelbase: 1.30,
     front: (track: 0.98, radius: 0.22, width: 0.18),
     rear: (track: 1.00, radius: 0.23, width: 0.22),
