@@ -329,7 +329,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `RaceEvent { racer: Option<Entity>, kind }` — CountdownTick(n), Go, PerfectStart, Stall, CheckpointSplit(delta), LapCompleted{lap,time,best}, FinalLap, Finished{rank,time}, WrongWay(bool), GoldenBattery, RaceEndsIn(secs), Hint(HintKind) | race | ui, audio, game, vfx |
 | `WeatherEvent::{ Lightning { intensity }, Changed(WeatherKind) }` | weather | render, vfx, audio |
 | `UiNav { action: NavAction, slot: Option<PlayerSlot>, device: DeviceKind, repeat: bool }` | input | ui (→ `ui.nav` React event) |
-| `RebindRequest { scheme, action }` / `RebindResult { scheme, action, binding: Option<Binding>, conflict }` | ui / input | input / ui |
+| `RebindRequest { scheme, action }` / `RebindResult { scheme, action, binding: Option<Binding>, conflict, previous }` (on a conflict the two actions swap: the other one gets `previous`) | ui / input | input / ui |
 | `DeviceEvent::{ Joined { slot, device }, Left { slot }, Disconnected { slot }, LastUsed { slot, kind } }` | input | game, ui |
 | `PauseRequest { slot: Option<PlayerSlot> }` | input, game (focus loss) | game |
 | `UiSound(UiCue)` | ui | audio |
@@ -352,7 +352,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `LocalPlayers { slots: Vec<SlotBinding { slot, devices, last_used: DeviceKind }> }` | input | game, ui, camera |
 | `LobbyState { open: bool, max_slots }` | game | input |
 | `PlayerViewports(Vec<(PlayerSlot, Rect)>)` (logical px) | camera | ui |
-| `MenuBackdrop { car, paint, focus }` | ui | render, camera |
+| `MenuBackdrop { car, paint, focus: Wide \| Car \| Room }` (`Room`: no turntable car — Garage, Credits, Cup end) | ui | render, camera |
 | `LoadingTasks` | game (runtime; loaders register at build and send `LoadingDone`) | loading gate |
 | `AutomationConfig` | binary (CLI) | game, ai, camera, render, ui, input (`--input-script`) |
 | `UserPaths { data_dir, assets_dir }` | binary (CLI/env) | game (saves, logs), track/vehicle/items/ai (data) |
@@ -362,6 +362,8 @@ Rapier components on the racer are private to rc_vehicle.
   Ice, Oil, Water) + `props()`.
 - `ItemKind`, `HazardKind`, `Effect` (GDD §5.5), `NavAction`, `DeviceKind`, `UiCue`, `MusicCue`,
   `EngineTimbre`, `HintKind`.
+- `RacerMarker::of(grid_index, slot)` → P1–P4 for humans, else a `MarkerShape` (●▲■◆★✚⬟⬢ by grid
+  index): the colour-blind markers; rc_vfx name tags and rc_ui (minimap, standings) share it.
 - Collision layers as `u32` bits: `CAR, TRACK, PROP, PROJECTILE, PICKUP, GHOST_CAR`.
 - `GRAVITY` (25 u/s²), `SIM_HZ` (60), `SPEED_DISPLAY_KMH` (1.8), `MAX_RACERS` (8),
   `MAX_LOCAL_PLAYERS` (4), `TOP_SPEED_CAP` (1.5), `SLOT_COLORS` (cyan, yellow, magenta, green).
@@ -545,7 +547,7 @@ indoors). Pause pauses Engines/Sfx/Ambience. No audio device → muted, no panic
 ### 5.12 `rc_game` (F1)
 - Boot: `Catalog`, `Settings`, `Profile` (from `UserPaths.data_dir`), window settings → Menu.
 - `GameCommand` messages (from rc_ui): `StartRace(RaceRequest)`, `Restart`, `NextRace`,
-  `Rematch`, `NextTrack(TrackVariant)`, `QuitToMenu`, `Pause/Resume`, `OpenLobby/CloseLobby`,
+  `Rematch`, `NextTrack(TrackVariant)`, `ChangeTrack(TrackPick)` (post-race track + options), `QuitToMenu`, `Pause/Resume`, `OpenLobby/CloseLobby`,
   `ApplySettings(Settings)`, `ResetProgress`, `QuitGame`. Validates unlocks (`--unlock-all`
   overrides in memory only).
 - Lifecycle transitions (§3.1), loading gate, pause (incl. window focus loss and controller
@@ -655,12 +657,12 @@ file is loaded and validated by a test of its owning crate.
 | `--unlock-all` | everything unlocked, in memory only |
 | `--quick-race <track> [--reverse] [--mirror] [--car <id>] [--ai <n>] [--laps <n>] [--weather <w>] [--time <t>] [--players <n>] [--seed <n>] [--mode tt\|versus\|cup:<id>]` | skip menus |
 | `--autopilot` | local players driven by the AI |
-| `--input-script <file>` | timed `UiNav` + driving intents (DoD-1 tests without a human) |
+| `--input-script <file>` | timed `UiNav` + driving intents, `wait screen <name>` steps (React reports the shown screen via `ui.screen`) — DoD-1 tests without a human |
 | `--exit-after <secs>` | quit after N seconds of wall time |
 | `--screenshot <path> [--screenshot-at <s>] [--screenshot-every <s>]` | captures |
 | `--headless-race` | no window/render/audio: run the race sim as fast as possible, print result JSON |
 | `--soak <minutes>` | chain random races through `Unloading`; assert entity/resource counts return to baseline |
-| `--bench <track>_<n>p` | p50/p95/p99 frame times as JSON (1920×1080 physical, vsync off) |
+| `--bench <track>_<n>p` | p50/p95/p99 frame times as JSON (1920×1080 physical, vsync off; implies `--unlock-all`) |
 | `--calibrate-medals` | Elite AI in a Phantom, items & catch-up off, on every layout → `medals.ron` |
 | `--capture-previews`, `--track-tour <track>` | preview images; screenshots along the racing line |
 | `--export-bindings <path>` | write the TS bindings and exit (also `cargo run -p rc_ui --example export_bindings`) |
