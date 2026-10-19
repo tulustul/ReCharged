@@ -30,16 +30,16 @@ take B2, B4, B5, B8, B10–B13, B15–B17, B19, B23–B25, B27.
 | B22 | ~~DONE~~ Decor has no time-of-day switch (supermarket ceiling light rows glow by day) — a "day-only"/"night-only" material prefix | rc_render | T16 supermarket |
 | B23 | ~~DONE~~ (T19a) Look-back camera mostly black when stopped against a ramp (Backyard Bash deck) — obstruction pull-in for look-back | rc_camera | T17 |
 | B24 | ~~DONE~~ (T19b) One Confirm on Car select once sent `race.start` twice (harmless: ignored in Loading) — debounce in the UI | ui | T17 |
-| B25 | PARTIAL (T19a: worst outlier +20 s → +8 s; rest = corner hops, see B32) ~1 in 8 Elite autopilot TT runs loses ~10 s (outliers absorbed by median-of-3 calibration) | rc_ai | T17 |
+| B25 | ~~DONE~~ (T19a rounds 1–2: Toy Town TT 0 outliers in 32 runs) ~1 in 8 Elite autopilot TT runs loses ~10 s (outliers absorbed by median-of-3 calibration) | rc_ai | T17 |
 | B26 | ~~DONE~~ `rc_render::quality::bench` overlaps the binary's `--bench` (logs from app start) — remove or keep log-only | rc_render | T17 |
 | B27 | ~~DONE~~ (T19b) `RECHARGED_UI_SCRIPT` `nav`/`pause` verbs superseded by `--input-script` (keep go/demo/tab) | rc_ui | T17 |
 | B28 | Night lamps: a car entering a shadow-casting lamp's range compiles 3 shadow pipelines mid-race (warm-up cars sit far from lamps) | rc_render warm-up | T19b |
 | B29 | Split-screen start compiles the overlay's sprite/blit pipelines at GO (frames < 30 ms) | rc_render warm-up | T19b |
 | B30 | Rain splashes extrapolate the plane under the car: far ones float/sink a little where the slope changes | rc_vfx | T19b |
 | B31 | Loading → InRace is 4.6–4.8 s in a dev build after the warm-up (budget ≤ 3 s, ARCHITECTURE §9) — measure the release build; trim if over | rc_render / rc_vfx warm-up | T19b |
-| B32 | toy_town reverse T1: AI spins on the climb + bank onset on lap 1 (3–4 s); same hop on kerbed corners causes the remaining TT outliers | toy_town data / rc_ai | T19a (round 2 in progress) |
-| B33 | Backyard sandbox kicker flips an assisted Phantom at ~30 u/s | garden data | T19a (round 2 in progress) |
-| B34 | Goo Bomb still explodes on its carrier in most AI uses (10 of 20 hits) | rc_ai / rc_items | T19a (round 2 in progress) |
-| B35 | Assist too generous: throttle-only runs at reference pace (Silver/Gold medal pace) — target 1.2–1.3× | rc_ai assist | T19a (round 2 in progress) |
+| B32 | ~~DONE~~ (T19a r2: raised turns' ends half banked) toy_town reverse T1: AI spins on the climb + bank onset on lap 1 (3–4 s); same hop on kerbed corners causes the remaining TT outliers | toy_town data / rc_ai | T19a (round 2 in progress) |
+| B33 | ~~DONE~~ (T19a r2: kicker lead-in board) Backyard sandbox kicker flips an assisted Phantom at ~30 u/s | garden data | T19a (round 2 in progress) |
+| B34 | ~~DONE~~ (T19a r2: near-miss pass, carrier 1.1×; self 64 % → 22 %) Goo Bomb still explodes on its carrier in most AI uses (10 of 20 hits) | rc_ai / rc_items | T19a (round 2 in progress) |
+| B35 | ~~DONE~~ (T19a r2: throttle-only 1.21–1.29×) Assist too generous: throttle-only runs at reference pace (Silver/Gold medal pace) — target 1.2–1.3× | rc_ai assist | T19a (round 2 in progress) |
 | B36 | Track select: the showroom car shows through the translucent track cards | ui / rc_render showroom | T20b |
 | B37 | Cup end: podium thumbnails use one fixed foot offset, some cars sit a few px into/above their block | ui | T20b |

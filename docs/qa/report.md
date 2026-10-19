@@ -318,7 +318,7 @@ Every script assumes a fresh `--user-data-dir` and default settings (pass `--unl
 |---|---|
 | Q1, Q2, Q3, Q5, Q10–Q18, notification collapse | fixed in T20b (4247177) |
 | Q4 | fixed in T19a (3d53d14): every_layout 28/28, wrench_works worst 1.19×, ≤ 2 respawns per car |
-| Q6 | improved in T19a (oil/pad 15 s, softer launches, goo aiming); goo self-hits still high → T19a round 2 (B34) |
-| Q7 | fixed in T19a (assist auto-brake); pace too generous → T19a round 2 (B35) |
+| Q6 | fixed in T19a (oil/pad 15 s, softer launches; Goo Bomb near-miss pass: carrier explosions 64 % → 22 %) |
+| Q7 | fixed in T19a (assist auto-brake; throttle-only 1.21–1.29× the reference, 0 respawns) |
 | Q22 | Toy Town and Wrench Works default to 4 laps (8132efd) |
 | Q8, Q9, Q19, Q20, Q21 | T20c in progress |
