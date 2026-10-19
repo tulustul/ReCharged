@@ -276,7 +276,8 @@ struct WeatherSetup { weather: WeatherChoice, time: TimeOfDay }
 }
 ```
 Written only by rc_game: before `Loading` (replaced for a next race) and between attempts
-(during `Setup`: new Time Trial ghost, collected Golden Battery, dropped player → autopilot);
+(during `Setup`: new Time Trial ghost, collected Golden Battery, dropped player → autopilot, Versus
+players re-sorted by the session points — GDD §3.2: rivals fill the front of the grid, players behind);
 read-only for everyone else, who must re-read it per attempt.
 `Human { autopilot: true }` → rc_race also adds `AiDriver` to that racer (camera/HUD stay).
 
@@ -307,7 +308,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `Prop { kind, dynamic }` (+ `Interpolated` if dynamic) | rc_track (session; reset on Setup) | rc_render (glb scene on the proxy) |
 | `Pickup { row, slot }` (+ `ItemTimer`: 0 = available, `ItemRadius`) | rc_items (attempt) | rc_vfx |
 | `Projectile { kind, owner }` (+ `Interpolated`, `ItemTarget` lock/target, `ItemTimer`, `ItemRadius`) | rc_items (attempt) | rc_vfx, rc_audio, ui (lock-on) |
-| `Hazard { kind: OilSlick / SpringPad / GooBomb …, owner }` (+ `ItemTarget` = goo carrier, `ItemTimer` = fuse/lifetime, `ItemRadius`) | rc_items (attempt) | rc_vfx, rc_audio, ui |
+| `Hazard { kind: OilSlick / SpringPad / GooBomb …, owner }` (+ `ItemTarget` = goo carrier, `ItemTimer` = fuse/lifetime, `ItemRadius`, `Spent` = used up after 3 cars, fading out over its shortened `ItemTimer`) | rc_items (attempt) | rc_vfx, rc_audio, ui |
 | `GoldenBattery` | rc_race (attempt) | rc_vfx |
 | `GhostCar { car, paint }` (+ `Interpolated`) | rc_race (attempt) | rc_render |
 | `GameCamera { slot }`, `MenuCamera`, `OverlayCamera`, `UiHost` marker | rc_camera | rc_render (post-processing), rc_audio (listener), rc_vfx (precipitation layer) |
@@ -352,7 +353,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `LocalPlayers { slots: Vec<SlotBinding { slot, devices, last_used: DeviceKind }> }` | input | game, ui, camera |
 | `LobbyState { open: bool, max_slots }` | game | input |
 | `PlayerViewports(Vec<(PlayerSlot, Rect)>)` (logical px) | camera | ui |
-| `MenuBackdrop { car, paint, focus: Wide \| Car \| Room }` (`Room`: no turntable car — Garage, Credits, Cup end) | ui | render, camera |
+| `MenuBackdrop { car, paint, focus: Wide \| Car \| Room }` (`Room`: no turntable car — Garage, Credits, Cup end, and Cup select, Track select, Versus lobby whose translucent cards it would show through) | ui | render, camera |
 | `LoadingTasks` | game (runtime; loaders register at build and send `LoadingDone`) | loading gate |
 | `AutomationConfig` | binary (CLI) | game, ai, camera, render, ui, input (`--input-script`) |
 | `UserPaths { data_dir, assets_dir }` | binary (CLI/env) | game (saves, logs), track/vehicle/items/ai (data) |
