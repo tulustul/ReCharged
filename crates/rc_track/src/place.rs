@@ -18,6 +18,10 @@ pub const MIN_CHECKPOINTS: usize = 8;
 pub const RESPAWN_SPACING_U: f32 = 15.0;
 /// No respawn point this close before a lip: a car must reach takeoff speed (u).
 pub const JUMP_RUNUP_U: f32 = 40.0;
+/// Every jump gets a respawn point this far past its landing (u): a car that fails after the
+/// landing restarts there instead of before the ramp (where it may fail again — a loop seen on
+/// Wrench Works).
+pub const LANDING_RESPAWN_U: f32 = 6.0;
 /// Respawned cars appear this far above the surface (u).
 pub const RESPAWN_DROP_U: f32 = 0.5;
 /// Pole position: distance of the first car behind the start line (u).
@@ -176,8 +180,13 @@ impl Track {
             .map(|&(a, b)| (a - JUMP_RUNUP_U, self.span(a, b) + JUMP_RUNUP_U + 1.0))
             .collect();
         let count = ((self.length / RESPAWN_SPACING_U).round() as usize).max(1);
-        let out: Vec<RespawnPoint> = (0..count)
+        let mut at: Vec<f32> = (0..count)
             .map(|k| k as f32 * self.length / count as f32)
+            .chain(gaps.iter().map(|&(_, b)| self.wrap(b + LANDING_RESPAWN_U)))
+            .collect();
+        at.sort_by(f32::total_cmp);
+        let out: Vec<RespawnPoint> = at
+            .into_iter()
             .filter(|&s| !zones.iter().any(|&z| self.inside(s, z)))
             .map(|s| self.frame_at(s))
             .filter(|f| {

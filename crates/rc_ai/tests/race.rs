@@ -142,8 +142,14 @@ fn lap_table() {
         for diff in env("AI_DIFFS", "Rookie,Pro,Elite,ElitePlus").split(',') {
             let difficulty = difficulty_named(diff);
             let (mut ratios, mut flying, mut respawns, mut dnf) = (Vec::new(), Vec::new(), 0, 0);
+            let mut causes = Vec::new();
             for seed in 1..=seeds {
                 let run = field_race(track, difficulty, 3, seed);
+                for &(cause, n) in &run.causes {
+                    for _ in 0..n {
+                        tally(&mut causes, cause);
+                    }
+                }
                 let expected = run.reference_lap * run.laps as f32;
                 for r in &run.racers {
                     if r.finished {
@@ -164,6 +170,9 @@ fn lap_table() {
                 ratios.iter().sum::<f32>() / ratios.len() as f32,
                 ratios[ratios.len() - 1],
             );
+            if !causes.is_empty() {
+                println!("respawn causes ({track} {diff}): {causes:?}");
+            }
         }
     }
 }
@@ -188,8 +197,17 @@ fn probe() {
     let seed: u64 = env("AI_SEED", "7").parse().expect("AI_SEED");
     let traced: Option<usize> = std::env::var("AI_TRACE").ok().and_then(|v| v.parse().ok());
     let mut app = race_app();
-    let racers = ai_field(&app, n, difficulty, class);
+    // `AI_TT=1`: the Time Trial of `tt_table` (the autopilot alone in a Phantom).
+    let tt = env("AI_TT", "0") == "1";
+    let racers = match tt {
+        true => vec![tt_racer()],
+        false => ai_field(&app, n, difficulty, class),
+    };
     let mut cfg = config(&track, racers, laps, seed);
+    if tt {
+        cfg.mode = GameMode::TimeTrial;
+        cfg.items = false;
+    }
     cfg.variant.reverse = env("AI_REV", "0") == "1";
     cfg.variant.mirror = env("AI_MIRROR", "0") == "1";
     let run = run_race_traced(&mut app, cfg, 300.0, |app, tick| {
@@ -198,4 +216,86 @@ fn probe() {
         }
     });
     run.print(&format!("{track} {difficulty:?} {class:?}"));
+}
+
+/// The Time Trial racer of `recharged --calibrate-medals`: a human on autopilot in a Phantom.
+fn tt_racer() -> RacerSetup {
+    RacerSetup {
+        name: "Phantom".into(),
+        car: CarId::new("phantom"),
+        controller: Controller::Human {
+            slot: PlayerSlot(0),
+            autopilot: true,
+        },
+        ..Default::default()
+    }
+}
+
+/// Time Trials by the autopilot (Elite, neutral personality) in a Phantom — the setup of
+/// `recharged --calibrate-medals` — on every layout of every track with a file (or `AI_TRACKS`),
+/// seeds 1..=`AI_SEEDS` (3): race times, respawns and outliers (> 3 s over the layout's median):
+/// `cargo test -p rc_ai --test race -- --ignored --nocapture tt_table`.
+#[test]
+#[ignore = "tuning table; long"]
+fn tt_table() {
+    let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.to_owned());
+    let seeds: u64 = env("AI_SEEDS", "3").parse().expect("AI_SEEDS");
+    let tracks: Vec<String> = match std::env::var("AI_TRACKS") {
+        Ok(list) => list.split(',').map(str::to_owned).collect(),
+        Err(_) => {
+            let app = race_app();
+            let dir = rc_testkit::assets_dir().join("data/tracks");
+            let catalog = app.world().resource::<Catalog>();
+            catalog
+                .tracks
+                .iter()
+                .map(|t| t.id.to_string())
+                .filter(|id| dir.join(format!("{id}.ron")).exists())
+                .collect()
+        }
+    };
+    let mut outliers = 0;
+    for track in &tracks {
+        for (reverse, mirror) in [(false, false), (true, false), (false, true), (true, true)] {
+            let mut runs = Vec::new();
+            for seed in 1..=seeds {
+                let mut app = race_app();
+                let mut cfg = config(track, vec![tt_racer()], 3, seed);
+                cfg.mode = GameMode::TimeTrial;
+                cfg.items = false;
+                cfg.variant.reverse = reverse;
+                cfg.variant.mirror = mirror;
+                let run = run_race(&mut app, cfg, 300.0);
+                let r = &run.racers[0];
+                runs.push((if r.finished { r.total } else { f32::NAN }, r.respawns));
+            }
+            let mut sorted: Vec<f32> = runs.iter().map(|r| r.0).collect();
+            sorted.sort_by(f32::total_cmp);
+            let median = sorted[sorted.len() / 2];
+            let shown: Vec<String> = runs
+                .iter()
+                .map(|(t, n)| {
+                    let flag = if t.is_nan() || *t > median + 3.0 {
+                        outliers += 1;
+                        "!"
+                    } else {
+                        ""
+                    };
+                    format!(
+                        "{t:.2}{}{flag}",
+                        if *n > 0 {
+                            format!("/{n}r")
+                        } else {
+                            String::new()
+                        }
+                    )
+                })
+                .collect();
+            println!(
+                "{track:<14} rev {reverse:<5} mirror {mirror:<5} median {median:6.2}  [{}]",
+                shown.join(", ")
+            );
+        }
+    }
+    println!("outliers (> median + 3 s or DNF): {outliers}");
 }

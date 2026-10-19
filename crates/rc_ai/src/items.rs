@@ -12,17 +12,21 @@ const REACTION_KEY: u64 = 8;
 const IDLE_USE_SECS: f32 = 4.0;
 /// Aggression widens the attack ranges between these shares (0 → 1).
 const RANGE_SHARE: (f32, f32) = (0.75, 1.2);
+/// The widest share of an attack range any driver uses (targets beyond it are never shot at).
+pub(crate) const MAX_RANGE_SHARE: f32 = RANGE_SHARE.1;
 /// Hoarders wait for surer shots: attack ranges shrink by up to this share.
 const HOARD_RANGE_CUT: f32 = 0.35;
 
 /// What the driver sees around it this tick (track and race geometry already evaluated).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct ItemView {
-    /// Nearest car inside the forward rocket cone (distance, u).
+    /// Nearest car inside the forward rocket cone (distance, u); while a Spark Rocket is held,
+    /// only cars the rocket could see (no wall or prop in between) count.
     pub cone_ahead: Option<f32>,
-    /// Nearest car inside the backward rocket cone (distance, u).
+    /// Nearest car inside the backward rocket cone (distance, u; in sight, as above).
     pub cone_behind: Option<f32>,
-    /// Distance (u) to the car directly ahead in the standings.
+    /// Distance (u) to the car directly ahead in the standings (while a Leech Coil is held: only
+    /// when in sight).
     pub next_in_race: Option<f32>,
     /// Nearest car ahead along the track (u).
     pub ahead_on_track: Option<f32>,
@@ -32,6 +36,8 @@ pub struct ItemView {
     pub nearest: Option<f32>,
     /// Cars within the EMP radius.
     pub in_emp_radius: usize,
+    /// A car a Goo Bomb carrier could bump soon (alongside or a little ahead, close laterally).
+    pub goo_in_reach: bool,
     /// A rocket is locked onto this car.
     pub locked_on: bool,
     /// This car is shielded.
@@ -56,8 +62,7 @@ pub struct Temper {
     pub hoard: f32,
 }
 
-// ponytail: no line-of-sight test (rockets and the Leech Coil need sight; a blocked shot is
-// wasted), and incoming rockets are answered with a shield only, never a dodge.
+// ponytail: incoming rockets are answered with a shield only, never a dodge.
 
 /// Use the item now? `Some(backward)` = yes (fired backward with look back).
 pub fn decide(
@@ -83,7 +88,8 @@ pub fn decide(
         ItemKind::LeechCoil => within(v.next_in_race, t.leech_range_u).then_some(false),
         ItemKind::ShockOrb => within(v.ahead_on_track, t.orb_range_u).then_some(false),
         ItemKind::EmpPulse => (v.in_emp_radius > 0).then_some(false),
-        ItemKind::GooBomb => within(v.nearest, t.goo_seek_u).then_some(false),
+        // Only with a bump in sight: carriers that had to chase blew themselves up.
+        ItemKind::GooBomb => v.goo_in_reach.then_some(false),
         ItemKind::OilSlick | ItemKind::SpringPad => {
             let close = v.behind_on_line.is_some_and(|d| d <= t.drop_behind_u);
             // A leader keeps a hazard to defend with; anyone else drops it after a while.
@@ -325,11 +331,22 @@ mod tests {
             d(
                 ItemKind::GooBomb,
                 ItemView {
-                    nearest: Some(10.0),
+                    goo_in_reach: true,
                     ..view()
                 }
             ),
             Some(false)
+        );
+        assert_eq!(
+            d(
+                ItemKind::GooBomb,
+                ItemView {
+                    nearest: Some(10.0),
+                    ..view()
+                }
+            ),
+            None,
+            "a car near but out of bump reach (behind, or far to the side)"
         );
         assert_eq!(
             d(

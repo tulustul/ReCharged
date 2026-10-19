@@ -82,17 +82,18 @@ counter-clockwise. Mirror variants mirror positions/yaws (prop meshes are not mi
 Item rows (5): start straight, cul-de-sac ring, raised yard, Birch east before the dip, Birch
 west. 13 checkpoints, 59–60 respawn points. Reference lap 34.8 s (reverse 34.9 s).
 
-**AI (DoD-2):** `AI_TRACK=maple_street AI_DIFF=Elite AI_CLASS=Elite AI_N=8 AI_LAPS=3
-AI_SEED=<s> [AI_REV=1] [AI_MIRROR=1] cargo test -p rc_ai --test race -- --ignored --nocapture
-probe` — seeds 21, 7 and 3 × all four variants: every car finishes, worst 1.31× the expected
-time (limit 1.5×), at most 2 respawns per race (limit 6). The corridor stays inside the barrier
-kerbs everywhere (an earlier version let the racing line graze the north kerb after the tunnel
-and the NW fillet: cars spun out in the mirrored reverse).
+**AI (DoD-2):** `AI_TRACK=maple_street AI_DIFF=Elite AI_CLASS=Elite AI_N=8 AI_LAPS=3 AI_SEED=<s>
+[AI_REV=1] [AI_MIRROR=1] cargo test -p rc_ai --test race -- --ignored --nocapture probe` — seeds 21,
+7 and 3 × all four variants (T19a): every car finishes, worst 1.22× the expected time (limit 1.5×),
+at most 2 respawns per car and race (limit 6). The corridor stays inside the barrier kerbs
+everywhere (an earlier version let the racing line graze the north kerb after the tunnel and the NW
+fillet: cars spun out in the mirrored reverse).
 
 **Intended lines:** hug the north parking lane into the SUV tunnel; swing wide (north) into
 the bulb and clip the island; cross the apron diagonally; stay straight from the plank to the
 lip; the shortcut saves ~16 u but is grass with two 9 u gates; after the curb hop, brake for
-the tight left (R 9); the dip throws the car up on exit — land straight for the U-turn.
+the tight left (R 11, `HOP_TURN_R`); the dip throws the car up on exit — land straight for the
+U-turn.
 
 ## Props (47 kinds, ~460 placements, 22 dynamic)
 
@@ -112,11 +113,14 @@ the tight left (R 9); the dip throws the car up on exit — land straight for th
 | `street_hedge`, `street_mailbox`, `street_trash_can`, `street_recycling_bin` | 600 / 568 / 596 | |
 | `street_sign_stop`, `street_sign_street` | 488 / 3 468 | block-letter STOP, MAPLE ST / BIRCH LN |
 | `street_barricade`, `street_cone` (dynamic 0.25) | 260 / 240 | amber flasher light |
-| `street_leaves`, `street_leaf_pile` | 1 058 / 4 730 | maple-leaf scatter (flat), soft 0.5 u bump (Grass) |
+| `street_leaves`, `street_leaf_pile` | 1 058 / 4 730 | maple-leaf scatter (flat), soft 0.5 u bump (Grass; the dome is 0.42–0.5 u high like its collider cap, so cars ride on the leaves) |
 | `street_manhole`, `street_paint_dash/bar/stop` | 920 / 12 | flush, drivable |
 | `street_newspaper` (dynamic 0.08), `street_sprinkler`, `street_garden_light`, `street_bike` | 132 / 192 / 96 / 1 328 | |
 
-Decor (`assets/data/decor/maple_street.ron`): 9 houses and 13 maples beyond the bounds.
+Decor (`assets/data/decor/maple_street.ron`): 9 houses and 13 maples beyond the bounds, standing
+at the edge-lawn height (0.6 u) on Grass lawn plates that `plan.py` lays 120 u beyond the bounds
+(`build_beyond`; Maple Street and Birch Lane leave between them at road level). Physics never
+reaches them.
 Visible-triangle estimate for the whole place: ≈ 0.5 M.
 
 Conventions: materials are plain PBR (no textures yet); clearcoat only on the parked cars'
@@ -153,9 +157,6 @@ dish).
   1.2 u tall; a low garden wall/hedge style would suit better.
 - Props are untextured PBR (plywood, siding, bark read as flat colours up close).
 - Maple canopies are lumpy icosphere clusters (stylised); leaf cards would need alpha.
-- Leaf piles look higher (0.9 u) than their collider (0.5 u cap): cars sink into the leaves.
-- The decor beyond the bounds stands on rc_render's outdoor plane (y ≈ 0), 0.6 u below the
-  lawns at the bounds' edge.
-- Reverse: the left turn right after climbing the curb hop (R 9) is slow; the autopilot scrubs
-  to ~7 km/h on the planting strip (within DoD-2). Widen `TURN_R` in `plan.py` if playtests
-  find it frustrating.
+- Reverse: the left turn right after climbing the curb hop is still the slowest corner (R 11,
+  widened from 9 in T19a: the autopilot scrubbed to ~7 km/h on the planting strip; forward it
+  is the right turn into the hop).

@@ -55,7 +55,7 @@
         life_secs: 10.0,
         hits: 3,
         height: 0.7, // above the track surface
-        edge_margin: 0.8, // bounces this far inside the racing width
+        edge_margin: 0.5, // its core bounces this far off a barrier (or the racing width's edge)
         max_angle_deg: 30.0, // launch angle to the track direction, at most
         knock: (up: 6.0, push: 7.0, spin: 1.0), // pushed sideways
     ),
@@ -64,10 +64,11 @@
         fuse_secs: 6.0,
         no_pass_back_secs: 0.5,
         radius: 7.0,
-        tumble: (up: 9.0, push: 6.0, spin: 1.5),
+        tumble: (up: 7.0, push: 5.0, spin: 1.5), // apex ≈ 1 u: under the 1.2 u barriers
     ),
-    oil_slick: (radius: 2.5, life_secs: 25.0, grip: 0.2, secs: 1.2, spin: 2.5),
-    spring_pad: (radius: 1.6, life_secs: 25.0, up: 12.0, forward: 4.0, spin: 0.6),
+    // Dropped hazards live 15 s: at 25 s a slick or pad caught ~3 cars (QA, T19a).
+    oil_slick: (radius: 2.5, life_secs: 15.0, grip: 0.2, secs: 1.2, spin: 2.5),
+    spring_pad: (radius: 1.6, life_secs: 15.0, up: 8.0, forward: 2.0, spin: 0.3),
     shield_bubble: (secs: 10.0, push: 6.0), // push: Δv given to a car it bumps
     storm_strike: (interval_secs: 0.25, power: 0.0, secs: 1.5, hop: 4.0),
 )

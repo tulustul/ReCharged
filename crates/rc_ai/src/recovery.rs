@@ -27,6 +27,8 @@ pub struct Sense {
     pub off_course: bool,
     /// On its side or roof.
     pub flipped: bool,
+    /// No drive power (EMP, Storm Strike, a stalled start): it cannot move, so it is not stuck.
+    pub powerless: bool,
 }
 
 /// What recovery wants the car to do.
@@ -87,6 +89,11 @@ impl Recovery {
 
     /// Advances by `dt` with what the car senses; returns what to do this tick.
     pub fn step(&mut self, t: &Tuning, sense: Sense, dt: f32) -> Action {
+        if sense.powerless {
+            // Progress cannot be judged while the car has no drive: the windows start over.
+            (self.window, self.window_progress) = (0.0, 0.0);
+            (self.long_window, self.long_progress) = (0.0, 0.0);
+        }
         self.long_window += dt;
         self.long_progress += sense.progress;
         if self.long_window >= TRAPPED_WINDOW_SECS {
@@ -132,7 +139,10 @@ impl Recovery {
         let judge = self.grace <= 0.0;
         let count =
             |timer: &mut f32, on: bool| *timer = if on && judge { *timer + dt } else { 0.0 };
-        count(&mut self.slow, sense.throttle && sense.speed < t.stuck_ups);
+        count(
+            &mut self.slow,
+            sense.throttle && !sense.powerless && sense.speed < t.stuck_ups,
+        );
         count(&mut self.off, sense.off_course);
         count(
             &mut self.flipped,
@@ -198,6 +208,7 @@ mod tests {
             progress: 20.0 * DT,
             off_course: false,
             flipped: false,
+            powerless: false,
         }
     }
 
@@ -248,6 +259,31 @@ mod tests {
             .take_while(|a| **a == Action::HoldReset)
             .count();
         assert!(held as f32 * DT > 0.4, "held long enough for a respawn");
+    }
+
+    #[test]
+    fn a_car_without_drive_power_is_not_stuck() {
+        let mut r = Recovery::default();
+        let powerless = Sense {
+            powerless: true,
+            ..stuck()
+        };
+        // An EMP (2 s) or Storm Strike stopped it in a slow corner: it waits, then drives on.
+        assert!(
+            run(&mut r, powerless, 3.0)
+                .iter()
+                .all(|a| *a == Action::Drive)
+        );
+        let actions = run(&mut r, stuck(), 3.0);
+        let first = actions
+            .iter()
+            .position(|a| *a != Action::Drive)
+            .expect("stuck once the power is back");
+        assert!(
+            (first as f32 * DT - 0.8).abs() < 0.05,
+            "judged from the moment the power returned: {}",
+            first as f32 * DT
+        );
     }
 
     #[test]

@@ -30,6 +30,11 @@ const MIN_BOOM_U: f32 = 1.2;
 const BOOM_RELEASE_S: f32 = 0.35;
 /// Smooth time of the FOV widening, s.
 const WIDEN_SMOOTH_S: f32 = 0.35;
+/// When even the shortest boom would end inside an obstacle (the look-back eye in front of a car
+/// stopped against a ramp or deck), the boom swings up over the car by these angles (rad)…
+const BOOM_LIFTS_RAD: [f32; 2] = [0.6, 1.2];
+/// …but never steeper than this elevation (rad, ≈ 85°): straight down flips the view.
+const MAX_BOOM_ELEVATION_RAD: f32 = 1.48;
 
 /// What a game camera shows.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -217,6 +222,37 @@ pub(crate) fn pull_in(rig: &mut Rig, full: f32, hit: Option<f32>, dt: f32) -> f3
     rig.boom * full
 }
 
+/// The boom direction (unit, pivot → eye) to use instead of `dir` and the obstruction along it
+/// (`cast(dir)` = distance to the first obstacle within the full boom): `dir` while the pulled-in
+/// boom can stay at least [`MIN_BOOM_U`] long, else the first lifted direction with that much
+/// room, else the roomiest one tried.
+// ponytail: the swing snaps (the pull-in already does); ease it if playtests find the pop jarring.
+pub(crate) fn clear_boom(
+    dir: Vec3,
+    full: f32,
+    cast: impl Fn(Vec3) -> Option<f32>,
+) -> (Vec3, Option<f32>) {
+    let room = |hit: Option<f32>| hit.map_or(full, |d| d - PULL_MARGIN_U);
+    let first = cast(dir);
+    let axis = dir.cross(Vec3::Y).normalize_or_zero();
+    if room(first) >= MIN_BOOM_U || axis == Vec3::ZERO {
+        return (dir, first);
+    }
+    let headroom = (MAX_BOOM_ELEVATION_RAD - dir.y.clamp(-1.0, 1.0).asin()).max(0.0);
+    let mut best = (dir, first);
+    for lift in BOOM_LIFTS_RAD {
+        let lifted = Quat::from_axis_angle(axis, lift.min(headroom)) * dir;
+        let hit = cast(lifted);
+        if room(hit) >= MIN_BOOM_U {
+            return (lifted, hit);
+        }
+        if room(hit) > room(best.1) {
+            best = (lifted, hit);
+        }
+    }
+    best
+}
+
 /// What a camera reads from the racer it follows.
 type SubjectData = (
     &'static Transform,
@@ -303,18 +339,24 @@ pub(crate) fn follow_racers(
         };
         let (mut pose, boom) = step(&mut rig, subject, &frame);
         if let Some((pivot, full)) = boom {
-            let dir = (pose.translation - pivot).normalize_or_zero();
-            let hit = physics.as_ref().and_then(|c| {
-                c.cast_ray(
-                    pivot,
-                    dir,
-                    full,
-                    true,
-                    QueryFilter::only_fixed().exclude_sensors(),
-                )
-                .map(|(_, toi)| toi)
-            });
+            let along = (pose.translation - pivot).normalize_or_zero();
+            let cast = |dir: Vec3| {
+                physics.as_ref().and_then(|c| {
+                    c.cast_ray(
+                        pivot,
+                        dir,
+                        full,
+                        true,
+                        QueryFilter::only_fixed().exclude_sensors(),
+                    )
+                    .map(|(_, toi)| toi)
+                })
+            };
+            let (dir, hit) = clear_boom(along, full, cast);
             pose.translation = pivot + dir * pull_in(&mut rig, full, hit, frame.dt);
+            if dir != along {
+                pose = look(pose.translation, pivot); // swung up over the car: look down at it
+            }
         }
         pose.rotation *= shake::offset(&mut rig, frame.dt, shake_on);
         *transform = pose;
@@ -435,6 +477,31 @@ mod tests {
         let (hood, boom) = step(&mut Rig::new(CameraMode::Hood), car, &frame(1.0 / 60.0));
         assert_eq!(hood.translation, HOOD_OFFSET);
         assert!(boom.is_none());
+    }
+
+    #[test]
+    fn a_boom_blocked_closer_than_the_shortest_boom_swings_up_over_the_car() {
+        // A deck face 1 u in front of the pivot, 1.5 u tall (the look-back eye would end inside).
+        let deck = |d: Vec3| {
+            (d.x > 1e-4)
+                .then(|| 1.0 / d.x)
+                .filter(|&t| t * d.y < 1.5 && t <= 4.6)
+        };
+        let look_back = Vec3::new(1.0, 0.2, 0.0).normalize();
+        let (dir, hit) = clear_boom(look_back, 4.6, deck);
+        assert!(dir.y > 0.9, "over the car: {dir}");
+        assert_eq!(hit, None, "clear up there");
+        assert!(dir.z.abs() < 1e-5, "stays in the boom's vertical plane");
+        // Room enough after the pull-in: the boom keeps its direction.
+        let far_wall = |d: Vec3| (d.x > 1e-4).then(|| 3.0 / d.x);
+        let (dir, hit) = clear_boom(look_back, 4.6, far_wall);
+        assert_eq!(dir, look_back);
+        assert!(hit.is_some());
+        let (dir, _) = clear_boom(look_back, 4.6, |_| None);
+        assert_eq!(dir, look_back, "unobstructed");
+        // Nowhere to go (a low ceiling everywhere): the roomiest direction tried.
+        let (dir, hit) = clear_boom(look_back, 4.6, |d| Some(0.5 + d.y));
+        assert!(dir.y > look_back.y && hit.is_some());
     }
 
     #[test]

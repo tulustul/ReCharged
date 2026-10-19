@@ -20,7 +20,7 @@ const WIDE_LINE_U: (f32, f32) = (1.0, 2.2);
 const MISTAKE_SECS: (f32, f32) = (1.0, 2.0);
 /// The pedals act on what the car meets this far ahead (s × speed): one tick of control lag
 /// plus the brakes' build-up.
-const PEDAL_LEAD_SECS: f32 = 0.1;
+pub(crate) const PEDAL_LEAD_SECS: f32 = 0.1;
 /// Body slip beyond this (rad) outside a drift counts as a slide: the corner plan adapts down.
 const SLIDE_RAD: f32 = 0.2;
 /// Cornering adaptation: lost per second of sliding, regained per second, its floor.
@@ -41,10 +41,13 @@ const MIN_SCAN_UPS: f32 = 5.0;
 /// On a jump's run-up (the lip within this many u) the throttle aims at no less than this share
 /// of the jump's reference takeoff speed, whatever the difficulty: rc_track guarantees landings
 /// from 0.8× of it, a slower car drops into the gap.
-const JUMP_RUNUP_U: f32 = 45.0;
-const JUMP_TAKEOFF_SHARE: f32 = 0.9;
+pub(crate) const JUMP_RUNUP_U: f32 = 45.0;
+pub(crate) const JUMP_TAKEOFF_SHARE: f32 = 0.9;
 /// Lateral room kept between the bodies of cars that overlap (u, as the driver's alongside gap).
 const OVERLAP_CLEARANCE_U: f32 = 0.4;
+/// A Goo Bomb carrier chasing a car to bump drives this much over its plan (closing 10 u on a
+/// car at 25 u/s takes ≈ 4 s of the 6 s fuse).
+const GOO_CHASE_SCALE: f32 = 1.1;
 
 /// Throttle and brake: the speed plan scaled by difficulty, braked into early enough; the car's
 /// current top speed (surface, catch-up, boost) caps the throttle only. Also returns the speed
@@ -66,6 +69,9 @@ pub(crate) fn speed_plan(
     if let Some((Mistake::LateBraking(x), _)) = brain.mistake {
         scale *= 1.0 + x;
     }
+    if seeking {
+        scale *= GOO_CHASE_SCALE;
+    }
     if car.progress.finished {
         scale *= d.finished_speed_scale;
     }
@@ -78,23 +84,27 @@ pub(crate) fn speed_plan(
     let cap_mul = (1.0 + car.catch_up.map_or(0.0, |c| c.0)) * car.effects.top_speed_mul();
     let grip = brain.adapt * car.effects.grip_mul();
     let (wet, snow) = w.wet;
-    let profile = &brain.profile;
+    let length = w.track.length();
     let corner_at = |s: f32| {
-        let props = profile.surface_at(s).props();
+        let props = brain.surface_at(length, s).props();
         let weather = props.with_weather(wet, snow);
         // An inside lane turns tighter than the racing line: κ' = κ / (1 − κ·d).
-        let kappa = profile.kappa_at(s);
+        let kappa = brain.kappa_at(length, s);
         let inside = brain.lane * kappa.signum();
         let lane = match inside > 0.0 {
             true => (1.0 - kappa.abs() * inside).max(MIN_LANE_SHARE).sqrt(),
             false => 1.0,
         };
-        scale * lane * profile.corner_at(s) * (grip * weather.grip / props.grip).sqrt()
+        scale * lane * brain.corner_at(length, s) * (grip * weather.grip / props.grip).sqrt()
     };
-    let here = profile.surface_at(view.s).props().with_weather(wet, snow);
+    let here = brain
+        .surface_at(length, view.s)
+        .props()
+        .with_weather(wet, snow);
     let cap = scale * brain.caps.top_speed * here.top_speed * cap_mul;
     let lead = view.s + speed.max(0.0) * PEDAL_LEAD_SECS;
-    let mut brake_to = brake_point_speed(speed.max(0.0), d.brake_decel, profile.spacing(), |x| {
+    let spacing = brain.profile.spacing();
+    let mut brake_to = brake_point_speed(speed.max(0.0), d.brake_decel, spacing, |x| {
         corner_at(lead + x)
     });
     // Traffic: never run into a slower car — unless bumping it on purpose with a Goo Bomb, or on
@@ -123,7 +133,6 @@ pub(crate) fn speed_plan(
         target = target.max((JUMP_TAKEOFF_SHARE * takeoff).min(own_top).min(brake_to));
     }
     let (throttle, brake) = pedals(speed, target, brake_to);
-    let spacing = profile.spacing();
     // Seconds of straight road ahead (the plan stays above the boosted cap), driving it at full
     // throttle with the car's acceleration (Accel stars).
     let (mut v, mut x, mut secs) = (speed.max(MIN_SCAN_UPS), 0.0, 0.0);

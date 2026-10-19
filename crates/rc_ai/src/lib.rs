@@ -3,18 +3,19 @@
 //! - **Responsibilities:** `CarControl` of `AiDriver` racers — pure pursuit on a personal offset
 //!   of the racing line, a per-car speed plan × difficulty, overtaking lanes, hazard and static
 //!   prop avoidance, drift for charge and boost on straights, item use with reaction delays,
-//!   perfect-start timing, stuck recovery, difficulty mistakes — the autopilot (an `AiDriver` on
-//!   a `LocalPlayer` racer), `CatchUp`, and the steering assist (`SimSet::Assist`, `steer` only,
-//!   for assisted local players).
+//!   perfect-start timing, stuck recovery, difficulty mistakes, shortcuts that are faster — the
+//!   autopilot (an `AiDriver` on a `LocalPlayer` racer), `CatchUp`, and the steering assist
+//!   (`SimSet::Assist`: `steer`, plus a gentle auto-brake that only lowers `throttle` / raises
+//!   `brake`, for assisted local players).
 //! - **Inputs:** `Track` (rc_track: racing line, frames, projection, jumps, walls), racer
 //!   `Transform`s, `VehicleTelemetry`, `Charge`, `StatusEffects`, `ItemSlot`, `RaceProgress`,
 //!   `Standings`, rc_items' `Hazard` / `Projectile` entities (`ItemTarget` = rocket lock or Goo
-//!   carrier, `ItemRadius` = reach), `CarRespawned`, `RaceConfig` (seed, catch-up, mode),
-//!   `Catalog` (car stars, rival personalities), `WeatherState`, `Settings` (assist),
-//!   `assets/data/ai.ron` ([`AiTuning`]).
-//! - **Outputs:** `CarControl` of AI racers (and `steer` of assisted humans), `CatchUp` of AI
-//!   rivals, rc_ai's own [`TrackView`] / [`AiBrain`] / [`AssistState`] components,
-//!   `LoadingDone("ai")` / `LoadingFailed`.
+//!   carrier, `ItemRadius` = reach), the rapier world (line of sight for rockets and the Leech
+//!   Coil), `CarRespawned`, `RaceConfig` (seed, catch-up, mode), `Catalog` (car stars, rival
+//!   personalities), `WeatherState`, `Settings` (assist), `assets/data/ai.ron` ([`AiTuning`]).
+//! - **Outputs:** `CarControl` of AI racers (and `steer` / the auto-brake of assisted humans),
+//!   `CatchUp` of AI rivals, rc_ai's own [`TrackView`] / [`AiBrain`] / [`AssistState`]
+//!   components, `LoadingDone("ai")` / `LoadingFailed`.
 //! - **Must never:** teleport or push cars, read input devices, or use non-keyed randomness.
 //!
 //! Design note: `docs/design/rc_ai.md`.
@@ -30,17 +31,19 @@ mod pace;
 mod profile;
 mod recovery;
 mod scene;
+mod shortcut;
 mod steering;
 mod traffic;
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
-pub use assist::AssistState;
+pub use assist::{AssistState, MAX_AUTO_BRAKE};
 pub use brain::{AiBrain, TrackView};
 pub use data::{AI_FILE, AiTuning, LOADING_KEY};
 pub use driver::AiClock;
 pub use profile::{CarCaps, SpeedProfile};
+pub use shortcut::{ShortcutChoice, ShortcutPlan};
 
 /// AI drivers, autopilot and steering assist.
 pub struct AiPlugin;

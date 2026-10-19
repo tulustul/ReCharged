@@ -1,11 +1,12 @@
 //! Analysis of a built track (pure): racing line and speed profile, jump flights, authoring
 //! lints and the geometry hash.
 
-use bevy::math::Vec3;
+use bevy::math::{Vec2, Vec3};
 use rc_core::SurfaceKind;
 
 use crate::def::CHOKE_WIDTH_U;
 use crate::geometry::runs;
+use crate::mesh::style_profile;
 use crate::place::{LINE_LOCK_AFTER_U, LINE_LOCK_BEFORE_U};
 use crate::racing::{LineInput, SpeedInput, SpeedModel, curvature, racing_line, speed_profile};
 use crate::track::*;
@@ -19,6 +20,12 @@ pub const MAX_CHOKEPOINTS: usize = 2;
 /// Two parts of the track closer than this vertically must not overlap in plan (u): a car and
 /// the lower barriers fit under the upper ribbon.
 pub const STACK_CLEARANCE_U: f32 = 3.5;
+/// Lint: the top of a ribbon's edge (ToyTrack lip, Asphalt curb, where barriers stand) must show
+/// at least this much above the floor it lies on (u). Banking tilts around the centreline, so the
+/// inner edge sinks; the authoring rule (`rc_track.md` §A5) keeps 0.15 at the control points,
+/// which leaves room for the spline between them. A ribbon lying flat whose edge rises less (a
+/// carpet runner) needs only its own rise.
+pub const EDGE_CLEARANCE_U: f32 = 0.1;
 /// Samples either side used for the racing line's curvature (2 u apart).
 const CURVATURE_SPAN: usize = 4;
 
@@ -174,8 +181,44 @@ pub(crate) fn lints(track: &Track) -> Vec<String> {
             ));
         }
     }
+    let (profile, edge, thickness) = style_profile(track.style);
+    if !profile.is_empty() {
+        // The edge's top corner: (beyond the half width, above the surface).
+        let lip = profile
+            .iter()
+            .map(|p| p.at(0.0))
+            .filter(|p| (p.x - edge).abs() < 1e-6)
+            .map(|p| p.y)
+            .fold(0.0, f32::max);
+        let edge_top = Vec2::new(edge, lip);
+        for z in zones(track, |n| sunken_edge(track, &n.frame, edge_top, thickness)) {
+            out.push(format!(
+                "s = {z} u: the banked ribbon's inner edge sinks to within {EDGE_CLEARANCE_U} u of the floor below it; raise the ribbon there or bank less (rc_track.md §A5)"
+            ));
+        }
+    }
     out.extend(self_overlaps(track));
     out
+}
+
+/// The top of a visible ribbon's edge (`edge_top` = beyond the half width, above the surface)
+/// lies less than [`EDGE_CLEARANCE_U`] above a floor the ribbon lies on: a ground polygon under
+/// the edge that is not above the ribbon's underside at the centreline (a table top the ribbon
+/// passes under does not count).
+fn sunken_edge(track: &Track, frame: &TrackFrame, edge_top: Vec2, thickness: f32) -> bool {
+    if frame.in_gap {
+        return false;
+    }
+    let clearance = EDGE_CLEARANCE_U.min(thickness + edge_top.y) - 1e-3;
+    let underside = frame.position.y - thickness + 1e-2;
+    [-1.0, 1.0].into_iter().any(|side| {
+        let top = frame.point(side * (frame.half_width + edge_top.x), edge_top.y);
+        track
+            .ground
+            .iter()
+            .filter(|g| g.height <= underside && g.contains_xz(Vec2::new(top.x, top.z)))
+            .any(|g| top.y < g.height + clearance)
+    })
 }
 
 /// Pairs of distant samples whose ribbons overlap in plan at a similar height (first 3).

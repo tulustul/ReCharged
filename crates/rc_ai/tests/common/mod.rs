@@ -84,6 +84,11 @@ pub struct RaceRun {
     /// Items used, by kind, and hits landed (blocked ones counted apart).
     pub items_used: Vec<(ItemKind, u32)>,
     pub hits: (u32, u32),
+    /// To-track respawns by the last hit the car took within [`CAUSE_WINDOW_SECS`] before
+    /// (`None` = no recent hit).
+    pub causes: Vec<(Option<ItemKind>, u32)>,
+    /// Landed (unblocked) hits by item.
+    pub landed: Vec<(ItemKind, u32)>,
     pub reference_lap: f32,
     pub laps: u8,
     pub racers: Vec<Outcome>,
@@ -96,8 +101,8 @@ impl RaceRun {
     pub fn print(&self, title: &str) {
         if !self.items_used.is_empty() {
             println!(
-                "items used {:?}, hits {} (+{} blocked)",
-                self.items_used, self.hits.0, self.hits.1
+                "items used {:?}, hits {} (+{} blocked) {:?}, respawn causes {:?}",
+                self.items_used, self.hits.0, self.hits.1, self.landed, self.causes
             );
         }
         println!(
@@ -132,6 +137,17 @@ impl RaceRun {
     }
 }
 
+/// A to-track respawn this soon after a landed hit (s) is counted as caused by that hit.
+pub const CAUSE_WINDOW_SECS: f32 = 8.0;
+
+/// Adds one to `kind`'s count.
+pub fn tally<K: PartialEq>(counts: &mut Vec<(K, u32)>, kind: K) {
+    match counts.iter_mut().find(|(k, _)| *k == kind) {
+        Some((_, n)) => *n += 1,
+        None => counts.push((kind, 1)),
+    }
+}
+
 /// Runs `config` from the grid (intro and countdown included) until every racer finished or
 /// `max_secs` of race time passed.
 pub fn run_race(app: &mut App, config: RaceConfig, max_secs: f32) -> RaceRun {
@@ -148,22 +164,19 @@ pub fn run_race_traced(
     let laps = config.laps;
     load_race(app, config).expect("race loads");
     let mut respawned = MessageCursor::<CarRespawned>::default();
+    let mut impacts = MessageCursor::<CarImpact>::default();
+    let mut race_events = MessageCursor::<RaceEvent>::default();
     let mut item_events = MessageCursor::<ItemEvent>::default();
     let mut hit_events = MessageCursor::<HitEvent>::default();
     let mut items_used: Vec<(ItemKind, u32)> = Vec::new();
     let mut hits = (0, 0);
     let mut respawns: Vec<(Entity, u32)> = Vec::new();
-    let mut count = |app: &App, respawns: &mut Vec<(Entity, u32)>| {
-        let messages = app.world().resource::<Messages<CarRespawned>>();
-        for m in respawned.read(messages) {
-            if m.kind == RespawnKind::ToTrack {
-                match respawns.iter_mut().find(|(e, _)| *e == m.car) {
-                    Some((_, n)) => *n += 1,
-                    None => respawns.push((m.car, 1)),
-                }
-            }
-        }
-    };
+    let mut causes: Vec<(Option<ItemKind>, u32)> = Vec::new();
+    let mut landed: Vec<(ItemKind, u32)> = Vec::new();
+    let mut last_hit: Vec<(Entity, ItemKind, u32)> = Vec::new();
+    let window = secs_to_ticks(CAUSE_WINDOW_SECS);
+    // `AI_TRACE_HITS=1`: print every hit and to-track respawn as it happens.
+    let log_hits = std::env::var("AI_TRACE_HITS").is_ok_and(|v| v == "1");
     for _ in 0..secs_to_ticks(10.0) {
         step(app, 1);
         if race_phase(app) == Some(RacePhase::Racing) {
@@ -173,20 +186,70 @@ pub fn run_race_traced(
     let ticks = secs_to_ticks(max_secs);
     for tick in 0..ticks {
         step(app, 1);
-        count(app, &mut respawns);
         for e in item_events.read(app.world().resource::<Messages<ItemEvent>>()) {
             if let ItemEventKind::Used(kind) = e.kind {
-                match items_used.iter_mut().find(|(k, _)| *k == kind) {
-                    Some((_, n)) => *n += 1,
-                    None => items_used.push((kind, 1)),
-                }
+                tally(&mut items_used, kind);
             }
         }
         for h in hit_events.read(app.world().resource::<Messages<HitEvent>>()) {
+            if log_hits {
+                let index = app.world().get::<Racer>(h.victim).map_or(99, |r| r.index);
+                println!("hit t {:.2} r{index} by {:?}", tick as f32 / 60.0, h.by);
+            }
             if h.blocked {
                 hits.1 += 1;
             } else {
                 hits.0 += 1;
+                tally(&mut landed, h.by);
+                last_hit.retain(|(car, ..)| *car != h.victim);
+                last_hit.push((h.victim, h.by, tick));
+            }
+        }
+        if log_hits {
+            for e in race_events.read(app.world().resource::<Messages<RaceEvent>>()) {
+                if e.kind == RaceEventKind::MissedCheckpoint {
+                    let index = e
+                        .racer
+                        .and_then(|r| app.world().get::<Racer>(r))
+                        .map_or(99, |r| r.index);
+                    println!("missed checkpoint t {:.2} r{index}", tick as f32 / 60.0);
+                }
+            }
+            for m in impacts.read(app.world().resource::<Messages<CarImpact>>()) {
+                let index = app.world().get::<Racer>(m.car).map_or(99, |r| r.index);
+                let what = m.other.map(|o| {
+                    let w = app.world();
+                    if let Some(p) = w.get::<TrackPiece>(o) {
+                        format!("{:?}", p.kind)
+                    } else if let Some(p) = w.get::<Prop>(o) {
+                        p.kind.clone()
+                    } else if w.get::<Racer>(o).is_some() {
+                        "car".to_owned()
+                    } else {
+                        format!("{o}")
+                    }
+                });
+                println!(
+                    "impact t {:.2} r{index} {what:?} strength {:.2} at {} normal {}",
+                    tick as f32 / 60.0,
+                    m.strength,
+                    m.point,
+                    m.normal
+                );
+            }
+        }
+        for m in respawned.read(app.world().resource::<Messages<CarRespawned>>()) {
+            if m.kind == RespawnKind::ToTrack {
+                if log_hits {
+                    let index = app.world().get::<Racer>(m.car).map_or(99, |r| r.index);
+                    println!("respawn t {:.2} r{index}", tick as f32 / 60.0);
+                }
+                tally(&mut respawns, m.car);
+                let cause = last_hit
+                    .iter()
+                    .find(|(car, _, at)| *car == m.car && tick - at <= window)
+                    .map(|(_, by, _)| *by);
+                tally(&mut causes, cause);
             }
         }
         trace(app, tick);
@@ -229,6 +292,8 @@ pub fn run_race_traced(
     RaceRun {
         items_used,
         hits,
+        causes,
+        landed,
         reference_lap: reference,
         laps,
         order: order.into_iter().map(|(_, i)| i).collect(),
@@ -268,6 +333,28 @@ pub fn trace_racer(app: &mut App, index: usize, tick: u32) {
                 tp.lateral,
                 r.map(|r| r.0)
             );
+        }
+    }
+    // `AI_TRACE_PROPS=1`: dynamic props within 4 u of the traced car.
+    if std::env::var("AI_TRACE_PROPS").is_ok() {
+        let at = {
+            let mut q = world.query::<(&Racer, &rc_ai::TrackView)>();
+            q.iter(world)
+                .find(|(r, _)| r.index == index)
+                .map(|(_, v)| v.pos)
+        };
+        let mut props = world.query::<(&Prop, &Transform)>();
+        for (prop, t) in props.iter(world) {
+            if let Some(at) = at
+                && prop.dynamic
+                && t.translation.distance(at) < 4.0
+            {
+                let tp = track.project(t.translation, None);
+                println!(
+                    "   prop {} s {:.1} lat {:.2} h {:.2}",
+                    prop.kind, tp.s, tp.lateral, tp.height
+                );
+            }
         }
     }
     let mut q = world.query::<(

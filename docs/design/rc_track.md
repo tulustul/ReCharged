@@ -48,7 +48,7 @@ in track files are errors (typos are caught); integers are fine for floats (`(0,
         (pos: (0, 0.3, 28), width: 12, surface: Asphalt, wall_left: true, wall_right: false, offroad_margin: 6),
         (pos: (0, 0.3, 10)),                  // inherits width/surface/walls/margin
         (pos: (0, 0.3, -30)),
-        (pos: (2.9, 0.3, -51), bank_deg: 15), // turn: a point every 20–30°
+        (pos: (2.9, 0.3, -51)),               // turn: a point every 20–30° (banking: §A5)
         // …
     ],
     gaps: [(from: 12, to: 13, dir: Fwd)],     // jumps
@@ -148,7 +148,7 @@ you how much); no checkpoint is placed inside a shortcut span (+ 2 u); it must g
 | Points | one every 20–30° in turns; on a straight, a point one turn-step (≈ R·30° in radians) before and after each turn; change heights and widths on straights | plot (speed ripple, edge bulges) |
 | Jumps | land at 0.8× and 1.0× the target speed; 0.6–1.2 s air (GDD §5.1) | lint + plot |
 | Items | 4–6 rows; never over gaps | tests / load error |
-| Banked turns on a floor | banking tilts around the centreline, so the inner lip and barrier sink: keep the ribbon at y ≥ floor + (hw + 0.35)·sin(bank) − 0.25·cos(bank) + 0.15 (hw = half width); change heights on the straights | plot (side view: inner edge) — not linted yet |
+| Banked turns on a floor | banking tilts around the centreline, so the inner lip and barrier sink: keep the ribbon at y ≥ floor + (hw + 0.35)·sin(bank) − 0.25·cos(bank) + 0.15 (hw = half width; Asphalt: hw + 0.9 and 0.08 for the curb); change heights on the straights | lint: an edge top (lip/curb) less than 0.1 u above a ground polygon it lies on (the rule's 0.15 leaves room for the spline between points); plot (side view: inner edge) |
 | Dynamic props | ≤ 40 per layout | load error |
 
 Catmull-Rom tips: a straight segment between collinear points is perfectly straight; a lone
@@ -276,7 +276,7 @@ usable without an `App`: `Track::load(assets_dir, &variant)` (e.g. from tools an
 | `is_on_drivable(pos) -> bool` | over the ribbon (not Invisible, not a gap) or a ground polygon, from 1 u below to 3 u above it; props not counted |
 | `outline_2d() -> Vec<Vec2>`, `summary() -> TrackSummary` | minimap outline (x, z, every ≈ 2 u); the rc_core summary |
 | `checkpoints() -> &[TrackFrame]` | ≥ 8 gates (position ± half width), sorted by `s` |
-| `respawn_points() -> &[RespawnPoint]` | `{ s, transform }` every ≈ 15 u, 0.5 u above the surface |
+| `respawn_points() -> &[RespawnPoint]` | `{ s, transform }` every ≈ 15 u and 6 u past every jump landing (`LANDING_RESPAWN_U`: a car that fails after the landing restarts there, not before the ramp where it may fail again — a loop seen on wrench_works), 0.5 u above the surface |
 | `grid() -> &[Transform]` | 8 poses, pole first, 2 staggered columns, 0.15 u above the surface |
 | `item_rows() -> &[ItemRow]` | `{ s, slots: Vec<Vec3> }` |
 | `props() -> &[PlacedProp]`, `prop_def(kind)` | `{ kind, transform }`; the `PropDef` (model, colliders, dynamic, mass, surface) |
@@ -327,7 +327,10 @@ usable without an `App`: `Track::load(assets_dir, &variant)` (e.g. from tools an
   tangents, helix frames, loop rejection, triangulation (concave, both windings, degenerate,
   self-intersection), outward-facing swept profiles, UVs, racing line margins/locking/lap time,
   speed limits, curvature, prop catalog parsing/merging/duplicates, wedge orientation.
-- Pipeline (`src/tests.rs`): every track file in all four variants without lints; loops close;
+- Pipeline (`src/tests.rs`): every track file in all four variants without lints; the sunken-edge
+  lint on a 20°-banked oval over a mat (ribbon at y 0.3: both turns linted; at 1.85, the §A5
+  height: clean; at 1.73, 0.08 u of lip left: linted); a respawn point follows every jump landing;
+  loops close;
   mirror/reverse invariants (length, mirrored outline, same curve backwards, hashes differ);
   feature `dir` filtering; projection continuity on a helix and across the start line; checkpoint
   and respawn wrap-around and clamping; racing line, speed, respawn, grid rules on real tracks;

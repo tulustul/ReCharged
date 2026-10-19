@@ -4,19 +4,33 @@
 //! barriers, jumps, the item view.
 
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::{CollisionGroups, Group, QueryFilter, RapierContext};
 use rc_core::prelude::*;
 use rc_track::{Primitive, Track, TrackFrame};
 
 use crate::brain::TrackView;
 use crate::data::AiTuning;
-use crate::items::ItemView;
+use crate::items::{ItemView, MAX_RANGE_SHARE};
 use crate::steering::angle_to;
 use crate::traffic::Obstacle;
 
 /// Half the width of a car (u).
 pub(crate) const CAR_HALF_WIDTH_U: f32 = 0.6;
+/// A car's centre above its origin (u) and where rc_items launches a rocket, ahead of (or behind)
+/// that centre (u): the line-of-sight tests use the item's own geometry.
+const CAR_CENTRE_U: f32 = 0.4;
+const MUZZLE_U: f32 = 1.4;
 /// Reach of a hazard without an `ItemRadius` (u, the oil slick's).
 const FALLBACK_HAZARD_RADIUS_U: f32 = 2.5;
+/// Item hazards (oil, Spring Pads, orbs) are seen this long ahead at the car's speed (s), at
+/// least as far as the traffic look-ahead: at 30 u/s the 16 u look-ahead left a dodge 0.5 s,
+/// and cars ran over a slick 3–4 times per drop.
+const HAZARD_LOOK_AHEAD_SECS: f32 = 0.8;
+/// A Goo Bomb carrier hunts the nearest unshielded car it can reach: from alongside to this far
+/// ahead along the track and this far to either side (u). Farther cars ahead are only seeked
+/// when none is in reach (the carrier rarely caught them and blew itself up).
+const GOO_HUNT_AHEAD_U: f32 = 15.0;
+const GOO_HUNT_LATERAL_U: f32 = 4.0;
 /// Cars within this distance along the track (u, either way) are alongside: they bound the
 /// lateral range instead of being passed.
 const ALONGSIDE_U: f32 = 3.0;
@@ -57,10 +71,9 @@ pub(crate) struct HazardSpot {
     pub s: f32,
     pub lateral: f32,
     pub radius: f32,
+    /// An item (oil, Spring Pad, orb) rather than a static prop: seen further ahead.
+    pub item: bool,
 }
-
-// ponytail: shortcuts are never taken (the racing line ignores them; `Track::shortcuts` has the
-// paths if a personality should gamble on one).
 
 /// Footprint circles (centre, radius) and vertical extent (min, max y) of one collider primitive
 /// placed at `at`. Boxes and wedges are covered by a row of circles along their long side, so a
@@ -138,6 +151,7 @@ pub(crate) fn static_obstacles(track: &Track) -> Vec<HazardSpot> {
                         s: tp.s,
                         lateral: tp.lateral,
                         radius,
+                        item: false,
                     });
                 }
             }
@@ -211,6 +225,7 @@ impl SceneBuffers {
                 s: tp.s,
                 lateral: tp.lateral,
                 radius: radius.map_or(FALLBACK_HAZARD_RADIUS_U, |r| r.0),
+                item: true,
             }
         };
         for (hazard, tf, target, radius) in hazards {
@@ -242,9 +257,33 @@ pub(crate) struct Scene<'a> {
     pub goo: &'a [Entity],
     /// Racers by rank.
     pub standings: &'a [Entity],
+    /// The physics world for line-of-sight tests (`None`: everything is in sight).
+    pub ctx: Option<&'a RapierContext<'a>>,
+}
+
+/// What a rocket or Leech Coil sees: the track's and the props' colliders, never cars or
+/// sensors (rc_items' rocket-lock filter).
+fn sight_filter() -> QueryFilter<'static> {
+    QueryFilter::new()
+        .exclude_sensors()
+        .groups(CollisionGroups::new(
+            Group::from_bits_truncate(layers::PROJECTILE),
+            Group::from_bits_truncate(layers::TRACK | layers::PROP),
+        ))
 }
 
 impl Scene<'_> {
+    /// Nothing of the world between `from` and `to`.
+    pub fn in_sight(&self, from: Vec3, to: Vec3) -> bool {
+        let Some(ctx) = self.ctx else { return true };
+        let d = to - from;
+        let len = d.length();
+        len < 1e-3
+            || ctx
+                .cast_ray(from, d / len, len, true, sight_filter())
+                .is_none()
+    }
+
     fn rivals(&self, me: Entity) -> impl Iterator<Item = &Other> {
         self.others
             .iter()
@@ -263,34 +302,38 @@ impl Scene<'_> {
     ) {
         let t = &self.tuning.traffic;
         let ahead = |s: f32| self.track.delta_s(view.s, s);
+        // Followers keep no extra berth from a Goo Bomb carrier: the carrier needs a bump.
         let cars = self
             .rivals(me)
             .filter(|o| Some(o.entity) != seek)
             .map(|o| Obstacle {
                 ahead: ahead(o.s),
                 lateral: o.lateral,
-                half_width: CAR_HALF_WIDTH_U
-                    + t.side_gap_u
-                    + if self.goo.contains(&o.entity) {
-                        t.goo_clearance_u
-                    } else {
-                        0.0
-                    },
+                half_width: CAR_HALF_WIDTH_U + t.side_gap_u,
                 speed: o.speed,
                 car: true,
-            });
-        let hazards = self.hazards.iter().map(|h| Obstacle {
-            ahead: ahead(h.s),
-            lateral: h.lateral,
-            half_width: h.radius + t.hazard_clearance_u,
-            speed: 0.0,
-            car: false,
-        });
+            })
+            .filter(|o| o.ahead > 0.0 && o.ahead < t.look_ahead_u);
+        let item_reach = t
+            .look_ahead_u
+            .max(HAZARD_LOOK_AHEAD_SECS * view.vel.length());
+        let hazards = self
+            .hazards
+            .iter()
+            .map(|h| {
+                let o = Obstacle {
+                    ahead: ahead(h.s),
+                    lateral: h.lateral,
+                    half_width: h.radius + t.hazard_clearance_u,
+                    speed: 0.0,
+                    car: false,
+                };
+                (o, if h.item { item_reach } else { t.look_ahead_u })
+            })
+            .filter(|(o, reach)| o.ahead > 0.0 && o.ahead < *reach)
+            .map(|(o, _)| o);
         out.clear();
-        out.extend(
-            cars.chain(hazards)
-                .filter(|o| o.ahead > 0.0 && o.ahead < t.look_ahead_u),
-        );
+        out.extend(cars.chain(hazards));
         alongside.clear();
         alongside.extend(
             self.rivals(me)
@@ -299,27 +342,39 @@ impl Scene<'_> {
         );
     }
 
-    /// The car a Goo Bomb carrier should bump: the nearest unshielded car ahead within reach.
+    /// The car a Goo Bomb carrier should bump: the nearest unshielded car in reach (alongside
+    /// to 15 u ahead, within 4 u to either side), else the nearest one ahead within `goo_seek_u`.
     pub fn goo_target(&self, me: Entity, view: &TrackView) -> Option<&Other> {
         if !self.goo.contains(&me) {
             return None;
         }
         let reach = self.tuning.items.goo_seek_u;
-        self.rivals(me)
-            .filter(|o| !o.shielded)
-            .map(|o| (o, self.track.delta_s(view.s, o.s)))
-            .filter(|(_, d)| *d > 0.0 && *d < reach)
-            .min_by(|a, b| a.1.total_cmp(&b.1))
+        let candidates = || {
+            self.rivals(me)
+                .filter(|o| !o.shielded)
+                .map(|o| (o, self.track.delta_s(view.s, o.s)))
+        };
+        let near = |(o, d): &(&Other, f32)| goo_reach(*d, o.lateral - view.lateral);
+        candidates()
+            .filter(near)
+            .min_by(|a, b| a.1.abs().total_cmp(&b.1.abs()))
+            .or_else(|| {
+                candidates()
+                    .filter(|(_, d)| *d > 0.0 && *d < reach)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+            })
             .map(|(o, _)| o)
     }
 
-    /// What the item decisions see from `me` (heading, up; rank; own state).
+    /// What the item decisions see from `me` (heading, up; rank; own state). Holding a Spark
+    /// Rocket or a Leech Coil (`held`), only targets the item could see count (rays from the
+    /// rocket's muzzle / the car's centre to the target's centre, like rc_items' lock).
     pub fn item_view(
         &self,
         me: Entity,
         view: &TrackView,
-        heading: Vec3,
-        up: Vec3,
+        (heading, up): (Vec3, Vec3),
+        held: Option<ItemKind>,
         own: ItemView,
     ) -> ItemView {
         let items = &self.tuning.items;
@@ -329,14 +384,28 @@ impl Scene<'_> {
             ..own
         };
         let closer = |slot: &mut Option<f32>, d: f32| *slot = Some(slot.map_or(d, |x| x.min(d)));
+        let centre = view.pos + up * CAR_CENTRE_U;
+        let target = |o: &Other| o.pos + Vec3::Y * CAR_CENTRE_U;
+        let rocket = held == Some(ItemKind::SparkRocket);
+        let reach = items.rocket_range_u.max(items.rocket_back_range_u) * MAX_RANGE_SHARE;
+        // A car counts for the rocket cone when it is nearer than the best so far and, with a
+        // rocket in hand, within reach and in sight from the muzzle (rays only for candidates).
+        let aimed = |best: Option<f32>, dist: f32, muzzle: Vec3, o: &Other| {
+            best.is_none_or(|b| dist < b)
+                && (!rocket || (dist <= reach && self.in_sight(muzzle, target(o))))
+        };
         for o in self.rivals(me) {
             let d = o.pos - view.pos;
             let dist = d.length();
             let angle = angle_to(heading, d - up * d.dot(up), up).abs();
             if angle <= cone {
-                closer(&mut v.cone_ahead, dist);
-            } else if angle >= std::f32::consts::PI - cone {
-                closer(&mut v.cone_behind, dist);
+                if aimed(v.cone_ahead, dist, centre + heading * MUZZLE_U, o) {
+                    v.cone_ahead = Some(dist);
+                }
+            } else if angle >= std::f32::consts::PI - cone
+                && aimed(v.cone_behind, dist, centre - heading * MUZZLE_U, o)
+            {
+                v.cone_behind = Some(dist);
             }
             let along = self.track.delta_s(view.s, o.s);
             if along > 0.0 {
@@ -348,14 +417,23 @@ impl Scene<'_> {
             if dist <= items.emp_radius_u {
                 v.in_emp_radius += 1;
             }
+            v.goo_in_reach |= !o.shielded && goo_reach(along, o.lateral - view.lateral);
         }
         let rank = self.standings.iter().position(|&e| e == me);
+        let leech = held == Some(ItemKind::LeechCoil);
         v.next_in_race = rank
             .and_then(|r| r.checked_sub(1))
             .and_then(|r| self.others.iter().find(|o| o.entity == self.standings[r]))
+            .filter(|o| !leech || self.in_sight(centre, target(o)))
             .map(|o| o.pos.distance(view.pos));
         v
     }
+}
+
+/// A car `ahead` u along the track and `lateral` u to the side is in a Goo Bomb carrier's bump
+/// reach.
+fn goo_reach(ahead: f32, lateral: f32) -> bool {
+    (-ALONGSIDE_U..GOO_HUNT_AHEAD_U).contains(&ahead) && lateral.abs() < GOO_HUNT_LATERAL_U
 }
 
 /// `s` (with `ahead` u of lookahead) is on a jump's run-up, flight or landing.

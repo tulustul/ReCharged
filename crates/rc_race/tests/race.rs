@@ -489,6 +489,29 @@ fn respawns_battery_and_dropped_players() {
 }
 
 #[test]
+fn a_finished_human_is_handed_to_the_ai() {
+    let mut app = app();
+    start_race(&mut app, config(&[0, 1], 1)).expect("loads");
+    step(&mut app, 2);
+    let cars = racers(&mut app);
+    let (p1, p2) = (cars[0].0, cars[1].0);
+    assert!(app.world().get::<AiDriver>(p1).is_none());
+    // P1 (the fastest stand-in) finishes first; P2 is still racing, so the race goes on.
+    step_until(&mut app, "P1's finish", |w| {
+        w.get::<RaceProgress>(p1).is_some_and(|p| p.finished)
+    });
+    step(&mut app, 1);
+    assert_eq!(race_phase(&app), Some(RacePhase::Racing));
+    let driver = app.world().get::<AiDriver>(p1).expect("the AI took over");
+    assert_eq!(driver.rival, RivalId::new("autopilot"));
+    assert!(
+        app.world().get::<LocalPlayer>(p1).is_some(),
+        "camera and HUD stay"
+    );
+    assert!(app.world().get::<AiDriver>(p2).is_none(), "P2 still drives");
+}
+
+#[test]
 fn time_trial_records_and_races_a_ghost() {
     let mut app = app();
     let mut tt = config(&[0], 1);

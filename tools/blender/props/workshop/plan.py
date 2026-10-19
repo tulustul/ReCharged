@@ -41,6 +41,8 @@ BENCH_X = 6.0                                       # workbench island centre on
 CHICANE = [(-30.0, 0.0), (-14.0, -4.0), (2.0, 4.0), (18.0, -4.0), (34.0, 0.0)]  # (x, lateral)
 ALLEY = dict(x0=-26.0, x1=-2.0, gaps=(-21.5, -6.5), width=4.4)  # GB alley behind apex A
 CHICANE_W = 8.0
+CHICANE_OPEN = 5.0                                  # the tyre walls start this far into the chicane
+DRESS_BEHIND = 1.5                                  # knockables stand this far behind a wall
 WASH_X = 27.0                                       # wash bay centre on the S3 lane
 BOOTH_X = -24.0                                     # paint booth centre on the S3 lane
 WALLS = dict(wall_left=True, wall_right=True)
@@ -124,16 +126,18 @@ def route():
     names = {}
     marks = [
         (X_E - step(R_U), 0, '', {}),
-        (e_edge + foot + 7, 0, '', dict(width=8.0)),
-        (e_edge + foot, 0, 'east ramp foot', OPEN),
+        # the walls stop 7 u before the east ramp foot and start again 7 u after the west one:
+        # a car landing a little off line (either direction) runs out on open floor
+        (e_edge + foot + 7, 0, '', dict(width=8.0, **OPEN)),
+        (e_edge + foot, 0, 'east ramp foot', {}),
         (e_edge + land, land_y, 'east ramp (reverse landing)', {}),
         (e_edge, lip_y, 'east bench edge (reverse lip)', {}),
         (e_edge - kick, top_y, 'east kicker foot', {}),
         (w_edge + kick, top_y, 'west kicker foot', {}),
         (w_edge, lip_y, 'west bench edge (forward lip)', {}),
         (w_edge - land, land_y, 'west ramp (forward landing)', {}),
-        (w_edge - foot, 0, 'west ramp foot', WALLS),
-        (w_edge - foot - 7, 0, '', dict(width=W)),
+        (w_edge - foot, 0, 'west ramp foot', {}),
+        (w_edge - foot - 7, 0, '', dict(width=W, **WALLS)),
         (X_WT + step(R_U), 0, '', {}),
     ]
     r.lane(X_WT, marks)
@@ -315,6 +319,8 @@ def props(pts, ix):
         for x, z in edge_line(pts, i0, i1, side * (t['r'] + 0.05), pitch):
             if side < 0 and any(abs(x - g) < pitch * 0.95 for g in a['gaps']):
                 continue
+            if x < CHICANE[0][0] + CHICANE_OPEN:
+                continue  # open entry: cars leave the W U-turn wide
             stack(x, z)
     off = t['r'] + 0.05 + 2 * t['r'] + a['width']
     outer = [q for q in edge_line(pts, i0, i1, -off, pitch) if a['x0'] <= q[0] <= a['x1']]
@@ -336,45 +342,51 @@ def arc_pt(c, r, deg):
 
 
 def dress(add):
-    """Knockables at the lane edges (<= 40 dynamic bodies) and statics in the islands."""
+    """Knockables beside the racing width (<= 40 dynamic bodies) and statics in the islands.
+    Nothing knockable stands on the racing width: behind the walls on walled lanes, just outside
+    the width where the walls are open (cars knocked them onto the line or tripped over them)."""
     bx = BENCH_X
-    # N lane: drain pans under the car tails, a creeper, the wheel off car B, oil jugs
-    add('workshop_drain_pan', LIFTS[0][0] - 2.5, Z_N + 3.2, note='N lane dressing (knockable)')
-    add('workshop_drain_pan', LIFTS[1][0] + 2.0, Z_N + 3.2, 40)
-    add('workshop_creeper', 19.0, Z_N - 3.4, 80)
-    add('workshop_wheel', LIFTS[1][0] - 4.0, Z_N - 3.3, 25)
-    for x, z, yaw in ((-2.0, Z_N - 3.9, 10), (-1.0, Z_N - 4.0, -25)):
+    behind = W / 2 + DRESS_BEHIND  # centre line of the dressing behind a lane wall
+    # N lane: drain pans under the car bodies (lift bays), a creeper, the wheel off car B, jugs
+    add('workshop_drain_pan', LIFTS[0][0] - 2.5, Z_N + behind + 1.2,
+        note='N lane dressing (knockable, behind the walls)')
+    add('workshop_drain_pan', LIFTS[1][0] + 2.0, Z_N + behind + 1.2, 40)
+    add('workshop_creeper', 19.0, Z_N - behind - 1.0, 80)
+    add('workshop_wheel', LIFTS[1][0] - 4.0, Z_N - behind - 1.4, 25)
+    for x, z, yaw in ((-2.0, Z_N - behind - 0.5, 10), (-1.0, Z_N - behind - 0.6, -25)):
         add('workshop_oil_can', x, z, yaw)
-    # E1 U-turn inside: a toolbox and a battery by the tool chest
-    for kind, deg, r, yaw in (('workshop_toolbox', 25, 10.4, -60), ('workshop_battery', 42, 10.2, 20)):
+    # E1 U-turn island (inside the inner wall): a toolbox and a battery by the tool chest
+    for kind, deg, r, yaw in (('workshop_toolbox', 25, 6.0, -60), ('workshop_battery', 42, 6.2, 20)):
         x, z = arc_pt((X_E, Z_N + R_U), r, deg)
         add(kind, x, z, yaw)
-    # M lane: cones at the ramp run-in and after the landing, spanners on the bench top
-    for x in (52.0, 46.5, -33.0, -38.0):
+    # M lane: cones on the open floor around both ramp feet (the walls open there), spanners on
+    # the bench top
+    e_foot = bx + C.BENCH['length'] / 2 + C.BENCH['ramp_run']
+    w_foot = bx - C.BENCH['length'] / 2 - C.BENCH['ramp_run']
+    for x in (e_foot + 5.0, e_foot + 2.0, w_foot - 2.0, w_foot - 5.0):
         for side in (-1, 1):
-            add('workshop_cone', x, Z_M + side * 3.9, (x * 13) % 90,
-                note='cones along the M lane' if (x, side) == (52.0, -1) else '')
+            add('workshop_cone', x, Z_M + side * 5.3, (x * 13) % 90,
+                note='cones around the ramp feet' if (x, side) == (e_foot + 5.0, -1) else '')
     add('workshop_wrench', bx + 4.0, Z_M + 2.6, 30, y=C.BENCH['top'],
         note='spanners left on the bench top (knock them off)')
     add('workshop_wrench', bx - 3.0, Z_M - 2.7, -50, y=C.BENCH['top'])
-    # S lane: cones before and after the chicane, loose tyres at its exit
-    for x in (-37.0, 41.0):
-        for side in (-1, 1):
-            add('workshop_cone', x, Z_S + side * 3.9, (x * 7) % 90)
-    for x, z in ((45.0, Z_S - 3.3), (48.5, Z_S + 3.4)):
+    # S lane: cones at the open chicane entry, loose tyres behind the walls after its exit
+    for side in (-1, 1):
+        add('workshop_cone', CHICANE[0][0] + 1.5, Z_S + side * (CHICANE_W / 2 + 1.2), 21)
+    for x, z in ((45.0, Z_S - behind - 1.4), (48.5, Z_S + behind + 1.4)):
         add('workshop_tyre', x, z, (x * 31) % 360, note='loose tyres' if x == 45.0 else '')
-    x, z = arc_pt((X_E, Z_S + R_U), 10.6, 0)
+    x, z = arc_pt((X_E, Z_S + R_U), 6.0, 0)
     add('workshop_tyre', x, z, 70)
     # S3 lane: buckets in the wash bay, oil jugs and jerry cans by the booth
     add('workshop_bucket', WASH_X + 9.0, Z_S3 + 4.9, 0, note='wash bay buckets, jugs, cans')
     add('workshop_bucket', WASH_X - 8.5, Z_S3 - 4.9, 0)
-    for x, z, yaw in ((-3.0, Z_S3 - 3.8, 15), (-4.0, Z_S3 - 4.1, -35)):
+    for x, z, yaw in ((-3.0, Z_S3 - behind - 0.5, 15), (-4.0, Z_S3 - behind - 0.6, -35)):
         add('workshop_oil_can', x, z, yaw)
-    add('workshop_jerry_can', BOOTH_X - 21.0, Z_S3 + 4.0, 80)
-    add('workshop_jerry_can', BOOTH_X - 22.6, Z_S3 + 4.1, 95)
-    # W lane: cones at the mat ends
+    add('workshop_jerry_can', BOOTH_X - 21.0, Z_S3 + behind + 0.6, 80)
+    add('workshop_jerry_can', BOOTH_X - 22.6, Z_S3 + behind + 0.7, 95)
+    # W lane: cones at the mat ends, behind the walls
     for z, side in ((-26.0, -1), (26.0, 1)):
-        add('workshop_cone', X_W + side * 3.9, z, 20)
+        add('workshop_cone', X_W + side * (behind + 0.8), z, 20)
     # islands (reachable only by falling off the bench): equipment and stock, static
     add('workshop_tyre_changer', 45.0, -1.5, 180, note='island equipment (static)')
     add('workshop_wheel_balancer', 53.0, 2.0, -90)

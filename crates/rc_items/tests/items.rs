@@ -4,6 +4,7 @@
 mod common;
 
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group};
 use common::*;
 use rc_core::prelude::*;
 use rc_items::{Band, ItemClock, ItemTuning};
@@ -61,8 +62,11 @@ fn rocket_hits_a_stationary_target_and_tumbles_it() {
 #[test]
 fn unlocked_rocket_flies_straight_and_explodes_on_the_wall() {
     let mut app = race(1);
-    // Facing the outer wall (−X) on the main straight; nobody to lock onto.
+    // Facing the outer wall (−X) on the main straight; nobody in sight to lock onto: the car
+    // parked on the grass behind the wall is in the cone and within the blast radius of the
+    // impact, but the wall hides it from the lock and shields it from the blast.
     let shooter = spawn_car(&mut app, straight(0.0), 90f32.to_radians());
+    let hidden = spawn_car(&mut app, Vec3::new(-8.3, 0.0, 0.0), 0.0);
     step(&mut app, 10);
     fire(&mut app, shooter, ItemKind::SparkRocket, false);
     step_until(&mut app, "the rocket explodes", |w| {
@@ -78,6 +82,93 @@ fn unlocked_rocket_flies_straight_and_explodes_on_the_wall() {
         "flew straight: {blast:?}"
     );
     assert!(log(&app).hits.is_empty(), "the owner is immune and alone");
+    assert!(
+        !log(&app)
+            .items
+            .iter()
+            .any(|e| e.kind == ItemEventKind::LockOn { target: hidden }),
+        "no lock through the wall"
+    );
+}
+
+#[test]
+fn a_rocket_that_loses_its_lock_locks_onto_the_next_car_in_its_cone() {
+    let mut app = race(1);
+    let shooter = spawn_car(&mut app, straight(5.0), 0.0);
+    let near = spawn_car(&mut app, straight(-20.0), 0.0);
+    let far = spawn_car(&mut app, straight(-50.0), 0.0);
+    step(&mut app, 20);
+    fire(&mut app, shooter, ItemKind::SparkRocket, false);
+    let lock = |target| ItemEvent {
+        racer: shooter,
+        kind: ItemEventKind::LockOn { target },
+    };
+    assert!(
+        log(&app).items.contains(&lock(near)),
+        "the nearest car first"
+    );
+    app.world_mut().despawn(near); // the target is gone: the lock is lost…
+    step(&mut app, 2);
+    let items = &log(&app).items;
+    let lost = ItemEvent {
+        racer: shooter,
+        kind: ItemEventKind::LockLost,
+    };
+    assert!(items.contains(&lost), "{items:?}");
+    assert!(items.contains(&lock(far)), "…and re-acquired: {items:?}");
+    let rocket = all::<Projectile>(&mut app)[0];
+    assert_eq!(
+        app.world().get::<ItemTarget>(rocket),
+        Some(&ItemTarget(Some(far)))
+    );
+    step_until(&mut app, "the rocket hits the new target", |w| {
+        w.resource::<Log>()
+            .hits
+            .iter()
+            .any(|(_, h)| h.victim == far)
+    });
+}
+
+#[test]
+fn an_emp_does_not_reach_through_a_wall() {
+    let mut app = race(1);
+    // The user stands on the grass outside the outer wall (x −6.9…−7.5); one car is 9.5 u away
+    // on the track behind the wall, another in plain view outside.
+    let user = spawn_car(&mut app, Vec3::new(-9.5, 0.0, 0.0), 0.0);
+    let behind_wall = spawn_car(&mut app, straight(0.0), 0.0);
+    let in_view = spawn_car(&mut app, Vec3::new(-9.5, 0.0, -6.0), 0.0);
+    step(&mut app, 10);
+    fire(&mut app, user, ItemKind::EmpPulse, false);
+    step_seconds(&mut app, 0.6);
+    assert_eq!(hits_on(&app, in_view, ItemKind::EmpPulse).len(), 1);
+    assert!(
+        hits_on(&app, behind_wall, ItemKind::EmpPulse).is_empty(),
+        "the wall shields it"
+    );
+}
+
+#[test]
+fn storm_strike_spares_a_car_under_cover() {
+    let mut app = race(1);
+    let cars: Vec<Entity> = (0..3)
+        .map(|i| spawn_car(&mut app, straight(-12.0 + 6.0 * i as f32), 0.0))
+        .collect();
+    let (covered, open, user) = (cars[0], cars[1], cars[2]);
+    // A roof (a static prop collider) over the leader.
+    app.world_mut().spawn((
+        Transform::from_xyz(0.0, 3.0, -12.0),
+        Collider::cuboid(2.0, 0.2, 2.0),
+        CollisionGroups::new(Group::from_bits_truncate(layers::PROP), Group::ALL),
+    ));
+    app.world_mut().insert_resource(Standings(cars.clone()));
+    step(&mut app, 10);
+    fire(&mut app, user, ItemKind::StormStrike, false);
+    step_seconds(&mut app, 1.0);
+    assert!(
+        hits_on(&app, covered, ItemKind::StormStrike).is_empty(),
+        "sheltered"
+    );
+    assert_eq!(hits_on(&app, open, ItemKind::StormStrike).len(), 1);
 }
 
 #[test]
@@ -291,9 +382,11 @@ fn spring_pad_launches_cars() {
     });
     step(&mut app, 2);
     let v = velocity(&app, victim).linear;
-    assert!(v.y > 8.0, "launched: {v}");
+    // items.ron: up 8 u/s (0.64 s of air), less two ticks of gravity.
+    assert!(v.y > 6.5, "launched: {v}");
     step_seconds(&mut app, 0.3);
-    assert!(pose(&app, victim).translation.y > ROAD_Y + 1.5);
+    let y = pose(&app, victim).translation.y;
+    assert!(y > ROAD_Y + 0.8, "in the air: {y}");
 }
 
 #[test]
@@ -343,6 +436,7 @@ fn shock_orb_follows_the_track_and_bounces() {
     };
     let mut last = start;
     let (mut travelled, mut bounces, mut sign) = (0.0, 0, -1.0);
+    let mut widest_left = 0.0f32;
     for _ in 0..secs_to_ticks(4.0) {
         step(&mut app, 1);
         let p = pose(&app, orb).translation;
@@ -352,11 +446,14 @@ fn shock_orb_follows_the_track_and_bounces() {
         assert!(ds > 0.0 && ds < 1.0, "moves forward along the track: {ds}");
         travelled += ds;
         let hw = t.frame_at(at.s).half_width;
+        // Left: the outer barrier stands beyond the 0.9 u curb (the core keeps 0.5 u off it);
+        // right: the infield is open, so it turns at the racing width's edge.
         assert!(
-            at.lateral.abs() <= hw,
-            "on the track: {} of {hw}",
+            at.lateral >= -(hw + 0.4 + 1e-3) && at.lateral <= hw - 0.5 + 1e-3,
+            "between the barrier and the open edge: {} of {hw}",
             at.lateral
         );
+        widest_left = widest_left.max(-at.lateral);
         assert!(
             (at.height - 0.7).abs() < 0.05,
             "glides above it: {}",
@@ -370,6 +467,10 @@ fn shock_orb_follows_the_track_and_bounces() {
         last = at;
     }
     assert!(bounces >= 2, "{bounces} bounces");
+    assert!(
+        widest_left > 6.1,
+        "it reached the barrier beyond the 6 u half width: {widest_left}"
+    );
     assert!(travelled > 70.0 && travelled < track_len, "{travelled} u");
     // Turn 1 starts at z ≈ -40: the orb followed it round to the right (+X).
     assert!(

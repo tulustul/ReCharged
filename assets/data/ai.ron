@@ -46,8 +46,8 @@
         look_ahead_u: 16.0,
         side_gap_u: 1.6,
         // Clearance kept around hazards beyond their reach (rc_items' `ItemRadius`: oil and
-        // spring pads trigger with the car centre over the disc, the orb knocks within 3 u); cars
-        // carrying a Goo Bomb are given goo_clearance_u more.
+        // spring pads trigger with the car centre over the disc, the orb knocks within 3 u).
+        // goo_clearance_u is unused (followers keep no extra berth from a Goo Bomb carrier).
         hazard_clearance_u: 0.6,
         goo_clearance_u: 2.0,
     ),
@@ -75,7 +75,7 @@
         progress_u: 3.0,
         progress_secs: 2.5,
         reverse_secs: 1.2,
-        reset_after_tries: 2,
+        reset_after_tries: 1,
         reset_hold_secs: 0.6,
         off_course_secs: 1.5,
         flipped_secs: 0.5,

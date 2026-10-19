@@ -132,7 +132,9 @@ pub struct Traffic {
     pub side_gap_u: f32,
     /// Clearance kept around hazards (u).
     pub hazard_clearance_u: f32,
-    /// Extra clearance around a car carrying a Goo Bomb (u).
+    /// Unused since T19a (followers keep no extra berth from a Goo Bomb carrier any more); kept
+    /// so builds that still require it read this file.
+    // ponytail: drop the field from the struct and `ai.ron` with the next format change.
     pub goo_clearance_u: f32,
 }
 

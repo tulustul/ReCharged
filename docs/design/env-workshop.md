@@ -46,7 +46,8 @@ tyre_rack 4 884, shelf_a 3 504, shelf_b 3 728, tool_wall 1 164, compressor 1 452
 safety_signs 640 (pictograms only), roof_truss 1 128, bay_marking 16, walkway_line 2, stains 180, start_line 70 (chequered tape —
 Invisible tracks get no drawn start line).
 
-Scene total ≈ 0.37 M triangles; 129 placed props (33 dynamic), 61 decor items.
+Scene total ≈ 0.36 M triangles; 123 placed props (31 dynamic), 61 decor items (T19a: the chicane
+entry lost 4 tyre stacks, the S lane 2 cones).
 
 ## Layout
 Room 176 × 120 u (x −88…88, z −60…60), concrete floor (Asphalt). Invisible ribbon; walls are
@@ -61,12 +62,15 @@ Forward (clockwise), lane by lane:
    tip.
 3. **M lane (west):** corridor narrows to 8 u, plywood ramp up (11.7°), crest hop onto the bench
    top (item row), kicker → **jump** off the west end (30 u/s, 0.8 s air) onto the far ramp.
-   Falling off the side drops into an enclosed island → respawn.
+   Falling off the side drops into an enclosed island → respawn. The lane walls stop 7 u short of
+   both ramp feet (T19a, Q4): a car landing a little off line, in either direction, runs out on
+   open floor instead of into a wall; a respawn point lies 6 u past each landing (rc_track).
 4. **W U-turn (left):** oil on the outside of the exit.
-5. **S lane (east):** **tyre-stack chicane** (three apexes, 8 u, ~17 u/s). **Golden Battery**
-   (forward only): in the tyre alley behind the first apex — in through a gap in the north tyre
-   wall, along a 3.4 u alley, out through the next gap (slow, tight; declared as no shortcut,
-   it is longer than the line).
+5. **S lane (east):** **tyre-stack chicane** (three apexes, 8 u, ~17 u/s; its tyre walls start 5 u
+   in, `CHICANE_OPEN`, so cars leaving the W U-turn wide are not caught on the first stack).
+   **Golden Battery** (forward only): in the tyre alley behind the first apex — in through a gap in
+   the north tyre wall, along a 3.4 u alley, out through the next gap (slow, tight; declared as no
+   shortcut, it is longer than the line).
 6. **E2 U-turn (right):** oil spill on the S3 exit.
 7. **S3 lane (west):** **wash bay** (Water, −15 % top speed) then the **paint booth**
    (drive-through, wider inside).
@@ -75,13 +79,17 @@ Forward (clockwise), lane by lane:
 Reverse: the same loop backwards; the jump goes off the east end of the bench (Rev gap); the
 alley exists without the battery. Mirror swaps sides (prop meshes are not mirrored).
 
-Islands (enclosed by lane walls) hold the lift columns, the tyre changer, wheel balancer, engine
+Knockable dressing (drain pans, creeper, wheel, jugs, jerry cans, cones, tyres) stands behind the
+lane walls (`DRESS_BEHIND` 1.5 u) or, where the walls are open, just outside the racing width:
+cars knocked it onto the line or tripped over it (QA, Q4). Islands (enclosed by lane walls) hold
+the lift columns, the tyre changer, wheel balancer, engine
 on a stand and crane, drums, pallets and tall tyre stacks (statics with colliders: a car falling
 off the bench can land there).
 
-**AI** (rc_ai `probe`, 8 Elite AI, 3 laps, seed 7): all 8 finish in every variant — forward
-worst 1.20× (1 respawn), reverse 1.44× (3), mirror 1.14× (1 each for 4 cars), reverse-mirror
-1.05× (0).
+**AI** (rc_ai `probe` / `every_layout`, 8 Elite AI in Elite cars, 3 laps, T19a): seeds 21, 7
+and 3 × all four variants — every car finishes, worst 1.19× the expected time (seed 7 mirror),
+at most 2 respawns per car and race (QA before T19a, seed 21: 1.56× — over the 1.5× limit — and
+4 respawns: the walls at the ramp feet, the chicane entry and knocked dressing).
 
 ## Lighting wishes (rendering)
 - **All times:** sodium work lights warm (≈ 1.0, 0.72, 0.42) against cool door daylight; walls

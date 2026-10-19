@@ -30,16 +30,16 @@
         (pos: (65.358, 0, -15.066)), // 12:
         (pos: (60, 0, -14)), // 13:
         (pos: (52.67, 0, -14)), // 14:
-        (pos: (46.7, 0, -14), width: 8), // 15:
-        (pos: (39.7, 0, -14), wall_left: false, wall_right: false), // 16: east ramp foot
+        (pos: (46.7, 0, -14), width: 8, wall_left: false, wall_right: false), // 15:
+        (pos: (39.7, 0, -14)), // 16: east ramp foot
         (pos: (32, 1.597, -14)), // 17: east ramp (reverse landing)
         (pos: (18, 4.5, -14)), // 18: east bench edge (reverse lip)
         (pos: (14.44, 4, -14)), // 19: east kicker foot
         (pos: (-2.44, 4, -14)), // 20: west kicker foot
         (pos: (-6, 4.5, -14)), // 21: west bench edge (forward lip)
         (pos: (-20, 1.597, -14)), // 22: west ramp (forward landing)
-        (pos: (-27.7, 0, -14), wall_left: true, wall_right: true), // 23: west ramp foot
-        (pos: (-34.7, 0, -14), width: 10), // 24:
+        (pos: (-27.7, 0, -14)), // 23: west ramp foot
+        (pos: (-34.7, 0, -14), width: 10, wall_left: true, wall_right: true), // 24:
         (pos: (-40.67, 0, -14)), // 25:
         (pos: (-48, 0, -14)), // 26: W U-turn
         (pos: (-53.358, 0, -12.934)), // 27:
@@ -143,8 +143,6 @@
         // red tool chest on the E1 island tip, drawers toward the U-turn
         (kind: "workshop_tool_chest", pos: (63.2, 0, -28), yaw: -90),
         // chicane tyre walls
-        (kind: "workshop_tyre_stack2", pos: (-30.815, 0, 8.608), yaw: 34.5),
-        (kind: "workshop_tyre_stack2", pos: (-27.493, 0, 7.698), yaw: 147.5),
         (kind: "workshop_tyre_stack2", pos: (-17.269, 0, 4.636), yaw: 132.1),
         (kind: "workshop_tyre_stack2", pos: (-14.258, 0, 4.513), yaw: 242.1),
         (kind: "workshop_tyre_stack2", pos: (-10.869, 0, 5.127), yaw: 14.3),
@@ -160,8 +158,6 @@
         (kind: "workshop_tyre_stack2", pos: (25.914, 0, 5.372), yaw: 297.9),
         (kind: "workshop_tyre_stack2", pos: (29.021, 0, 6.186), yaw: 61.8),
         (kind: "workshop_tyre_stack2", pos: (32.277, 0, 7.079), yaw: 192.1),
-        (kind: "workshop_tyre_stack2", pos: (-29.185, 0, 19.392), yaw: 213.5),
-        (kind: "workshop_tyre_stack2", pos: (-25.973, 0, 18.678), yaw: 324.5),
         (kind: "workshop_tyre_stack2", pos: (-23.077, 0, 17.698), yaw: 60.8),
         (kind: "workshop_tyre_stack2", pos: (-19.783, 0, 16.487), yaw: 169.4),
         (kind: "workshop_tyre_stack2", pos: (-16.524, 0, 15.553), yaw: 279.7),
@@ -192,44 +188,42 @@
         (kind: "workshop_tyre_stack2", pos: (-25.549, 0, 4.427), yaw: 183.4),
         (kind: "workshop_tyre_stack2", pos: (-2.312, 0, 4.275), yaw: 321.5),
         (kind: "workshop_tyre_stack2", pos: (-2.227, 0, 7.264), yaw: 357.5),
-        // N lane dressing (knockable)
-        (kind: "workshop_drain_pan", pos: (3.5, 0, -38.8)),
-        (kind: "workshop_drain_pan", pos: (34, 0, -38.8), yaw: 40),
-        (kind: "workshop_creeper", pos: (19, 0, -45.4), yaw: 80),
-        (kind: "workshop_wheel", pos: (28, 0, -45.3), yaw: 25),
-        (kind: "workshop_oil_can", pos: (-2, 0, -45.9), yaw: 10),
-        (kind: "workshop_oil_can", pos: (-1, 0, -46), yaw: -25),
-        (kind: "workshop_toolbox", pos: (69.426, 0, -23.605), yaw: -60),
-        (kind: "workshop_battery", pos: (67.58, 0, -21.175), yaw: 20),
-        // cones along the M lane
-        (kind: "workshop_cone", pos: (52, 0, -17.9), yaw: 46),
-        (kind: "workshop_cone", pos: (52, 0, -10.1), yaw: 46),
-        (kind: "workshop_cone", pos: (46.5, 0, -17.9), yaw: 64.5),
-        (kind: "workshop_cone", pos: (46.5, 0, -10.1), yaw: 64.5),
-        (kind: "workshop_cone", pos: (-33, 0, -17.9), yaw: 21),
-        (kind: "workshop_cone", pos: (-33, 0, -10.1), yaw: 21),
-        (kind: "workshop_cone", pos: (-38, 0, -17.9), yaw: 46),
-        (kind: "workshop_cone", pos: (-38, 0, -10.1), yaw: 46),
+        // N lane dressing (knockable, behind the walls)
+        (kind: "workshop_drain_pan", pos: (3.5, 0, -34.3)),
+        (kind: "workshop_drain_pan", pos: (34, 0, -34.3), yaw: 40),
+        (kind: "workshop_creeper", pos: (19, 0, -49.5), yaw: 80),
+        (kind: "workshop_wheel", pos: (28, 0, -49.9), yaw: 25),
+        (kind: "workshop_oil_can", pos: (-2, 0, -49), yaw: 10),
+        (kind: "workshop_oil_can", pos: (-1, 0, -49.1), yaw: -25),
+        (kind: "workshop_toolbox", pos: (65.438, 0, -25.464), yaw: -60),
+        (kind: "workshop_battery", pos: (64.607, 0, -23.851), yaw: 20),
+        // cones around the ramp feet
+        (kind: "workshop_cone", pos: (44.7, 0, -19.3), yaw: 41.1),
+        (kind: "workshop_cone", pos: (44.7, 0, -8.7), yaw: 41.1),
+        (kind: "workshop_cone", pos: (41.7, 0, -19.3), yaw: 2.1),
+        (kind: "workshop_cone", pos: (41.7, 0, -8.7), yaw: 2.1),
+        (kind: "workshop_cone", pos: (-29.7, 0, -19.3), yaw: 63.9),
+        (kind: "workshop_cone", pos: (-29.7, 0, -8.7), yaw: 63.9),
+        (kind: "workshop_cone", pos: (-32.7, 0, -19.3), yaw: 24.9),
+        (kind: "workshop_cone", pos: (-32.7, 0, -8.7), yaw: 24.9),
         // spanners left on the bench top (knock them off)
         (kind: "workshop_wrench", pos: (10, 4, -11.4), yaw: 30),
         (kind: "workshop_wrench", pos: (3, 4, -16.7), yaw: -50),
-        (kind: "workshop_cone", pos: (-37, 0, 10.1), yaw: 11),
-        (kind: "workshop_cone", pos: (-37, 0, 17.9), yaw: 11),
-        (kind: "workshop_cone", pos: (41, 0, 10.1), yaw: 17),
-        (kind: "workshop_cone", pos: (41, 0, 17.9), yaw: 17),
+        (kind: "workshop_cone", pos: (-28.5, 0, 8.8), yaw: 21),
+        (kind: "workshop_cone", pos: (-28.5, 0, 19.2), yaw: 21),
         // loose tyres
-        (kind: "workshop_tyre", pos: (45, 0, 10.7), yaw: 315),
-        (kind: "workshop_tyre", pos: (48.5, 0, 17.4), yaw: 63.5),
-        (kind: "workshop_tyre", pos: (70.6, 0, 28), yaw: 70),
+        (kind: "workshop_tyre", pos: (45, 0, 6.1), yaw: 315),
+        (kind: "workshop_tyre", pos: (48.5, 0, 21.9), yaw: 63.5),
+        (kind: "workshop_tyre", pos: (66, 0, 28), yaw: 70),
         // wash bay buckets, jugs, cans
         (kind: "workshop_bucket", pos: (36, 0, 46.9)),
         (kind: "workshop_bucket", pos: (18.5, 0, 37.1)),
-        (kind: "workshop_oil_can", pos: (-3, 0, 38.2), yaw: 15),
-        (kind: "workshop_oil_can", pos: (-4, 0, 37.9), yaw: -35),
-        (kind: "workshop_jerry_can", pos: (-45, 0, 46), yaw: 80),
-        (kind: "workshop_jerry_can", pos: (-46.6, 0, 46.1), yaw: 95),
-        (kind: "workshop_cone", pos: (-81.9, 0, -26), yaw: 20),
-        (kind: "workshop_cone", pos: (-74.1, 0, 26), yaw: 20),
+        (kind: "workshop_oil_can", pos: (-3, 0, 35), yaw: 15),
+        (kind: "workshop_oil_can", pos: (-4, 0, 34.9), yaw: -35),
+        (kind: "workshop_jerry_can", pos: (-45, 0, 49.1), yaw: 80),
+        (kind: "workshop_jerry_can", pos: (-46.6, 0, 49.2), yaw: 95),
+        (kind: "workshop_cone", pos: (-85.3, 0, -26), yaw: 20),
+        (kind: "workshop_cone", pos: (-70.7, 0, 26), yaw: 20),
         // island equipment (static)
         (kind: "workshop_tyre_changer", pos: (45, 0, -1.5), yaw: 180),
         (kind: "workshop_wheel_balancer", pos: (53, 0, 2), yaw: -90),

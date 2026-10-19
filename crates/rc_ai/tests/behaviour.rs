@@ -136,13 +136,54 @@ fn assisted_steer(assist: bool) -> (f32, f32) {
 }
 
 #[test]
-fn steering_assist_steers_toward_the_line_and_touches_nothing_else() {
+fn steering_assist_steers_toward_the_line_and_keeps_the_pedals_on_a_straight() {
     let (steer, throttle) = assisted_steer(true);
     // The grid slot is right of test_oval's racing line on the main straight (left edge).
     assert!(steer < -0.05, "the assist steers toward the line: {steer}");
-    assert_eq!(throttle, 0.7, "only steer is changed");
+    assert_eq!(
+        throttle, 0.7,
+        "under the speed plan the pedals are the player's"
+    );
     let (steer, _) = assisted_steer(false);
     assert_eq!(steer, 0.0, "assist off: the player's steer is kept");
+}
+
+/// Full throttle, no steering, for 6 s on test_oval (into turn 1): the lowest throttle and the
+/// strongest brake the car got.
+fn assisted_pedals(assist: bool) -> (f32, f32) {
+    let mut app = race_app();
+    let mut settings = Settings::default();
+    settings.accessibility.steering_assist = assist;
+    app.insert_resource(settings);
+    load_race(&mut app, config("test_oval", vec![human(false)], 1, 6)).expect("loads");
+    run_to_go(&mut app, &mut Vec::new());
+    let car = find(&mut app, 0);
+    let (mut throttle, mut brake) = (1.0f32, 0.0f32);
+    for _ in 0..secs_to_ticks(6.0) {
+        *app.world_mut().get_mut::<CarControl>(car).expect("racer") = CarControl {
+            throttle: 1.0,
+            ..default()
+        };
+        step(&mut app, 1);
+        let c = *app.world().get::<CarControl>(car).expect("racer");
+        (throttle, brake) = (throttle.min(c.throttle), brake.max(c.brake));
+    }
+    (throttle, brake)
+}
+
+#[test]
+fn the_assist_brakes_gently_before_a_corner_taken_too_fast() {
+    let (throttle, brake) = assisted_pedals(true);
+    assert_eq!(throttle, 0.0, "the throttle lifts before turn 1");
+    assert!(
+        brake > 0.0 && brake <= rc_ai::MAX_AUTO_BRAKE,
+        "a gentle auto-brake: {brake}"
+    );
+    assert_eq!(
+        assisted_pedals(false),
+        (1.0, 0.0),
+        "assist off: the pedals are the player's"
+    );
 }
 
 #[test]
@@ -207,5 +248,210 @@ fn a_car_put_against_a_wall_gets_back_into_the_race() {
     assert!(
         now - start > 60.0,
         "back to racing: {start:.1} → {now:.1} u"
+    );
+}
+
+#[test]
+fn rockets_are_fired_only_at_cars_in_sight() {
+    let mut app = race_app();
+    let mut racers = ai_field(&app, 1, Difficulty::ElitePlus, CarClass::Pro);
+    racers.push(human(false)); // parked: nobody writes its control
+    load_race(&mut app, config("test_oval", racers, 3, 9)).expect("loads");
+    run_to_go(&mut app, &mut Vec::new());
+    let (shooter, target) = (find(&mut app, 0), find(&mut app, 1));
+    let place = |app: &mut App, car, at: Vec3| {
+        app.world_mut().write_message(RespawnCar {
+            car,
+            transform: Transform::from_translation(at).looking_to(Vec3::NEG_Z, Vec3::Y),
+            kind: RespawnKind::ToTrack,
+        });
+    };
+    // The shooter on the main straight heading −Z; the target 30 u ahead and 9.5 u left — in
+    // the rocket cone and range, but on the grass behind the outer wall.
+    place(&mut app, shooter, Vec3::new(0.0, 0.5, 20.0));
+    place(&mut app, target, Vec3::new(-9.5, 0.2, -10.0));
+    step(&mut app, 2);
+    let rocket = ItemSlot {
+        item: Some(ItemKind::SparkRocket),
+        roulette: 0.0,
+    };
+    *app.world_mut().get_mut::<ItemSlot>(shooter).expect("racer") = rocket;
+    step_seconds(&mut app, 1.0);
+    let held = |app: &App| app.world().get::<ItemSlot>(shooter).expect("racer").item;
+    assert_eq!(
+        held(&app),
+        Some(ItemKind::SparkRocket),
+        "no shot at a hidden car"
+    );
+    // The same car on the track, in plain view: the shot goes after the reaction delay.
+    place(&mut app, shooter, Vec3::new(0.0, 0.5, 20.0));
+    place(&mut app, target, Vec3::new(-3.0, 0.5, -10.0));
+    step_seconds(&mut app, 1.0);
+    assert_eq!(held(&app), None, "fired at a car in sight");
+}
+
+#[test]
+fn a_car_that_missed_a_gate_resets_to_drive_through_it() {
+    let mut app = race_app();
+    let racers = ai_field(&app, 1, Difficulty::Pro, CarClass::Pro);
+    load_race(&mut app, config("test_oval", racers, 3, 10)).expect("loads");
+    run_to_go(&mut app, &mut Vec::new());
+    step_seconds(&mut app, 2.0); // over the line: lap 1, gate 1 next
+    let car = find(&mut app, 0);
+    let (gate, gate_s) = {
+        let progress = app.world().get::<RaceProgress>(car).expect("racer");
+        let track = app.world().resource::<rc_testkit::rc_track::Track>();
+        let next = progress.next_checkpoint;
+        (next, track.checkpoints()[next].s)
+    };
+    // Put the car 15 u past that gate: it skipped it.
+    let pose = {
+        let track = app.world().resource::<rc_testkit::rc_track::Track>();
+        let f = track.frame_at(gate_s + 15.0);
+        Transform::from_translation(f.point(0.0, 0.5)).with_rotation(f.rotation())
+    };
+    app.world_mut().write_message(RespawnCar {
+        car,
+        transform: pose,
+        kind: RespawnKind::ToTrack,
+    });
+    let mut respawns = MessageCursor::<CarRespawned>::default();
+    step(&mut app, 2);
+    respawns
+        .read(app.world().resource::<Messages<CarRespawned>>())
+        .count();
+    let mut reset = false;
+    for _ in 0..secs_to_ticks(6.0) {
+        step(&mut app, 1);
+        let n = respawns
+            .read(app.world().resource::<Messages<CarRespawned>>())
+            .filter(|m| m.car == car)
+            .count();
+        reset |= n > 0;
+    }
+    assert!(reset, "the AI held reset after missing the gate");
+    let progress = app.world().get::<RaceProgress>(car).expect("racer");
+    assert_ne!(
+        progress.next_checkpoint, gate,
+        "the gate counted on the second pass"
+    );
+}
+
+/// A throttle-only player with the steering assist (QA's kid-friendly path; auto-accelerate
+/// gives the same input): its lap times against the track's reference lap, respawns and "Hold
+/// Reset" hints — `AI_TRACK=backyard_bash AI_LAPS=1 [AI_REV=1] [AI_MIRROR=1] [AI_CAR=phantom]
+/// cargo test -p rc_ai --test behaviour -- --ignored --nocapture assist_probe`.
+#[test]
+#[ignore = "tuning probe"]
+fn assist_probe() {
+    let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.to_owned());
+    let mut app = race_app();
+    let mut settings = Settings::default();
+    settings.accessibility.steering_assist = true;
+    app.insert_resource(settings);
+    let laps: u8 = env("AI_LAPS", "1").parse().expect("AI_LAPS");
+    let mut cfg = config(
+        &env("AI_TRACK", "backyard_bash"),
+        vec![human(false)],
+        laps,
+        1,
+    );
+    cfg.variant.reverse = env("AI_REV", "0") == "1";
+    cfg.variant.mirror = env("AI_MIRROR", "0") == "1";
+    cfg.racers[0].car = CarId::new(env("AI_CAR", "hornet"));
+    load_race(&mut app, cfg).expect("loads");
+    run_to_go(&mut app, &mut Vec::new());
+    let car = find(&mut app, 0);
+    let mut respawns = MessageCursor::<CarRespawned>::default();
+    let mut events = MessageCursor::<RaceEvent>::default();
+    let mut impacts = MessageCursor::<CarImpact>::default();
+    let (mut count, mut stuck_hints) = (0, 0);
+    let trace = std::env::var("AI_TRACE").is_ok();
+    for tick in 0..secs_to_ticks(240.0) {
+        *app.world_mut().get_mut::<CarControl>(car).expect("racer") = CarControl {
+            throttle: 1.0,
+            ..default()
+        };
+        step(&mut app, 1);
+        if trace
+            && tick
+                % std::env::var("AI_TRACE_EVERY")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(6)
+                == 0
+        {
+            let w = app.world();
+            let (v, t, c) = (
+                w.get::<rc_ai::TrackView>(car).expect("racer"),
+                w.get::<VehicleTelemetry>(car).expect("racer"),
+                w.get::<CarControl>(car).expect("racer"),
+            );
+            println!(
+                "t {:6.2} s {:6.1} lat {:5.2} h {:5.2} v {:5.1} gw {} up {:4.2} | th {:.2} br {:.2} st {:5.2}",
+                tick as f32 / 60.0,
+                v.s,
+                v.lateral,
+                v.height,
+                t.forward_speed,
+                t.grounded_wheels,
+                t.up_dot,
+                c.throttle,
+                c.brake,
+                c.steer
+            );
+        }
+        if trace {
+            for m in impacts.read(app.world().resource::<Messages<CarImpact>>()) {
+                if m.car == car {
+                    let prop = m
+                        .other
+                        .and_then(|e| app.world().get::<Prop>(e))
+                        .map(|p| p.kind.to_string());
+                    println!(
+                        "   impact {:.2} at {:.2} normal {:.2} other {prop:?}",
+                        m.strength, m.point, m.normal
+                    );
+                }
+            }
+        }
+        let n = respawns
+            .read(app.world().resource::<Messages<CarRespawned>>())
+            .filter(|m| m.car == car)
+            .count();
+        if n > 0 {
+            let view = app.world().get::<rc_ai::TrackView>(car).expect("racer");
+            println!("respawn near s {:.1} (lateral {:.1})", view.s, view.lateral);
+        }
+        count += n;
+        stuck_hints += events
+            .read(app.world().resource::<Messages<RaceEvent>>())
+            .filter(|e| e.kind == RaceEventKind::Hint(HintKind::HoldReset))
+            .count();
+        if app
+            .world()
+            .get::<RaceProgress>(car)
+            .is_some_and(|p| p.finished)
+        {
+            break;
+        }
+    }
+    let reference = reference_lap(app.world().resource::<rc_testkit::rc_track::Track>());
+    let p = app.world().get::<RaceProgress>(car).expect("racer");
+    let laps: Vec<String> = p
+        .lap_times
+        .iter()
+        .map(|&t| {
+            format!(
+                "{:.2} s ({:.2}×)",
+                ticks_to_secs(t),
+                ticks_to_secs(t) / reference
+            )
+        })
+        .collect();
+    println!(
+        "assisted throttle-only: laps {laps:?} (reference {reference:.2} s), finished {}, \
+         respawns {count}, Hold Reset hints {stuck_hints}",
+        p.finished
     );
 }

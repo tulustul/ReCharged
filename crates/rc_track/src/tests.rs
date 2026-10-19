@@ -428,6 +428,81 @@ fn geometry_is_deterministic() {
 }
 
 #[test]
+fn a_respawn_point_follows_every_landing() {
+    // A car that fails after a jump restarts past the landing, not before the ramp.
+    for id in track_ids() {
+        for v in variants(&id) {
+            let t = Track::load(&assets(), &v).unwrap_or_else(|e| panic!("{e}"));
+            for j in t.jumps() {
+                let after = |r: &RespawnPoint| {
+                    let d = t.delta_s(j.landing_s, r.s);
+                    d > 1.0 && d <= LANDING_RESPAWN_U + 0.5
+                };
+                assert!(
+                    t.respawn_points().iter().any(after),
+                    "{id} {}: no respawn point after the landing at s = {:.1}",
+                    variant_name(&v),
+                    j.landing_s
+                );
+            }
+        }
+    }
+}
+
+/// test_oval's shape as a ToyTrack ribbon at height `y` with both turns banked 20°, on a
+/// play-mat at 0.05.
+fn banked_oval(y: f32) -> String {
+    let p = |x: f32, z: f32, bank: f32| format!("(pos: ({x}, {y}, {z}), bank_deg: {bank}),");
+    let mut pts = String::new();
+    for (x, z, bank) in [
+        (0.0, 28.5, 0.0),
+        (0.0, 10.0, 0.0),
+        (0.0, -10.0, 0.0),
+        (0.0, -28.5, 0.0),
+        (0.0, -40.0, 0.0),
+        (2.947, -51.0, 20.0),
+        (11.0, -59.053, 20.0),
+        (22.0, -62.0, 20.0),
+        (33.0, -59.053, 20.0),
+        (41.053, -51.0, 20.0),
+        (44.0, -40.0, 0.0),
+        (44.0, -28.5, 0.0),
+        (44.0, 28.5, 0.0),
+        (44.0, 40.0, 0.0),
+        (41.053, 51.0, 20.0),
+        (33.0, 59.053, 20.0),
+        (22.0, 62.0, 20.0),
+        (11.0, 59.053, 20.0),
+        (2.947, 51.0, 20.0),
+        (0.0, 40.0, 0.0),
+    ] {
+        pts += &p(x, z, bank);
+    }
+    format!(
+        "(style: ToyTrack, start: 2, kill_height: -10, points: [{pts}],
+          ground: [(surface: Carpet, height: 0.05, points: [(-25, -85), (70, -85), (70, 85), (-25, 85)])])"
+    )
+}
+
+#[test]
+fn banked_turns_whose_inner_edge_sinks_into_the_floor_are_linted() {
+    let sunk = |y: f32| {
+        build(&banked_oval(y), false, false)
+            .lints()
+            .iter()
+            .filter(|l| l.contains("inner edge sinks"))
+            .count()
+    };
+    // At 0.3 the inner lip of a 20° bank (half width 5 + lip 0.35) sinks ≈ 1.3 u under the mat:
+    // both turns are linted.
+    assert_eq!(sunk(0.3), 2);
+    // Raised by the §A5 rule (≥ 0.05 + 5.35 sin 20° − 0.25 cos 20° + 0.15 ≈ 1.8): clean.
+    assert_eq!(sunk(1.85), 0);
+    // 0.08 u of lip left above the mat at the apex (< the lint's 0.1): linted.
+    assert_eq!(sunk(1.73), 2);
+}
+
+#[test]
 fn a_track_crossing_itself_at_one_height_is_linted() {
     // Lemniscate of Bernoulli: a figure eight crossing at the origin.
     let pts: String = (0..24)

@@ -57,9 +57,9 @@
         (pos: (48.6, 0.62, 49.6), width: 8, offroad_margin: 17), // 39
         (pos: (48.6, 0.62, 58), wall_left: false), // 40: Birch-side gate (lawn shortcut)
         (pos: (48.6, 0.62, 69), offroad_margin: 8), // 41: Birch east sidewalk
-        (pos: (47.39, 0.62, 77.5)), // 42
-        (pos: (44.1, 0.62, 80.79)), // 43
-        (pos: (39.6, 0.62, 82), width: 10), // 44
+        (pos: (47.13, 0.62, 76.5)), // 42
+        (pos: (43.1, 0.62, 80.53)), // 43
+        (pos: (37.6, 0.62, 82), width: 10), // 44
         (pos: (35.8, 0.3, 82)), // 45: curb hop (rolled kerb)
         (pos: (30.45, 0, 82)), // 46: under the parked SUV (across, between the axles)
         (pos: (23.95, 0, 82)), // 47
@@ -135,6 +135,18 @@
         (surface: Asphalt, height: 0.64, points: [(228.14, 34.72), (239.74, 42.55), (225.93, 95.23), (214.32, 87.4)]),
         // Birch Lane driveway
         (surface: Asphalt, height: 0.64, points: [(36.6, 147), (86, 147), (86, 161), (36.6, 161)]),
+        // lawn plate beyond: north (decor stands on it)
+        (surface: Grass, height: 0.6, points: [(-220, -230), (495, -230), (495, -110), (-220, -110)]),
+        // lawn plate beyond: east (decor stands on it)
+        (surface: Grass, height: 0.6, points: [(375, -110), (495, -110), (495, 340), (375, 340)]),
+        // lawn plate beyond: south-east (decor stands on it)
+        (surface: Grass, height: 0.6, points: [(36.6, 220), (375, 220), (375, 340), (36.6, 340)]),
+        // lawn plate beyond: south-west (decor stands on it)
+        (surface: Grass, height: 0.6, points: [(-220, 220), (-36.6, 220), (-36.6, 340), (-220, 340)]),
+        // lawn plate beyond: west, south of Maple Street (decor stands on it)
+        (surface: Grass, height: 0.6, points: [(-220, 20.6), (-100, 20.6), (-100, 220), (-220, 220)]),
+        // lawn plate beyond: west, north of Maple Street (decor stands on it)
+        (surface: Grass, height: 0.6, points: [(-220, -110), (-100, -110), (-100, -20.6), (-220, -20.6)]),
         // raised front yard (3.0)
         (surface: Grass, height: 3, points: [(153.8, 41), (182.2, 41), (182.2, 55), (153.8, 55)]),
     ],

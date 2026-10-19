@@ -14,9 +14,9 @@ use crate::recovery::Recovery;
 /// A local racer within this distance of the Golden Battery collects it (u).
 const BATTERY_PICKUP_U: f32 = 1.6;
 
-/// The AI driving an autopilot or dropped player's car (rc_ai treats the unknown rival id as a
-/// neutral personality).
-fn autopilot() -> AiDriver {
+/// The AI driving an autopilot, dropped or finished player's car (rc_ai treats the unknown rival
+/// id as a neutral personality).
+pub(crate) fn autopilot() -> AiDriver {
     AiDriver {
         rival: RivalId::new("autopilot"),
         difficulty: Difficulty::Elite,

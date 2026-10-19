@@ -9,6 +9,7 @@ use crate::data::{AiTuning, DifficultyProfile, Personality};
 use crate::items::ItemBrain;
 use crate::profile::{CarCaps, SpeedProfile};
 use crate::recovery::Recovery;
+use crate::shortcut::{ShortcutChoice, ShortcutPlan, take_chance};
 
 /// A racer moving farther than this in one tick was teleported (u).
 const TELEPORT_STEP_U: f32 = 4.0;
@@ -129,6 +130,10 @@ pub struct AiBrain {
     pub items: ItemBrain,
     /// Throttle asked for last tick (stuck detection).
     pub last_throttle: f32,
+    /// Shortcuts that are faster for this car (none at Rookie).
+    pub shortcuts: Vec<ShortcutPlan>,
+    /// The shortcut taken this lap, if any.
+    pub shortcut: ShortcutChoice,
 }
 
 /// Creates the brain of every AI racer that has none (spawn, autopilot, dropped player) and
@@ -173,7 +178,7 @@ pub(crate) fn ensure_brains(
 const NEUTRAL_AGGRESSION: f32 = 0.5;
 const NEUTRAL_CONSISTENCY: f32 = 0.8;
 /// Stars of a car missing from the catalog: the 3★ reference car.
-const REFERENCE_STARS: CarStars = CarStars {
+pub(crate) const REFERENCE_STARS: CarStars = CarStars {
     speed: 3,
     accel: 3,
     handling: 3,
@@ -199,14 +204,12 @@ impl AiBrain {
         let caps = CarCaps::from_stars(stars, &tuning.driving.lateral_accel_by_handling);
         let key = index as u64 * KEYS_PER_RACER;
         let spread = rng::range(seed, 0, RngStream::AiLineOffset, key, -1.0, 1.0);
+        let profile =
+            SpeedProfile::build(track, &caps, skill.corner_grip, tuning.driving.brake_decel);
+        let shortcuts = plan_shortcuts(track, &caps, &profile, tuning, driver.difficulty);
         let mut brain = Self {
             caps,
-            profile: SpeedProfile::build(
-                track,
-                &caps,
-                skill.corner_grip,
-                tuning.driving.brake_decel,
-            ),
+            profile,
             drift_zones: Vec::new(),
             aggression: rival.map_or(NEUTRAL_AGGRESSION, |r| r.aggression),
             consistency: rival.map_or(NEUTRAL_CONSISTENCY, |r| r.consistency),
@@ -223,8 +226,10 @@ impl AiBrain {
             countdown: (0, start_press_tick(seed, key, skill.perfect_start)),
             items: ItemBrain::default(),
             last_throttle: 0.0,
+            shortcuts,
+            shortcut: ShortcutChoice::default(),
         };
-        brain.drift_zones = drift_zones(&brain, tuning, skill);
+        brain.drift_zones = drift_zones(track, &brain, tuning, skill);
         brain
     }
 
@@ -237,8 +242,58 @@ impl AiBrain {
             skill.corner_grip,
             tuning.driving.brake_decel,
         );
-        self.drift_zones = drift_zones(self, tuning, skill);
+        self.shortcuts = plan_shortcuts(track, &self.caps, &self.profile, tuning, difficulty);
+        self.shortcut = ShortcutChoice::default();
+        self.drift_zones = drift_zones(track, self, tuning, skill);
     }
+
+    /// The shortcut being driven, where it covers `s` (track `length`).
+    pub fn shortcut_at(&self, length: f32, s: f32) -> Option<&ShortcutPlan> {
+        self.shortcut.at(&self.shortcuts, length, s)
+    }
+
+    /// Corner- and brake-limited speed at `s` (dry, u/s): the shortcut's where one is driven,
+    /// else the speed plan's.
+    pub fn corner_at(&self, length: f32, s: f32) -> f32 {
+        self.shortcut_at(length, s)
+            .and_then(|p| p.corner_at(length, s))
+            .unwrap_or_else(|| self.profile.corner_at(s))
+    }
+
+    /// Signed curvature of the line driven at `s` (1/u, + = right).
+    pub fn kappa_at(&self, length: f32, s: f32) -> f32 {
+        self.shortcut_at(length, s)
+            .and_then(|p| p.kappa_at(length, s))
+            .unwrap_or_else(|| self.profile.kappa_at(s))
+    }
+
+    /// Surface under the line driven at `s`.
+    pub fn surface_at(&self, length: f32, s: f32) -> SurfaceKind {
+        self.shortcut_at(length, s)
+            .and_then(|p| p.surface_at(length, s))
+            .unwrap_or_else(|| self.profile.surface_at(s))
+    }
+}
+
+/// The shortcuts that are faster for a car with `caps` on its speed plan `profile` (none when the
+/// difficulty never takes one).
+fn plan_shortcuts(
+    track: &Track,
+    caps: &CarCaps,
+    profile: &SpeedProfile,
+    tuning: &AiTuning,
+    difficulty: Difficulty,
+) -> Vec<ShortcutPlan> {
+    if take_chance(difficulty, 1.0) <= 0.0 {
+        return Vec::new();
+    }
+    let skill = tuning.difficulty.get(difficulty);
+    let brake = tuning.driving.brake_decel;
+    track
+        .shortcuts()
+        .iter()
+        .filter_map(|s| ShortcutPlan::build(track, s, caps, skill.corner_grip, brake, profile))
+        .collect()
 }
 
 /// Countdown tick (1-based, GO after `COUNTDOWN_TICKS`) at which the AI with RNG key `key`
@@ -261,8 +316,19 @@ pub fn start_press_tick(seed: u64, key: u64, perfect: f32) -> u32 {
     }
 }
 
-/// Corners worth a drift: tighter than the drift radius, fast enough to charge, long enough.
-fn drift_zones(brain: &AiBrain, tuning: &AiTuning, skill: &DifficultyProfile) -> Vec<(f32, f32)> {
+/// Corners worth a drift: tighter than the drift radius, fast enough to charge, long enough, and
+/// not steeply banked.
+/// Banked more than this (rad, 10°), a corner is not drifted: on a banked (raised, lipped) turn
+/// an over-rotating drift slid into the lip or barrier and stopped the car (toy_town's 20° turns
+/// cost Elite autopilot runs several seconds).
+const DRIFT_MAX_BANK_RAD: f32 = 10.0 * std::f32::consts::PI / 180.0;
+
+fn drift_zones(
+    track: &Track,
+    brain: &AiBrain,
+    tuning: &AiTuning,
+    skill: &DifficultyProfile,
+) -> Vec<(f32, f32)> {
     if skill.drift <= 0.0 {
         return Vec::new();
     }
@@ -273,7 +339,9 @@ fn drift_zones(brain: &AiBrain, tuning: &AiTuning, skill: &DifficultyProfile) ->
     let min_speed = c.drift_min_speed * brain.caps.top_speed;
     let tight = |i: usize| {
         let s = i as f32 * ds;
-        p.kappa_at(s).abs() > 1.0 / c.drift_max_radius_u && p.corner_at(s) >= min_speed
+        p.kappa_at(s).abs() > 1.0 / c.drift_max_radius_u
+            && p.corner_at(s) >= min_speed
+            && track.frame_at(s).bank.abs() <= DRIFT_MAX_BANK_RAD
     };
     // Start the scan on a sample outside any zone so no zone straddles the wrap.
     let Some(first) = (0..n).find(|&i| !tight(i)) else {

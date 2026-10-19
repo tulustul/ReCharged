@@ -1,16 +1,22 @@
 //! Area items (GDD §6.2). EMP Pulse: a wind-up entity rides on its user for 0.4 s, then a 12 u
-//! pulse hits every other car (`PowerLoss(0)` 2 s, steering still works, and half its charge).
-//! Storm Strike: every unfinished car ahead of the user in `Standings` is struck, leader first,
-//! one every 0.25 s from 0.25 s after the use (the `Used` event is the warning; `PowerLoss(0)`
-//! 1.5 s + a hop).
+//! pulse hits every other car it can see — no wall, ribbon or prop in between — (`PowerLoss(0)`
+//! 2 s, steering still works, and half its charge). Storm Strike: every unfinished car ahead of
+//! the user in `Standings` is struck, leader first, one every 0.25 s from 0.25 s after the use
+//! (the `Used` event is the warning; `PowerLoss(0)` 1.5 s + a hop); a car under cover (a ribbon
+//! or prop above it: an overpass, a table, the dollhouse) is spared and the next one struck.
 
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 use rc_core::prelude::*;
 
 use crate::data::ItemTuning;
 use crate::effects::run_down;
-use crate::hits::{Blow, Hits, centre};
+use crate::hits::{Blow, Hits, centre, exposed};
 use crate::pickups::UseItem;
+
+/// A Storm Strike bolt comes down from this high above a car (u): anything of the world in
+/// between shelters it.
+const STORM_DROP_U: f32 = 40.0;
 
 /// An EMP winding up (with `Projectile { kind: EmpPulse }` and the wind-up in `ItemTimer`).
 #[derive(Component, Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -93,16 +99,18 @@ pub(crate) fn start_area_items(
 }
 
 /// EMPs follow their user through the wind-up, then pulse.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(crate) fn pulse_emps(
     mut commands: Commands,
     tuning: Res<ItemTuning>,
+    rapier: ReadRapierContext,
     mut emps: Query<(Entity, &Projectile, &mut ItemTimer, &mut Transform), With<Emp>>,
     cars: Query<(Entity, &Transform), (With<Racer>, Without<Emp>)>,
     mut hits: Hits,
     mut explosions: MessageWriter<Explosion>,
 ) {
     let e = &tuning.emp_pulse;
+    let ctx = rapier.single().ok();
     for (entity, p, mut timer, mut t) in &mut emps {
         if let Ok((_, owner)) = cars.get(p.owner) {
             t.translation = centre(owner);
@@ -117,7 +125,8 @@ pub(crate) fn pulse_emps(
             kind: ItemKind::EmpPulse,
         });
         for (car, c) in &cars {
-            if car != p.owner && centre(c).distance(at) <= e.radius {
+            let hit = centre(c);
+            if car != p.owner && hit.distance(at) <= e.radius && exposed(ctx.as_ref(), at, hit) {
                 let blow = Blow {
                     effect: Some(Effect::PowerLoss {
                         mul: e.power,
@@ -133,15 +142,22 @@ pub(crate) fn pulse_emps(
     }
 }
 
+/// Nothing of the world above the car centred at `at` (the sky is open for a bolt).
+fn under_open_sky(ctx: Option<&RapierContext>, at: Vec3) -> bool {
+    exposed(ctx, at + Vec3::Y * STORM_DROP_U, at)
+}
+
 /// Storm Strikes hit their next target every interval.
 pub(crate) fn run_storms(
     mut commands: Commands,
     tuning: Res<ItemTuning>,
+    rapier: ReadRapierContext,
     mut storms: Query<(Entity, &mut Storm)>,
-    cars: Query<(), With<Racer>>,
+    cars: Query<&Transform, With<Racer>>,
     mut hits: Hits,
 ) {
     let s = &tuning.storm_strike;
+    let ctx = rapier.single().ok();
     for (entity, mut storm) in &mut storms {
         if storm.wait > 0.0 && run_down(&mut storm.wait) {
             continue;
@@ -151,8 +167,11 @@ pub(crate) fn run_storms(
             continue;
         };
         storm.targets.remove(0);
-        if !cars.contains(victim) {
-            continue; // gone: strike the next one now
+        let open = cars
+            .get(victim)
+            .is_ok_and(|t| under_open_sky(ctx.as_ref(), centre(t)));
+        if !open {
+            continue; // gone or under cover: strike the next one now
         }
         storm.wait = s.interval_secs;
         let blow = Blow {

@@ -4,6 +4,7 @@
 
 use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::ReadRapierContext;
 use rc_core::prelude::*;
 use rc_track::{RibbonStyle, Track, TrackFrame};
 
@@ -16,6 +17,7 @@ use crate::recovery::{Action, Sense};
 use crate::scene::{
     CAR_HALF_WIDTH_U, Scene, SceneBuffers, behind_wall, narrowest_ahead, near_jump,
 };
+use crate::shortcut::take_chance;
 use crate::steering::{lookahead, pursuit_curvature, steer_for_curvature};
 use crate::traffic::{LaneChoice, Obstacle, choose_lane, side_bounds};
 
@@ -38,6 +40,12 @@ const JUMP_LANE_U: f32 = 0.8;
 const JUMP_DODGE_U: f32 = 3.0;
 /// `up_dot` below this = on the side or roof (GDD §5.4).
 const FLIPPED_UP_DOT: f32 = 0.3;
+/// Drive power below this share (EMP, Storm Strike, stall) = the car cannot move by itself.
+const POWERLESS_MUL: f32 = 0.5;
+/// The next gate still to validate this far behind the car (u) = it was missed (passed outside
+/// the gate after a slide or a shove): the car holds reset and rc_race puts it back before the
+/// gate — a respawn instead of a whole extra lap.
+const MISSED_GATE_U: f32 = 6.0;
 /// Wide-line mistakes act only in corners tighter than this radius (u).
 const WIDE_LINE_RADIUS_U: f32 = 60.0;
 /// Reversing out steers at least this hard (−1…1).
@@ -47,6 +55,8 @@ const REVERSE_STEER: f32 = 0.8;
 const SLIDE_REFERENCE_RAD: f32 = 0.14;
 /// Lateral room kept between the bodies of cars alongside (u).
 const ALONGSIDE_CLEARANCE_U: f32 = 0.4;
+/// RNG key offset of the per-lap shortcut decision.
+const SHORTCUT_KEY: u64 = 6;
 
 /// Ticks since the attempt began (keys the AI's RNG draws). Reset in `OnEnter(RacePhase::Setup)`.
 #[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +107,7 @@ pub(crate) fn drive_ai(
     racers: Query<(Entity, &TrackView, &StatusEffects), With<Racer>>,
     hazards: Query<HazardItem>,
     projectiles: Query<ProjectileItem>,
+    rapier: ReadRapierContext,
     mut buffers: Local<SceneBuffers>,
 ) {
     clock.0 += 1;
@@ -104,6 +115,7 @@ pub(crate) fn drive_ai(
         return;
     };
     let phase = phase.map_or(RacePhase::Setup, |p| *p.get());
+    let ctx = rapier.single().ok();
     let buffers = &mut *buffers;
     buffers.fill(&track, racers.iter(), hazards.iter(), projectiles.iter());
     let scene = Scene {
@@ -117,6 +129,7 @@ pub(crate) fn drive_ai(
         locked: &buffers.locked,
         goo: &buffers.goo,
         standings: standings.as_deref().map_or(&[], |s| &s.0),
+        ctx: ctx.as_ref(),
     };
     for mut car in &mut cars {
         let control = drive(
@@ -164,6 +177,7 @@ fn drive(
         brain.lane = 0.0;
         brain.drift = None;
         brain.boosting = false;
+        brain.shortcut.active = None; // never into a shortcut from a respawn point
     }
     let tuning = w.tuning;
     let skill = tuning.difficulty.get(car.driver.difficulty);
@@ -173,7 +187,19 @@ fn drive(
     let rot = car.transform.rotation;
     let (heading, up) = (rot * Vec3::NEG_Z, rot * Vec3::Y);
     let frame = w.track.frame_at(view.s);
+    let length = w.track.length();
     pace::roll_mistake(w, brain, skill, key);
+    let chance = take_chance(car.driver.difficulty, brain.aggression);
+    let roll = |p: f32| rng::chance(w.seed, w.tick, RngStream::AiMistakes, key + SHORTCUT_KEY, p);
+    brain.shortcut.step(
+        &brain.shortcuts,
+        length,
+        (view.s, view.lateral),
+        chance,
+        roll,
+    );
+    // On a shortcut the car is legally beyond barriers and off the ribbon.
+    let on_shortcut = brain.shortcut_at(length, view.s).is_some();
 
     let seek = w
         .goo_target(car.entity, &view)
@@ -192,17 +218,23 @@ fn drive(
     let kappa = pursuit_curvature(view.pos, reference, up, path.target);
     let steer = steer_for_curvature(kappa, speed.max(0.0), brain.caps.lateral_accel);
 
+    let gates = w.track.checkpoints();
+    let next_gate = gates[car.progress.next_checkpoint % gates.len()].s;
+    let missed_gate = !car.progress.finished && w.track.delta_s(next_gate, view.s) > MISSED_GATE_U;
     let sense = Sense {
         speed: speed.abs(),
         throttle: brain.last_throttle > 0.5,
         progress: view.progress,
-        off_course: view.lateral.abs() > frame.half_width + frame.offroad_margin
+        off_course: missed_gate
+            || view.lateral.abs() > frame.half_width + frame.offroad_margin
             || view.height < FALLEN_HEIGHT_U
-            || behind_wall(w.track, &view, &frame)
-            || (w.track.style() != RibbonStyle::Invisible
+            || (!on_shortcut && behind_wall(w.track, &view, &frame))
+            || (!on_shortcut
+                && w.track.style() != RibbonStyle::Invisible
                 && view.lateral.abs() < frame.half_width
                 && view.height < -UNDER_RIBBON_U),
         flipped: tel.up_dot < FLIPPED_UP_DOT,
+        powerless: car.effects.power_mul() < POWERLESS_MUL,
     };
     match brain.recovery.step(&tuning.recovery, sense, SIM_DT) {
         Action::Drive => {}
@@ -232,7 +264,13 @@ fn drive(
         off_line: (view.lateral - path.planned - brain.lane).abs(),
         edge_room: path.narrowest - view.lateral.abs(),
     };
-    let drift = charge::drift(w, brain, skill, key, sense);
+    let drift = match on_shortcut {
+        true => {
+            brain.drift = None;
+            false
+        }
+        false => charge::drift(w, brain, skill, key, sense),
+    };
     pace::adapt_grip(brain, tel);
 
     let (throttle, brake, brake_to, straight_secs) =
@@ -255,8 +293,8 @@ fn drive(
         near_jump: near_jump(w.track, view.s, JUMP_NO_DROP_U),
         ..default()
     };
-    let items = w.item_view(car.entity, &view, heading, up, own);
     let usable = car.slot.item.filter(|_| car.slot.roulette <= 0.0);
+    let items = w.item_view(car.entity, &view, (heading, up), usable, own);
     let temper = Temper {
         aggression: brain.aggression,
         hoard: (brain.personality.hoard + skill.hoard).min(1.0),
@@ -282,8 +320,9 @@ fn drive(
     }
 }
 
-/// The racing line + personal offset, shifted for traffic, hazards and mistakes, never wider than
-/// the narrowest track ahead nor into cars alongside; a Goo Bomb carrier aims at `seek`.
+/// The racing line + personal offset (or a shortcut's line and corridor while one is driven),
+/// shifted for traffic, hazards and mistakes, never wider than the narrowest track ahead nor into
+/// cars alongside; a Goo Bomb carrier aims at `seek`.
 #[allow(clippy::too_many_arguments)]
 fn plan_path(
     w: &Scene,
@@ -304,11 +343,21 @@ fn plan_path(
             0.0
         };
     let bounds = |f: &TrackFrame| (f.half_width - edge).max(0.0);
-    let planned = |s: f32| w.track.racing_line_offset_at(s) + brain.line_offset;
+    let length = w.track.length();
+    let cut = |s: f32| brain.shortcut.at(&brain.shortcuts, length, s);
+    let planned = |s: f32| match cut(s).and_then(|p| p.lateral_at(length, s)) {
+        Some(lateral) => lateral,
+        None => w.track.racing_line_offset_at(s) + brain.line_offset,
+    };
+    // The legal lateral range at `s`: the shortcut's corridor, else ±`ribbon`.
+    let corridor = |s: f32, ribbon: f32| match cut(s) {
+        Some(p) => (planned(s) - p.half_width, planned(s) + p.half_width),
+        None => (-ribbon, ribbon),
+    };
     let narrowest = narrowest_ahead(w.track, view.s, tuning.traffic.look_ahead_u, edge);
     w.obstacles(me, view, seek.map(|s| s.0), obstacles, alongside);
     let gap = 2.0 * CAR_HALF_WIDTH_U + ALONGSIDE_CLEARANCE_U;
-    let (lo, hi) = side_bounds(view.lateral, (-narrowest, narrowest), alongside, gap);
+    let (lo, hi) = side_bounds(view.lateral, corridor(view.s, narrowest), alongside, gap);
     let here = planned(view.s).clamp(lo, hi);
     let lane = match seek {
         Some((_, lateral)) => LaneChoice {
@@ -316,9 +365,11 @@ fn plan_path(
             follow_speed: None,
             dodge: false,
         },
+        // The side to pass on follows last tick's target, not the car's own lateral: a car
+        // nearly in line with a hazard would otherwise flip sides every tick and hit it.
         None => choose_lane(
             here,
-            view.lateral,
+            here + brain.lane,
             CAR_HALF_WIDTH_U,
             speed,
             (lo, hi),
@@ -366,7 +417,7 @@ fn plan_path(
         false => brain.lane + (want - brain.lane).clamp(-step, step),
     };
     let s_t = view.s + ld;
-    let kappa_t = brain.profile.kappa_at(s_t);
+    let kappa_t = brain.kappa_at(length, s_t);
     let wide = match brain.mistake {
         Some((Mistake::WideLine(u), _)) if kappa_t.abs() > 1.0 / WIDE_LINE_RADIUS_U => {
             -kappa_t.signum() * u
@@ -374,8 +425,13 @@ fn plan_path(
         _ => 0.0,
     };
     let frame_t = w.track.frame_at(s_t);
-    let bt = bounds(&frame_t);
-    let (lo_t, hi_t) = (lo.max(-bt), hi.min(bt));
+    let (lo_t, hi_t) = match cut(s_t) {
+        Some(_) => corridor(s_t, 0.0),
+        None => {
+            let bt = bounds(&frame_t);
+            (lo.max(-bt), hi.min(bt))
+        }
+    };
     let lateral_t = (planned(s_t) + brain.lane + wide).clamp(lo_t, hi_t.max(lo_t));
     Path {
         target: frame_t.point(lateral_t, 0.0),

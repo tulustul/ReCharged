@@ -1,9 +1,10 @@
-//! Spark Rocket (GDD §6.2). Fired forward, or backward with Look back; at launch it locks onto
-//! the nearest car in its cone and range that is in sight (`ItemEvent::LockOn`) and homes with a
-//! turn-rate limit; the lock breaks (`LockLost`) when the target leaves the cone (sharp turns),
-//! the range or the line of sight, and an unlocked rocket flies straight. It skims ramps and
-//! banks, detonates on walls and props, on a car near its path or when its life runs out, and
-//! tumbles every car in the blast — its owner only after the immunity window.
+//! Spark Rocket (GDD §6.2). Fired forward, or backward with Look back; it locks onto the nearest
+//! car in its cone and range that is in sight (`ItemEvent::LockOn`, never its owner) — at launch
+//! and, while it has no lock, on every later tick — and homes with a turn-rate limit; the lock
+//! breaks (`LockLost`) when the target leaves the cone (sharp turns), the range or the line of
+//! sight. An unlocked rocket flies straight. It skims ramps and banks, detonates on walls and
+//! props, on a car near its path or when its life runs out, and tumbles every car in the blast
+//! that the blast can see (not through walls) — its owner only after the immunity window.
 
 use bevy::prelude::*;
 use bevy_rapier3d::parry::shape::Ball;
@@ -163,7 +164,9 @@ pub(crate) fn launch_rockets(
 type Cars<'w, 's> = Query<'w, 's, (Entity, &'static Transform), (With<Racer>, Without<Rocket>)>;
 
 /// Locked rockets turn toward their target, or lose it (`LockLost`) when it leaves the cone,
-/// the range or the line of sight.
+/// the range or the line of sight. A rocket without a lock looks for one every tick by the
+/// launch rules (nearest car in its cone and range, in sight; never its owner) and announces it
+/// (`LockOn`), so a lost lock can be re-acquired.
 pub(crate) fn home_rockets(
     tuning: Res<ItemTuning>,
     rapier: ReadRapierContext,
@@ -176,8 +179,23 @@ pub(crate) fn home_rockets(
     let cos_cone = r.lock_cone_deg.to_radians().cos();
     let turn = r.turn_rate_deg.to_radians() * SIM_DT;
     for (projectile, mut rocket, mut target, t) in &mut rockets {
-        let Some(locked) = target.0 else { continue };
         let p = t.translation;
+        let owner = projectile.owner;
+        let Some(locked) = target.0 else {
+            let others = cars
+                .iter()
+                .filter(|&(e, _)| e != owner)
+                .map(|(e, c)| (e, centre(c)));
+            let sight = |c: Vec3| in_sight(&ctx, p, c);
+            if let Some(found) = lock_target(p, rocket.dir, cos_cone, rocket.range, others, sight) {
+                target.0 = Some(found);
+                events.write(ItemEvent {
+                    racer: owner,
+                    kind: ItemEventKind::LockOn { target: found },
+                });
+            }
+            continue;
+        };
         let aim = cars.get(locked).ok().map(|(_, c)| centre(c)).filter(|&a| {
             in_cone(rocket.dir, a - p, cos_cone, rocket.range) && in_sight(&ctx, p, a)
         });
@@ -186,7 +204,7 @@ pub(crate) fn home_rockets(
             None => {
                 target.0 = None;
                 events.write(ItemEvent {
-                    racer: projectile.owner,
+                    racer: owner,
                     kind: ItemEventKind::LockLost,
                 });
             }
@@ -248,7 +266,8 @@ pub(crate) fn fly_rockets(
             kind: ItemKind::SparkRocket,
         });
         for (car, c) in &cars {
-            if !spared(car) && centre(c).distance(at) <= r.blast_radius {
+            let hit = centre(c);
+            if !spared(car) && hit.distance(at) <= r.blast_radius && in_sight(&ctx, at, hit) {
                 let blow = Blow::impulse(tumble(&r.tumble, rocket.dir));
                 hits.land(car, owner, ItemKind::SparkRocket, entity, blow);
             }

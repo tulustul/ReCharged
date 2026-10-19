@@ -3,8 +3,8 @@
 //! near its surface; leaving the disc re-arms it) slips (`Grip` 0.2 + spin) or is launched.
 //! The Goo Bomb sticks to its user: a bump (rapier `CollisionEvent::Started` between two racers)
 //! passes it on — never to a shielded car, never back to the giver within 0.5 s — and after the
-//! 6 s fuse it tumbles everyone within 7 u, the carrier included. A shielded car bumping another
-//! pushes it away (Shield Bubble).
+//! 6 s fuse it tumbles everyone within 7 u that the blast can see (not through walls), the
+//! carrier included. A shielded car bumping another pushes it away (Shield Bubble).
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
@@ -13,7 +13,7 @@ use rc_core::prelude::*;
 use crate::data::ItemTuning;
 use crate::effects::{ItemClock, run_down};
 use crate::hits::{
-    Blow, Born, CAR_HALF_LENGTH_U, Hits, centre, flat, ground_below, immune, tumble,
+    Blow, Born, CAR_HALF_LENGTH_U, Hits, centre, exposed, flat, ground_below, immune, tumble,
 };
 use crate::pickups::UseItem;
 
@@ -262,6 +262,7 @@ pub(crate) fn goo_bombs(
     mut commands: Commands,
     tuning: Res<ItemTuning>,
     clock: Res<ItemClock>,
+    rapier: ReadRapierContext,
     mut collisions: MessageReader<CollisionEvent>,
     mut bombs: Query<(
         Entity,
@@ -276,6 +277,7 @@ pub(crate) fn goo_bombs(
     mut contacts: Local<Vec<(Entity, Entity)>>,
 ) {
     let g = &tuning.goo_bomb;
+    let ctx = rapier.single().ok();
     contacts.clear();
     contacts.extend(bumps(collisions.read(), |e| cars.contains(e)));
     let no_back = u64::from(secs_to_ticks(g.no_pass_back_secs));
@@ -312,7 +314,7 @@ pub(crate) fn goo_bombs(
         });
         for (car, c) in &cars {
             let to = centre(c) - at;
-            if to.length() <= g.radius {
+            if to.length() <= g.radius && exposed(ctx.as_ref(), at, centre(c)) {
                 let blow = Blow::impulse(tumble(&g.tumble, to));
                 hits.land(car, hazard.owner, ItemKind::GooBomb, entity, blow);
             }

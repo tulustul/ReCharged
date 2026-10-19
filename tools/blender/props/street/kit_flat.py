@@ -95,13 +95,14 @@ def leaf_pile():
     rnd = random.Random(9)
     bm = core.new_bm()
     cols = [mi('leaf_red'), mi('leaf_orange'), mi('leaf_yellow'), mi('leaf_brown')]
-    # lumpy dome matching the collider's spherical cap (r 6 at -5.5: 0.5 u high, 2.4 u radius)
+    # lumpy dome matching the collider's spherical cap (r 6 at -5.5: 0.5 u high, 2.4 u radius):
+    # 0.42 u + up to 0.08 u of jitter, so cars ride on the leaves instead of sinking into them
     out = bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=10, radius=1.0)
     for v in out['verts']:
         x, y, z = v.co
         z = max(z, 0.0)
         jitter = rnd.uniform(-0.15, 0.15)
-        v.co = V((x * 2.6 + jitter, y * 2.6 + jitter, z * 0.8 + rnd.uniform(-0.05, 0.16) * z))
+        v.co = V((x * 2.6 + jitter, y * 2.6 + jitter, z * 0.42 + rnd.uniform(-0.03, 0.08) * z))
     for f in {f for v in out['verts'] for f in v.link_faces}:
         f.material_index = cols[3] if rnd.random() < 0.7 else cols[1]
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.01], context='VERTS')
@@ -110,7 +111,7 @@ def leaf_pile():
         a = rnd.uniform(0, 2 * math.pi)
         x, y = r * math.cos(a), r * math.sin(a)
         d = math.hypot(x / 2.6, y / 2.6)
-        z = (0.8 * math.sqrt(max(0.0, 1 - d * d)) + 0.12 if d < 1 else 0.0) + 0.03
+        z = (0.42 * math.sqrt(max(0.0, 1 - d * d)) + 0.06 if d < 1 else 0.0) + 0.03
         leaf(bm, (x, y, z), rnd.uniform(0.22, 0.34), rnd.uniform(0, 6.3), rnd.uniform(-0.5, 0.5),
              rnd.choices(cols, [0.35, 0.3, 0.25, 0.1])[0])
     ob = core.obj_from_bm('leaf_pile', bm, weighted=False, angle=60)

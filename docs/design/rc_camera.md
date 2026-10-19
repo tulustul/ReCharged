@@ -66,7 +66,11 @@ Camera { order: 10, clear_color: ClearColorConfig::Custom(Color::NONE),
   hood view.
 - Obstruction: a ray from the look-at point to the eye, `QueryFilter::only_fixed()`, so cars and other
   dynamic bodies never block. The boom pulls in at once (0.3 u margin, at least 1.2 u) and regrows
-  over 0.35 s.
+  over 0.35 s. When even the shortest boom would end inside an obstacle — the look-back eye in front
+  of a car stopped against a ramp, a deck face or a wall (B23) — the boom swings up over the car in
+  its vertical plane (by 0.6, then 1.2 rad, never steeper than ≈ 85°: straight down flips the view)
+  to the first direction with 1.2 u of room (else the roomiest tried) and looks down at the car.
+  The swing snaps, like the pull-in (`ponytail:`).
 - Shake: trauma from `CarImpact` (×0.6 strength), `CarLanded` (≥ 0.3 s air, ×0.35), `Explosion`
   (0.9 at the centre, 0 at 3 × radius). Angle = trauma² × (2°, 2°, 1.2°), decays 1.6/s. Off with
   `camera_shake`.
@@ -84,10 +88,11 @@ eased over 0.6 s.
 ## Tests
 `cargo test -p rc_camera`: layouts for every count, orientation and aspect (tiling, 3P free
 quadrant), logical rects, Hor+ and the 2P clamp, spring convergence and frame-rate independence,
-chase / look-back / hood / far framing, obstruction pull-in, fly-by end pose, orbit, widening,
-shake, spectate order, mode cycle, showroom framing. Headless `tests/rig.rs`: one host per state,
-3P overlay + viewports + `PlayerViewports`, 2P orientation setting and window resize, cameras kept
-across restart and re-bound, camera-mode cycling.
+chase / look-back / hood / far framing, obstruction pull-in, the boom swinging up over the car when
+even the shortest boom is blocked (and keeping its direction otherwise), fly-by end pose, orbit,
+widening, shake, spectate order, mode cycle, showroom framing. Headless `tests/rig.rs`: one host per
+state, 3P overlay + viewports + `PlayerViewports`, 2P orientation setting and window resize, cameras
+kept across restart and re-bound, camera-mode cycling.
 
 ## Known limitations
 - The fly-by circles the car; flying along the `Track` spline waits for T02's query API (`ponytail`).

@@ -1,4 +1,4 @@
-# rc_race — race rules, the referee (design note, T06)
+# rc_race — race rules, the referee (design note, T06, T19a)
 
 `RacePlugin` spawns each attempt's racers, drives the phases, keeps everyone's progress, decides
 resets and respawns, ends the race and writes `RaceResults`. It never moves a car: respawns are
@@ -18,7 +18,9 @@ next to thin systems: `phases.rs`, `progress.rs`, `standings.rs`, `recovery.rs`,
 
 A racer gets `Racer` (its required components: `CarControl`, `RaceProgress`, `Interpolated`, …),
 `LocalPlayer(slot)` for humans, `AiDriver` for AI and for autopilot humans (`rival: "autopilot"`,
-Elite), plus private `Tracker`, `Recovery`, `Launch`.
+Elite), plus private `Tracker`, `Recovery`, `Launch`. A human who finishes gets the same
+`AiDriver` in the finishing tick (Re-Volt style: the car drives its cool-down lap, at rc_ai's
+finished pace, while the player waits for the others); `LocalPlayer` stays (camera, HUD).
 
 ## Phases (fixed ticks; a pause freezes them)
 | Phase | Length | Leaves when |
@@ -48,6 +50,9 @@ auto-accelerate only in Racing, so it never stalls.
   is inside the gate: |lateral| ≤ half width + off-road margin (the legal corridor — open sides and
   floors may be driven within the margin), ≤ 4 u from the gate plane (rejects projection jumps),
   ≤ 4 u from the surface. Backward crossings validate nothing; a missed gate must be passed again.
+  Passing the next gate's `s` outside the gate sends `RaceEvent::MissedCheckpoint` once per pass:
+  it re-arms only when the car is back more than the gate depth (4 u) behind the gate, so a car
+  jittering on the gate line outside it reports once (rc_ui shows the message).
 - **Laps:** validating checkpoint 0 with all others done completes a lap: `LapCompleted { lap,
   time, best }` (`best` = beat this race's best, so never on lap 1), `FinalLap` when the last lap
   starts, finish after the last. Lap 1 is timed from GO (it includes the run-up), so lap times sum
@@ -102,7 +107,8 @@ Time Trial human's `GhostData` (`time_ticks` = finish, `geometry_hash` from `Tra
 
 ## Events produced
 `CountdownTick(n)`, `Go` (racer `None`); `PerfectStart`, `Stall`, `CheckpointSplit`,
-`LapCompleted`, `FinalLap`, `Finished`, `WrongWay`, `GoldenBattery`, `Hint` (racer `Some`);
+`MissedCheckpoint`, `LapCompleted`, `FinalLap`, `Finished`, `WrongWay`, `GoldenBattery`, `Hint`
+(racer `Some`);
 `RaceEndsIn(n)` (`None`). Messages: `RespawnCar`, `ApplyEffect`, `Teleported` (spawns).
 
 ## Decisions
@@ -118,25 +124,27 @@ Time Trial human's `GhostData` (`time_ticks` = finish, `geometry_hash` from `Tra
 - **Splits from the ghost's samples** instead of a new persisted field: old ghosts keep working.
 
 ## Tests (`cargo test -p rc_race`)
-- Unit (20): lap/checkpoint rules on `test_oval` forward and reverse (grid ≤ 0, continuity across
-  the line, laps only after every gate, lap times = finish, frozen after the finish, missed gate,
-  backwards), crossing wrap, standings (finishers, distance, ties, same-tick finishes), wrong-way
-  hysteresis, soft-lock start for 0/1/2+ humans, projected times, respawn table (tap vs hold,
-  cooldown, off-track with/without assist, stuck), flip pose, start windows, phase table,
-  countdown numbers, ghost playback and splits, hint triggers.
+- Unit (22): lap/checkpoint rules on `test_oval` forward and reverse (grid ≤ 0, continuity across
+  the line, laps only after every gate, lap times = finish, frozen after the finish, missed gate and
+  its notice once per pass — not again while jittering on the gate line — backwards), crossing wrap,
+  standings (finishers, distance, ties, same-tick finishes), wrong-way hysteresis, soft-lock start
+  for 0/1/2+ humans, projected times, respawn table (tap vs hold, cooldown, off-track with/without
+  assist, stuck), flip pose, start windows, phase table, countdown numbers, ghost playback and
+  splits, hint triggers.
 - Headless (`tests/race.rs`, rc_testkit): an 8-car 2-lap race on the full sim stack
   (`SimPlugins` without `AiPlugin`; scripted pure-pursuit pilots write `CarControl`, real physics)
   through every phase to the finish — countdown events, a perfect start and a stall, laps, ranks,
   results, the clock stops. The other tests use `TrackPlugin` + `RacePlugin` and a kinematic
   stand-in for rc_vehicle (exact positions): restart mid-race recreates the grid without the
   intro; leaving during Setup leaks nothing; pause freezes race time; kill-height respawn +
-  ghosting + cooldown, Golden Battery pickup, dropped player; Time Trial ghost recorded, raced back
-  at the same pace with ~0 splits; the soft-lock guard classifies a human who never finishes.
+  ghosting + cooldown, Golden Battery pickup, dropped player; a finished human is handed to the AI
+  (`AiDriver` "autopilot", `LocalPlayer` kept) while the other human races on; Time Trial ghost
+  recorded, raced back at the same pace with ~0 splits; the soft-lock guard classifies a human who
+  never finishes.
 
 ## Known limitations
-- A missed gate has no HUD message; the racer's distance just stops growing until it goes back.
+- A missed gate stops the racer's distance growing until it goes back (the AI holds reset to be
+  put back before it, rc_ai).
 - Respawns in the same spot overlap; ghosting covers 1.5 s (no spawn jitter).
 - In `Finished` nothing is refereed: a car falling off during the results stays there.
-- A finished human keeps its driving input (rc_input); handing it to the AI, Re-Volt style, would
-  be one `AiDriver` insert once rc_ai drives.
 - Projected times assume the average pace so far (a racer stuck at the end projects slow).

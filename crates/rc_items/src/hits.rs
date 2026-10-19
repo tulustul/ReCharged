@@ -157,6 +157,22 @@ pub(crate) fn in_sight(ctx: &RapierContext, from: Vec3, to: Vec3) -> bool {
             .is_none()
 }
 
+/// A blast at `at` reaches the car centred at `car`: no wall, ribbon or prop between them
+/// (always, without a physics world).
+pub(crate) fn exposed(ctx: Option<&RapierContext>, at: Vec3, car: Vec3) -> bool {
+    ctx.is_none_or(|ctx| in_sight(ctx, at, car))
+}
+
+/// Scene queries against the track's own colliders only (barriers, ribbons, ground, shell).
+pub(crate) fn track_filter() -> QueryFilter<'static> {
+    QueryFilter::new()
+        .exclude_sensors()
+        .groups(CollisionGroups::new(
+            Group::from_bits_truncate(layers::PROJECTILE),
+            Group::from_bits_truncate(layers::TRACK),
+        ))
+}
+
 /// The ground below `from` within `reach`: (point, normal).
 pub(crate) fn ground_below(ctx: &RapierContext, from: Vec3, reach: f32) -> Option<(Vec3, Vec3)> {
     let (_, hit) = ctx.cast_ray_and_get_normal(from, Vec3::NEG_Y, reach, true, world_filter())?;

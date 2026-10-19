@@ -5,7 +5,9 @@
 //!   `total_distance` ≤ 0 there and grows continuously across the line.
 //! - A checkpoint counts when the projected `s` passes it **forward**, in order, with the car
 //!   inside its gate (`position ± (half width + off-road margin)`, near the gate plane and the
-//!   surface). A missed gate freezes the racer's distance at it until it is passed properly.
+//!   surface). A missed gate freezes the racer's distance at it until it is passed properly;
+//!   passing its `s` outside the gate sends `MissedCheckpoint` once per pass (re-armed when the
+//!   car is back behind the gate, so a car jittering on the gate line reports it once).
 //! - Lap 1 is timed from GO (the run-up from the grid is part of it), so the lap times add up to
 //!   the race time.
 
@@ -14,6 +16,7 @@ use rc_core::prelude::*;
 use rc_track::{Track, TrackFrame};
 
 use crate::ghost::GhostRun;
+use crate::spawn::autopilot;
 
 /// A crossing counts only this close to the gate plane along the track (u): a car moves < 1 u
 /// per tick, so this rejects projection jumps.
@@ -75,6 +78,9 @@ pub(crate) struct Tracker {
     pub crossings: usize,
     /// Wrong-way warning.
     pub wrong_way: WrongWay,
+    /// The gate whose missed pass was reported; re-armed once the car is back behind it (so a
+    /// car jittering on the gate line outside the gate reports it once).
+    pub missed: Option<usize>,
 }
 
 /// What a tick of motion did (events for the HUD, audio and the ghost splits).
@@ -88,6 +94,8 @@ pub(crate) enum Happening {
     FinalLap,
     /// The wrong-way warning turned on or off.
     WrongWay(bool),
+    /// The next gate's `s` was passed outside the gate.
+    MissedCheckpoint,
 }
 
 /// The world as one racer sees it this tick.
@@ -143,14 +151,24 @@ impl Tracker {
                 progress.wrong_way = on;
                 emit(Happening::WrongWay(on));
             }
+            if self
+                .missed
+                .is_some_and(|m| track.delta_s(tp.s, cps[m].s) > GATE_DEPTH_U)
+            {
+                self.missed = None;
+            }
             loop {
                 let next = (progress.last_valid_checkpoint + 1) % cps.len();
                 let Some(frac) = crossed(cps[next].s, s0, d, length) else {
                     break;
                 };
                 if !in_gate(&cps[next], tick.pos) {
+                    if self.missed.replace(next) != Some(next) {
+                        emit(Happening::MissedCheckpoint);
+                    }
                     break;
                 }
+                self.missed = None;
                 progress.last_valid_checkpoint = next;
                 progress.next_checkpoint = (next + 1) % cps.len();
                 let time = tick.now.saturating_sub(1) as f32 + frac;
@@ -227,9 +245,13 @@ type ProgressItem<'a> = (
     &'a mut RaceProgress,
     &'a mut Tracker,
     Has<LocalPlayer>,
+    Has<AiDriver>,
 );
 
-/// `SimSet::Race` (Intro, Countdown, Racing): every racer's progress and its events.
+/// `SimSet::Race` (Intro, Countdown, Racing): every racer's progress and its events. A human
+/// who finishes is handed to the AI (Re-Volt style), so the car keeps driving its cool-down lap
+/// while the player spectates or waits.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn update_progress(
     track: Option<Res<Track>>,
     (status, phase, config): (
@@ -242,6 +264,7 @@ pub(crate) fn update_progress(
     ghost: Option<Single<&GhostRun>>,
     mut jumped: Local<Vec<Entity>>,
     mut events: MessageWriter<RaceEvent>,
+    mut commands: Commands,
 ) {
     let Some(track) = track else {
         warn_once!("rc_race: no Track in a race; progress is not tracked");
@@ -251,7 +274,8 @@ pub(crate) fn update_progress(
     jumped.extend(teleported.read().map(|t| t.entity));
     let time_trial = config.is_some_and(|c| c.mode == GameMode::TimeTrial);
     let splits = ghost.as_deref().map_or(&[][..], |g| &g.splits[..]);
-    for (car, transform, mut progress, mut tracker, human) in &mut racers {
+    for (car, transform, mut progress, mut tracker, human, driven) in &mut racers {
+        let was_finished = progress.finished;
         let tick = Tick {
             track: &track,
             pos: transform.translation,
@@ -277,8 +301,13 @@ pub(crate) fn update_progress(
             }
             Happening::FinalLap => send(RaceEventKind::FinalLap),
             Happening::WrongWay(on) => send(RaceEventKind::WrongWay(on)),
+            Happening::MissedCheckpoint => send(RaceEventKind::MissedCheckpoint),
             Happening::Checkpoint { .. } => {}
         });
+        if human && !driven && progress.finished && !was_finished {
+            info!("rc_race: the AI drives the finished human's car");
+            commands.entity(car).insert(autopilot());
+        }
     }
 }
 
@@ -378,6 +407,11 @@ pub(crate) mod tests {
             let lap = |h: &&Happening| matches!(h, Happening::Lap { .. });
             self.events.iter().filter(lap).count()
         }
+
+        fn missed(&self) -> usize {
+            let missed = |h: &&Happening| **h == Happening::MissedCheckpoint;
+            self.events.iter().filter(missed).count()
+        }
     }
 
     #[test]
@@ -448,6 +482,34 @@ pub(crate) mod tests {
         car.drive(track.length() / 30.0, 30.0, 0.0);
         assert!(car.progress.next_checkpoint > 2 || car.progress.lap > 1);
         assert_eq!(car.laps(), 0, "the first lap still needs the missed gate");
+        assert_eq!(car.missed(), 1, "one notice for the one missed pass");
+    }
+
+    #[test]
+    fn a_missed_gate_is_reported_once_per_pass() {
+        let track = track(false);
+        let mut car = Drive::new(&track);
+        let c2 = track.checkpoints()[2];
+        let wide = c2.half_width + c2.offroad_margin + 1.0;
+        let to_c2 = (c2.s - car.s).rem_euclid(track.length()) - 1.0;
+        car.drive(to_c2 / 30.0, 30.0, 0.0);
+        car.drive(0.1, 30.0, wide); // past the gate's s, outside it
+        assert_eq!(car.missed(), 1);
+        // Jittering on the gate line (never more than the gate depth behind it): no new notice.
+        for _ in 0..3 {
+            car.drive(0.3, -10.0, wide);
+            car.drive(0.3, 10.0, wide);
+        }
+        assert_eq!(car.missed(), 1, "a car stuck on the line reports once");
+        // Back well behind the gate and past it outside again: a second missed pass.
+        car.drive(0.8, -10.0, wide);
+        car.drive(0.8, 10.0, wide);
+        assert_eq!(car.missed(), 2);
+        // Back and through the gate: validated, no notice.
+        car.drive(0.8, -10.0, 0.0);
+        car.drive(0.8, 10.0, 0.0);
+        assert_eq!(car.missed(), 2);
+        assert_eq!(car.progress.next_checkpoint, 3, "the gate counted");
     }
 
     #[test]

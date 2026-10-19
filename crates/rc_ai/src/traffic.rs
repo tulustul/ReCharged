@@ -27,10 +27,13 @@ pub struct LaneChoice {
     pub dodge: bool,
 }
 
-/// Where to drive given the planned `lateral`, the car's current lateral `current`, its half
-/// width `my_half`, its speed and `obstacles` ahead; `bounds` = (min, max) legal laterals.
-/// A blocking obstacle is passed on the side the car already is on when there is room, else on
-/// the other side; a car that cannot be passed is followed.
+/// Where to drive given the planned `lateral`, the lateral the car is heading for (`current`:
+/// last tick's target), its half width `my_half`, its speed and `obstacles` ahead; `bounds` =
+/// (min, max) legal laterals. A blocking obstacle is passed on the side the car is already
+/// heading for when there is room, else on the other side; a car that cannot be passed is
+/// followed. A side is free when no car near the
+/// blocker and no hazard anywhere ahead is in the way (passing a car must not lead onto a Spring
+/// Pad the car hid).
 pub fn choose_lane(
     planned: f32,
     current: f32,
@@ -61,7 +64,7 @@ pub fn choose_lane(
             && !obstacles
                 .iter()
                 .filter(relevant)
-                .filter(|o| (o.ahead - blocker.ahead).abs() < 2.0 * reach.max(2.0))
+                .filter(|o| !o.car || (o.ahead - blocker.ahead).abs() < 2.0 * reach.max(2.0))
                 .any(|o| blocks(lat, o))
     };
     let sides = match current <= blocker.lateral {
@@ -189,6 +192,21 @@ mod tests {
         let o = [car(6.0, -3.0, 12.0)];
         let c = choose_lane(-3.0, -3.5, HALF, 20.0, BOUNDS, &o);
         assert!((c.lateral - -1.0).abs() < 1e-5, "{c:?}");
+    }
+
+    #[test]
+    fn a_hazard_beyond_the_car_decides_the_passing_side() {
+        let pad = Obstacle {
+            ahead: 14.0,
+            lateral: -2.0,
+            half_width: 1.6 + 0.6,
+            speed: 0.0,
+            car: false,
+        };
+        // On the car's left already, but a Spring Pad lies on the left lane farther on.
+        let o = [car(6.0, 0.0, 12.0), pad];
+        let c = choose_lane(0.0, -0.3, HALF, 20.0, BOUNDS, &o);
+        assert!((c.lateral - 2.0).abs() < 1e-5, "passes on the right: {c:?}");
     }
 
     #[test]
