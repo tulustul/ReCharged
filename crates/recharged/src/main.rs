@@ -4,7 +4,8 @@
 //! `UserPaths`, roots the `AssetPlugin` at the assets dir, loads the React bundle and owns the
 //! wall-clock automation hooks ([`automation`]), the `--input-script` host, `--bench` ([`bench`]),
 //! `--headless-race` ([`headless`]) and `--calibrate-medals` ([`calibrate`]). `--export-bindings
-//! <path>` writes the TypeScript client and exits without opening a window. Tools:
+//! <path>` writes the TypeScript client and exits without opening a window. Human runs exit only
+//! once no render pipeline is compiling ([`quit`]). Tools:
 //! `docs/design/automation.md`.
 //!
 //! Must never: contain game logic (it only wires plugins and flags together).
@@ -14,6 +15,7 @@ mod bench;
 mod calibrate;
 mod cli;
 mod headless;
+mod quit;
 
 use std::path::PathBuf;
 
@@ -123,9 +125,8 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
             })
             // Automated runs exit within seconds; exiting while pipelines still compile on
             // Bevy's async threads drops the GPU device on a worker thread and crashes the NVIDIA
-            // driver (exit 139). Synchronous compilation removes that window.
-            // ponytail: a human closing the window mid-compile can still hit it; defer AppExit
-            // until the pipeline cache is idle if that ever shows up.
+            // driver (exit 139). Synchronous compilation removes that window; human runs defer
+            // their exit until the pipeline queue is idle instead ([`quit`]).
             .set(bevy::render::RenderPlugin {
                 synchronous_pipeline_compilation: automated,
                 ..default()
@@ -146,6 +147,8 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
                     },
                     ..default()
                 }),
+                // Human runs: `quit` closes the window once no pipeline is compiling.
+                close_when_requested: automated,
                 ..default()
             })
             .set(AssetPlugin {
@@ -171,6 +174,8 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
             focused_mode: UpdateMode::Continuous,
             unfocused_mode: UpdateMode::Continuous,
         });
+    } else {
+        app.add_plugins(quit::plugin);
     }
     add_sim_plugins(&mut app);
     app.add_plugins((

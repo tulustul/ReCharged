@@ -6,16 +6,22 @@
 //              24-27 shape, 28-29 mode (0 billboard, 1 axial, 2 flat), 30 emissive
 // Emissive particles are added (premultiplied output with alpha 0); lit ones are shaded by the
 // scene's PBR lighting and blended. Shapes are procedural (no textures, no atlas bleeding).
+// Billboards fade where they meet opaque geometry (soft particles) when the view has a depth
+// prepass (SSAO, TAA or motion blur on): big puffs no longer cut a hard line into the ground.
 
 import bevy_pbr::render::{
     mesh_functions::{get_world_from_local, get_tag},
     mesh_view_bindings::view,
-    view_transformations::position_world_to_clip,
+    view_transformations::{position_world_to_clip, depth_ndc_to_view_z},
     pbr_fragment::pbr_input_from_standard_material,
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
     pbr_types::STANDARD_MATERIAL_FLAGS_FOG_ENABLED_BIT,
     forward_io::{VertexOutput, FragmentOutput},
 };
+import bevy_pbr::prepass::utils as prepass_utils;
+
+// A billboard fades out over this fraction of its size in front of the scene behind it.
+const SOFT_DEPTH_PER_SIZE: f32 = 0.5;
 
 // x: intensity of a full level byte.
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> particle_params: vec4<f32>;
@@ -181,6 +187,16 @@ fn shape_alpha(shape: u32, p: vec2<f32>) -> f32 {
     }
 }
 
+// Opacity factor of a billboard fragment near the opaque scene behind it: 0 where it touches the
+// surface, 1 from `SOFT_DEPTH_PER_SIZE` × its size in front of it.
+@if(DEPTH_PREPASS)
+fn soft_fade(in: VertexOutput) -> f32 {
+    let size = length(get_world_from_local(in.instance_index)[0].xyz);
+    let scene = depth_ndc_to_view_z(prepass_utils::prepass_depth(in.position, 0u));
+    let here = depth_ndc_to_view_z(in.position.z);
+    return clamp((here - scene) / max(size * SOFT_DEPTH_PER_SIZE, 1e-3), 0.0, 1.0);
+}
+
 fn unpack_rgb(tag: u32) -> vec3<f32> {
     let c = vec3<f32>(
         f32(tag & 31u) / 31.0,
@@ -199,7 +215,11 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let level = f32((tag >> 16u) & 255u) / 255.0;
     let rgb = unpack_rgb(tag);
     let p = in.uv;
-    let a_shape = shape_alpha(shape, p);
+    var a_shape = shape_alpha(shape, p);
+    @if(DEPTH_PREPASS)
+    if mode == 0u {
+        a_shape *= soft_fade(in);
+    }
     if a_shape < 0.004 {
         discard;
     }

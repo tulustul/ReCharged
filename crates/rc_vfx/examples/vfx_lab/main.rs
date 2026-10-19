@@ -5,15 +5,17 @@
 //!
 //! `cargo run -p rc_vfx --example vfx_lab -- --scene
 //! <shapes|drive|sparks|items|blasts|events|weather> [--chase] [--wet] [--snow] [--split]
-//! [--night] [--calm] [--slow <speed>] [--screenshot <png>
+//! [--night] [--calm] [--hard] [--slow <speed>] [--screenshot <png>
 //! --screenshot-at <s>[,<s>…]] [--exit-after <s>]` — `--slow 0.25` runs at quarter speed, so
-//! short flashes can be caught; screenshot times stay in wall-clock seconds.
+//! short flashes can be caught; screenshot times stay in wall-clock seconds. The views have a
+//! depth prepass like the game's (soft particles); `--hard` leaves it out for comparison.
 
 mod scenes;
 
 use std::path::PathBuf;
 
 use bevy::camera::{Exposure, Viewport};
+use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::light::light_consts::lux;
 use bevy::post_process::bloom::Bloom;
@@ -33,6 +35,7 @@ pub(crate) struct Args {
     pub(crate) night: bool,
     pub(crate) calm: bool,
     pub(crate) wet: bool,
+    hard: bool,
     slow: Option<f32>,
     screenshot: Option<PathBuf>,
     shots_at: Vec<f32>,
@@ -55,6 +58,7 @@ fn parse_args() -> Args {
             "--night" => args.night = true,
             "--calm" => args.calm = true,
             "--wet" => args.wet = true,
+            "--hard" => args.hard = true,
             "--slow" => args.slow = value().parse().ok(),
             "--screenshot" => args.screenshot = Some(value().into()),
             "--screenshot-at" => {
@@ -235,7 +239,7 @@ fn build_ground(
 fn spawn_views(args: Res<Args>, mut commands: Commands) {
     let views = if args.split { 2 } else { 1 };
     for slot in 0..views {
-        commands.spawn((
+        let mut camera = commands.spawn((
             Camera3d::default(),
             Camera {
                 order: slot as isize,
@@ -259,6 +263,9 @@ fn spawn_views(args: Res<Args>, mut commands: Commands) {
                 slot: PlayerSlot(slot),
             },
         ));
+        if !args.hard {
+            camera.insert((DepthPrepass, Msaa::Off));
+        }
     }
 }
 

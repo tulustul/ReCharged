@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
-use crate::cars::{CarFx, Eyes, Poses, SKID_SLIP, car_velocity};
+use crate::cars::{CarFx, Eyes, Poses, SKID_SLIP, car_velocity, ground_point};
 use crate::fx::{Fx, zigzag};
 use crate::particles::{Facing, Look, Particle, Shape};
 use crate::pool::Emitter;
@@ -229,7 +229,7 @@ fn sparks_and_debris(
             if n == 0 {
                 continue;
             }
-            let at = pose.transform_point(car.shape.contact(wheel, w.offset));
+            let at = ground_point(&pose, &car.shape, wheel, w).0;
             let color = spark_color(f);
             let cool = LinearRgba::rgb(color.red * 0.3, color.green * 0.2, color.blue * 0.3);
             let size = spark_size(f);
@@ -267,7 +267,7 @@ fn sparks_and_debris(
             if n == 0 {
                 continue;
             }
-            let at = pose.transform_point(car.shape.contact(i, w.offset));
+            let at = ground_point(&pose, &car.shape, i, w).0;
             for _ in 0..n {
                 throw_debris(&mut fx, debris, at, vel, back, up, t.speed);
             }

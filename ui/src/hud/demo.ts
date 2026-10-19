@@ -95,6 +95,7 @@ function events(slots: number[], scene: HudScene): UiRaceEvent[] {
       return [
         { kind: "hit", slot: b, by: "shockOrb", attacker: "Dash", blocked: false },
         { kind: "hit", slot: c, by: "sparkRocket", attacker: "Penny", blocked: true },
+        { kind: "missedCheckpoint", slot: a },
       ];
     case "roulette":
       return [

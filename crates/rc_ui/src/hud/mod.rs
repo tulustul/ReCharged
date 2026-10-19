@@ -199,6 +199,11 @@ pub enum UiRaceEvent {
         /// Slot 0–3.
         slot: u8,
     },
+    /// Passed a checkpoint outside its gate: drive back through it.
+    MissedCheckpoint {
+        /// Slot 0–3.
+        slot: u8,
+    },
     /// The soft-lock guard's last ten seconds.
     EndsIn {
         /// Seconds left.

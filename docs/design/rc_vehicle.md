@@ -90,6 +90,9 @@ also capped at 1.5× base after every step. `DrainCharge` multiplies, `GrantChar
   car up — add to the model's wheel node), `slip` (sliding speed / 6 u/s); `slip_angle` (+ = moving
   right of the heading), `drifting` (10° in / 7° out, < 90°), `airborne_time` (no wheel down),
   `rpm` (driven-wheel speed / effective top), **`charge_rate`** (%/s of the latest tick).
+  Per wheel also **`contact`** / **`normal`** (world space): the tyre's lowest point in the
+  post-step pose moved onto the plane its ray hit at the start of the tick (`ground_contact`),
+  so effects sit on ramps and curbs; airborne wheels report the tyre bottom and the car's up.
 - `CarLanded` after ≥ 0.25 s of air: at touchdown, or after the clean-landing judgement (≤ 0.15 s)
   for flights over 0.8 s; strength = pre-absorber closing speed / 15 u/s.
 - `CarImpact` from rapier contact forces: strength = Δv / 15 u/s (≥ 0.12), near-vertical normals

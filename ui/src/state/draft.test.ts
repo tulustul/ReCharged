@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { UiProfile, UiTrack } from "../bevy";
-import { DEFAULT_DRAFT, maxAi, normalize, startMessage, weatherChoices, withTrack } from "./draft.ts";
+import { DEFAULT_DRAFT, maxAi, normalize, oncePer, startMessage, weatherChoices, withTrack } from "./draft.ts";
 
 const track = (over: Partial<UiTrack> = {}): UiTrack => ({
   id: "aisle_rush",
@@ -78,4 +78,12 @@ test("a cup start carries only the cup and the car", () => {
   assert.deepEqual(msg.mode, { kind: "championship", cup: "pro_cup", race: 0 });
   assert.equal(msg.laps, undefined);
   assert.equal(msg.players[0].car, "torque");
+});
+
+test("one Confirm sends race.start once: repeats within the window are dropped", () => {
+  const gate = oncePer(1000);
+  assert.equal(gate(5000), true);
+  assert.equal(gate(5016), false, "the same press seen twice");
+  assert.equal(gate(5999), false);
+  assert.equal(gate(6000), true, "a new press after the window");
 });

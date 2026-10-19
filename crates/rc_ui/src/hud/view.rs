@@ -106,10 +106,9 @@ pub(super) fn race_event(
             slot,
             hint: hint.into(),
         },
+        (K::MissedCheckpoint, Some(slot)) => UiRaceEvent::MissedCheckpoint { slot },
         // `race.hud` carries the warning while it lasts.
         (K::WrongWay(_), Some(_)) => return None,
-        // T19b: show "Missed checkpoint — go back" (B15).
-        (K::MissedCheckpoint, Some(_)) => return None,
     })
 }
 
@@ -403,6 +402,15 @@ mod tests {
                 slot: 0,
                 secs: -0.42
             })
+        );
+        assert_eq!(
+            race_event(RaceEventKind::MissedCheckpoint, Some(2), false),
+            Some(UiRaceEvent::MissedCheckpoint { slot: 2 })
+        );
+        assert_eq!(
+            race_event(RaceEventKind::MissedCheckpoint, None, false),
+            None,
+            "rivals' misses are theirs"
         );
     }
 }

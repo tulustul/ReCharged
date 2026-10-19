@@ -21,6 +21,8 @@ pub(crate) struct WheelRuntime {
     pub slip: f32,
     /// Contact normal (when grounded).
     pub normal: Vec3,
+    /// Ray hit point at the start of the tick (when grounded), world space.
+    pub contact: Vec3,
 }
 
 /// A touchdown being judged (all four wheels within the window, tilt).

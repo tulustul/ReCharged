@@ -30,6 +30,7 @@ mod pool;
 mod projectiles;
 mod skids;
 mod tags;
+mod warmup;
 mod weather;
 
 use bevy::prelude::*;
@@ -68,6 +69,7 @@ impl Plugin for VfxPlugin {
         weather::build(app);
         lightning::build(app);
         tags::build(app);
+        warmup::build(app);
     }
 }
 

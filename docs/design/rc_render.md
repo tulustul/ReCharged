@@ -32,8 +32,16 @@ Shaders (WESL, `assets/shaders/render/`): `surface.wesl` (macro variation, wetne
   Intro) and for 3 frames the render world has neither queued nor created a pipeline (20 s
   timeout; frame counts stay low because the driver throttles an occluded window to 1 frame/s).
   While Loading, quality and shadow tiers count the race's local players as views, so the
-  warm-up compiles the split-screen variants (2 players: Loading → Intro 4.7 s → 3.2 s). Still
-  compiled in the Intro: pickups/effects spawned in `Setup` (transparent PBR variants, ≈ 1 s).
+  warm-up compiles the split-screen variants (2 players: Loading → Intro 4.7 s → 3.2 s). rc_vfx
+  adds one never-culled instance of every effect material (`rc_vfx/src/warmup.rs`), and a 2 px
+  bevy_ui node (background, Oklab gradient, box shadow) targets the warm-up camera: bevy_ui
+  compiles per target format, and a 1P race hosts its HUD on the HDR game camera while the
+  loading camera is LDR. GO of a session's first race logs what the warm-up missed —
+  `visuals: race start: N pipelines compiled after the warm-up, worst frame X ms` — and
+  `RUST_LOG=rc_render=debug` names every pipeline the render world creates (label, shaders, set
+  shader defs). T19b measurement: see *Verify*.
+- `PipelineQueue` (pub): pipelines queued/compiling and created, published by the render world
+  every frame; the binary waits for an idle queue before a human run exits (B2).
 - `OnEnter(Unloading)`: `ActiveEnvironment` removed; `Look` disappears with it.
 
 ## Quality (GDD §15, ARCH §5.8, §9)
@@ -130,6 +138,10 @@ cans, cyan/volt neon strips, a warm work lamp. EV 8.
   test_oval|toy_town --time <t> --weather <w> --screenshot-at 12 --screenshot <png> --exit-after 14`;
   the menu without `--quick-race`.
 - Frame times: the binary's `--bench <track>_<n>p` (JSON; default settings, vsync off).
+- Race-start hitch: the `visuals: race start: …` log line of any `--quick-race` run. T19b (toy_town
+  1P, dev build, 1280×720, no other game running): before the effects/UI warm-up 6 pipelines
+  compiled after the warm-up and the worst frame took 763 / 808 ms; after, 0 pipelines and 27 / 25
+  ms; Loading → InRace 3.8–4.3 s → 4.6–4.8 s (the compiles moved under the loading screen).
 - Textures: `python3 tools/textures/gen_textures.py [--only a,b] [--preview DIR]`.
 
 ## Known limitations

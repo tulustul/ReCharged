@@ -16,7 +16,7 @@ import { useSeen } from "../hooks";
 import { back } from "../nav/routes";
 import { useFocusNav } from "../nav/useFocusNav";
 import { sfx } from "../sound";
-import { draft, startMessage } from "../state/draft";
+import { draft, startGate, startMessage } from "../state/draft";
 import { appState, catalog, profile } from "../state/stores";
 import { carUnlocked, isFresh, lockText, paintUnlocked } from "../state/unlocks";
 import { useStore } from "../state/useStore";
@@ -38,6 +38,7 @@ export function CarSelect() {
   const maxPaints = Math.max(1, ...cars.map((c) => c.paints.length));
   const start = (car: UiCar | undefined, paint: number) => {
     if (!car || !carUnlocked(p, car.id) || !car.paints[paint] || !paintUnlocked(p, car.paints[paint])) return sfx("error");
+    if (!startGate(performance.now())) return;
     sfx("select");
     draft.update((x) => ({ ...x, car: car.id, paint }));
     bevy.race.start(startMessage({ ...d, car: car.id, paint }, [{ slot: 0, car: car.id, paint }]));

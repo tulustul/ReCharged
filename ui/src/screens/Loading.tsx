@@ -58,6 +58,9 @@ export function Loading() {
                   height: 10,
                   borderRadius: radius.pill,
                   backgroundGradient: { type: "linear", angle: 90, stops: [{ color: color.cyan }, { color: color.volt }] },
+                  // The glow also compiles bevy_ui's box-shadow pipeline for this LDR camera, which
+                  // split-screen races share: their HUD glows then never compile mid-race.
+                  boxShadow: [{ color: color.cyanGlow, blurRadius: 14 }],
                   transform: { scaleX: Math.max(progress, 0.02), translateX: (-(1 - Math.max(progress, 0.02)) * BAR) / 2 },
                   transition: { transform: { duration: 350, easing: "easeOut" } },
                 }}

@@ -20,7 +20,11 @@ carries only the JSON/table.
 pipelines synchronously. Runs then depend neither on the monitor (a DPMS-blanked screen stalls
 vsync'd presentation to ~1 fps) nor on the window having the focus (Bevy throttles an unfocused
 window to 60 Hz). rc_render does not re-enable vsync from `Settings` in automated runs. Human runs
-keep vsync and Bevy's defaults.
+keep vsync and Bevy's defaults, compile pipelines asynchronously and defer their exit (window
+close, Quit): `crates/recharged/src/quit.rs` holds every `AppExit` and close request back
+until rc_render's `PipelineQueue` has been idle for 2 frames (at most 3 s, then it exits anyway
+with a warning), so quitting mid-compile cannot drop the GPU device under a compile task (the
+NVIDIA exit crash, exit 139). It logs `exit: pipeline queue idle after N s`.
 
 ## `--input-script <file>`: a scripted virtual device
 **Layer.** Steps press keys of both keyboard schemes in `ButtonInput<KeyCode>` and buttons/sticks
@@ -82,9 +86,10 @@ rm -rf target/agent-data/kb && cargo run -p recharged -- --user-data-dir target/
 Screenshots `kb_01_main_menu … kb_14_menu` / `pad_01 … pad_14` land in the data dir's
 `screenshots/`; `settings.ron` there shows `vsync: false` and `steering_assist: true` afterwards.
 
-**Relation to `RECHARGED_UI_SCRIPT`** (rc_ui): that hook sends `ui.nav` straight to React and
-drives React fixtures (`go`, `demo`, `tab`) for UI screenshots. `--input-script` covers its `nav`
-and `pause` through the real input path (what DoD 1 must prove); the fixture verbs stay there.
+**Relation to `RECHARGED_UI_SCRIPT`** (rc_ui): that hook only drives React fixtures (`go`,
+`demo`, `tab`) for UI screenshots. Navigation and pausing are scripted here, through the real
+input path (what DoD 1 must prove); its old `nav`/`pause` verbs were removed (B27) and are
+rejected with a pointer to `--input-script`.
 
 ## `--headless-race`
 `MinimalPlugins` + transforms + states + the sim plugins (`main.rs::add_sim_plugins`, shared with

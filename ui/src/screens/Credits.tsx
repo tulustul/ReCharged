@@ -11,17 +11,21 @@ import { credits, creditsText } from "../strings/credits";
 import { fill, text } from "../theme/styles";
 import { color, frame, space } from "../theme/tokens";
 
-/** Seconds for one pass of the roll. */
-const ROLL_SECS = 30;
-/** Distance the roll travels, UI px (from below the screen to past the top). */
+/** Roll speed, UI px per second. */
+const ROLL_PX_PER_S = 57;
+/** Start of the roll (UI px below its resting place: the title shows near the bottom). */
 const ROLL_FROM = 260;
-const ROLL_TO = -1450;
+/** Height of the rolling column, UI px, from the layout below: top padding, title, one block per
+ * section (gap, caps title, lines of h3 with their gaps), the thanks line. */
+const COLUMN_PX = 120 + 72 + credits.reduce((h, s) => h + 64 + 24 + s.lines.length * 46, 0) + 64 + 40 + 46;
+/** End of the roll: the thanks line has scrolled up to the top. */
+const ROLL_TO = 92 - COLUMN_PX;
 
 export function Credits() {
   useFocusNav({}, { region: "none", index: 0 }, { back, confirm: back });
   const roll = useSharedValue(0);
   useEffect(() => {
-    roll.value = withRepeat(withTiming(1, { duration: ROLL_SECS * 1000, easing: "linear" }));
+    roll.value = withRepeat(withTiming(1, { duration: ((ROLL_FROM - ROLL_TO) / ROLL_PX_PER_S) * 1000, easing: "linear" }));
   }, [roll]);
   return (
     <node style={{ ...fill, overflowX: "clip", overflowY: "clip" }}>

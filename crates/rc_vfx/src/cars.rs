@@ -237,6 +237,39 @@ fn decorate_racer(
     commands.entity(add.entity).insert(CarFx::new(shape));
 }
 
+/// Where wheel `i` of a car drawn at `pose` touches the ground this frame, and the ground normal:
+/// the drawn contact patch moved onto the ground plane rc_vehicle's wheel ray hit
+/// (`WheelState::contact` / `normal`), so marks and debris sit exactly on ramps and curbs while
+/// following the interpolated car. Airborne wheels (or no ground data) keep the drawn patch.
+pub(crate) fn ground_point(
+    pose: &Transform,
+    shape: &CarShape,
+    i: usize,
+    w: &WheelState,
+) -> (Vec3, Vec3) {
+    let patch = pose.transform_point(shape.contact(i, w.offset));
+    if !w.grounded || w.normal == Vec3::ZERO {
+        return (patch, pose.rotation * Vec3::Y);
+    }
+    (
+        patch - w.normal * (patch - w.contact).dot(w.normal),
+        w.normal,
+    )
+}
+
+/// The ground plane under a car (a point and the unit normal): the mean contact of its grounded
+/// wheels; `None` when airborne or without ground data.
+pub(crate) fn ground_plane(t: &VehicleTelemetry) -> Option<(Vec3, Vec3)> {
+    let (n, point, normal) = t
+        .wheels
+        .iter()
+        .filter(|w| w.grounded && w.normal != Vec3::ZERO)
+        .fold((0.0, Vec3::ZERO, Vec3::ZERO), |(n, p, m), w| {
+            (n + 1.0, p + w.contact, m + w.normal)
+        });
+    (n > 0.0).then(|| (point / n, normal.normalize_or(Vec3::Y)))
+}
+
 /// Car velocity in world space from telemetry (heading + slip angle), u/s.
 pub(crate) fn car_velocity(pose: &Transform, t: &VehicleTelemetry) -> Vec3 {
     let fwd = pose.rotation * Vec3::NEG_Z;
@@ -285,6 +318,45 @@ mod tests {
             }
         }
         assert!(n >= 8, "found {n} wheel files");
+    }
+
+    #[test]
+    fn contacts_sit_on_the_ground_the_wheel_ray_hit() {
+        let shape = CarShape::default();
+        // The drawn car is level but its front-left wheel rides up a 30° curb face whose plane
+        // passes through (−0.55, 0.1, −0.65).
+        let n = Vec3::new(0.5, 0.75f32.sqrt(), 0.0);
+        let on_curb = WheelState {
+            grounded: true,
+            contact: Vec3::new(-0.55, 0.1, -0.65),
+            normal: n,
+            ..default()
+        };
+        let pose = Transform::from_xyz(0.0, 0.0, 0.0);
+        let (at, up) = ground_point(&pose, &shape, 0, &on_curb);
+        assert_eq!(up, n);
+        assert!(
+            (at - on_curb.contact).dot(n).abs() < 1e-5,
+            "on the curb face: {at}"
+        );
+        let patch = pose.transform_point(shape.contact(0, 0.0));
+        assert!(
+            (at - patch).cross(n).length() < 1e-5,
+            "moved along the normal only"
+        );
+
+        let airborne = WheelState::default();
+        assert_eq!(ground_point(&pose, &shape, 0, &airborne), (patch, Vec3::Y));
+        let t = VehicleTelemetry {
+            wheels: [on_curb, airborne, airborne, airborne],
+            ..default()
+        };
+        assert_eq!(ground_plane(&t), Some((on_curb.contact, n)));
+        assert_eq!(
+            ground_plane(&VehicleTelemetry::default()),
+            None,
+            "in the air"
+        );
     }
 
     #[test]

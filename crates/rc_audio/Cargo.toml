@@ -12,8 +12,6 @@ workspace = true
 rc_core.workspace = true
 bevy.workspace = true
 bevy_kira_audio.workspace = true
-serde.workspace = true
-ron.workspace = true
 
 [dev-dependencies]
 rc_testkit.workspace = true

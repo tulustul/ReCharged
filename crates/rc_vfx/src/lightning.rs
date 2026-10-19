@@ -61,7 +61,7 @@ pub fn strike_brightness(t: f32) -> f32 {
 }
 
 /// A camera-facing ribbon mesh along bolt `paths` (`(points, width)`), seen from `eye`.
-fn bolt_mesh(paths: &[(Vec<Vec3>, f32)], eye: Vec3) -> Mesh {
+pub(crate) fn bolt_mesh(paths: &[(Vec<Vec3>, f32)], eye: Vec3) -> Mesh {
     let mut positions = Vec::new();
     let mut indices = Vec::new();
     for (points, width) in paths {
@@ -81,6 +81,19 @@ fn bolt_mesh(paths: &[(Vec<Vec3>, f32)], eye: Vec3) -> Mesh {
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_indices(Indices::U32(indices))
+}
+
+/// The additive material of a bolt at brightness `peak` (faded by `fade_bolts`).
+pub(crate) fn bolt_material(peak: LinearRgba) -> StandardMaterial {
+    StandardMaterial {
+        base_color: Color::from(peak),
+        unlit: true,
+        alpha_mode: AlphaMode::Add,
+        fog_enabled: false,
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -154,15 +167,7 @@ fn sky_lightning(
                     LinearRgba::rgb(9.0, 10.0, 16.0) * intensity.max(0.4),
                 )
             };
-            let material = materials.add(StandardMaterial {
-                base_color: Color::from(peak),
-                unlit: true,
-                alpha_mode: AlphaMode::Add,
-                fog_enabled: false,
-                double_sided: true,
-                cull_mode: None,
-                ..default()
-            });
+            let material = materials.add(bolt_material(peak));
             commands.spawn((
                 Name::new("Sky lightning"),
                 FxVisual,

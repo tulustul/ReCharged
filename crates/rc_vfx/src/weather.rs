@@ -17,7 +17,7 @@ use bevy::render::render_resource::{
 use bevy::shader::ShaderRef;
 use rc_core::prelude::*;
 
-use crate::cars::Poses;
+use crate::cars::{Poses, ground_plane};
 use crate::fx::{Fx, FxRng};
 use crate::particles::{Facing, Look, Particle, Shape};
 use crate::pool::Emitter;
@@ -32,6 +32,8 @@ const RAIN_FALL_UPS: f32 = 40.0;
 const SNOW_FALL_UPS: f32 = 4.0;
 /// Splashes per second around a local car at full rain.
 const SPLASH_RATE: f32 = 90.0;
+/// No splashes while the car's ground is steeper than this (normal's up component).
+const MIN_SPLASH_NORMAL_Y: f32 = 0.5;
 
 /// Render layer of a player's private effects: precipitation, lightning, name tags, markers.
 pub fn player_layer(slot: PlayerSlot) -> usize {
@@ -161,8 +163,8 @@ struct Precip {
 
 /// Shared precipitation mesh and the effects clock (stops while paused).
 #[derive(Resource, Debug, Default)]
-struct WeatherFx {
-    mesh: Handle<Mesh>,
+pub(crate) struct WeatherFx {
+    pub(crate) mesh: Handle<Mesh>,
     clock: f32,
     splash: Vec<(Entity, Emitter)>,
 }
@@ -306,14 +308,20 @@ const SPLASH_DROP: Look = Look {
     ..Look::DEFAULT
 };
 
-/// Raindrops splashing on wet ground in front of every local player's car.
+/// Height of the plane through `point` with unit normal `normal` (not vertical) at (`x`, `z`).
+fn plane_height((point, normal): (Vec3, Vec3), x: f32, z: f32) -> f32 {
+    point.y - (normal.x * (x - point.x) + normal.z * (z - point.z)) / normal.y
+}
+
+/// Raindrops splashing on wet ground in front of every local player's car: on the plane its
+/// wheels touch (`ground_plane`, so they follow ramps and banks), none while it is airborne.
 fn splashes(
     time: Res<Time>,
     weather: Option<Res<WeatherState>>,
     mut fx: ResMut<Fx>,
     mut state: ResMut<WeatherFx>,
     poses: Poses,
-    locals: Query<Entity, With<LocalPlayer>>,
+    locals: Query<(Entity, &VehicleTelemetry), With<LocalPlayer>>,
 ) {
     let Some(w) = weather.as_deref() else {
         return;
@@ -325,11 +333,14 @@ fn splashes(
     let dt = time.delta_secs();
     let rate = SPLASH_RATE * w.precipitation * fx.density;
     state.splash.retain(|(e, _)| locals.contains(*e));
-    for car in &locals {
+    for (car, telemetry) in &locals {
         if !state.splash.iter().any(|(e, _)| *e == car) {
             state.splash.push((car, Emitter::default()));
         }
-        let Some(pose) = poses.of(car) else {
+        let (Some(pose), Some(plane)) = (
+            poses.of(car),
+            ground_plane(telemetry).filter(|(_, n)| n.y > MIN_SPLASH_NORMAL_Y),
+        ) else {
             continue;
         };
         let Some((_, emitter)) = state.splash.iter_mut().find(|(e, _)| *e == car) else {
@@ -338,11 +349,15 @@ fn splashes(
         let n = emitter.count(rate, dt);
         let fwd = pose.rotation * Vec3::NEG_Z;
         let yaw = fwd.z.atan2(fwd.x);
+        let flat = Quat::from_rotation_arc(Vec3::Z, plane.1);
         for _ in 0..n {
             let a = yaw + fx.rng.signed(1.6);
             let r = fx.rng.range(1.5, 13.0);
-            let at = pose.translation + Vec3::new(a.cos() * r, 0.02, a.sin() * r);
-            let flat = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+            let (x, z) = (
+                pose.translation.x + a.cos() * r,
+                pose.translation.z + a.sin() * r,
+            );
+            let at = Vec3::new(x, plane_height(plane, x, z), z) + plane.1 * 0.02;
             let life = fx.rng.range(0.22, 0.32);
             fx.spawn(Particle::new(SPLASH_RING, at, Vec3::ZERO, life).rotated(flat));
             for _ in 0..2 {
@@ -368,6 +383,15 @@ mod tests {
             wetness: 1.0,
             ..default()
         }
+    }
+
+    #[test]
+    fn splashes_lie_on_the_ground_plane() {
+        let n = Vec3::new(0.0, 0.8, 0.6);
+        let plane = (Vec3::new(1.0, 2.0, 3.0), n);
+        assert!((plane_height(plane, 1.0, 3.0) - 2.0).abs() < 1e-6);
+        let p = Vec3::new(5.0, plane_height(plane, 5.0, -4.0), -4.0);
+        assert!((p - plane.0).dot(n).abs() < 1e-5, "{p} is on the plane");
     }
 
     #[test]

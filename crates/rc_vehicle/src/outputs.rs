@@ -7,7 +7,7 @@ use rc_core::prelude::*;
 
 use crate::charge::{DRIFT_SLIP_MAX_DEG, DRIFT_SLIP_MIN_DEG};
 use crate::model::CarSpec;
-use crate::state::{CarState, Landing};
+use crate::state::{CarState, Landing, WheelRuntime};
 
 /// `CarLanded` is sent only after at least this much air time, s (small bumps stay silent).
 const LANDING_MIN_AIR_SECS: f32 = 0.25;
@@ -213,6 +213,7 @@ pub(crate) fn write_telemetry(
         let fwd = transform.rotation * Vec3::NEG_Z;
         let wheels = std::array::from_fn(|i| {
             let (w, r) = (&spec.wheels[i], &state.wheels[i]);
+            let (contact, normal) = ground_contact(transform, w.hardpoint, w.radius, r);
             WheelState {
                 grounded: r.grounded,
                 compression: (1.0 - r.extension / w.travel).clamp(0.0, 1.0),
@@ -221,6 +222,8 @@ pub(crate) fn write_telemetry(
                 surface: r.surface.filter(|_| r.grounded),
                 slip: r.slip,
                 offset: w.rest - r.extension,
+                contact,
+                normal,
             }
         });
         *tel = VehicleTelemetry {
@@ -240,6 +243,26 @@ pub(crate) fn write_telemetry(
             charge_rate: state.charge_rate,
         };
     }
+}
+
+/// A wheel's ground contact after the step (`WheelState::contact` / `normal`): the tyre's lowest
+/// point in the post-step pose, moved onto the ground plane its ray hit at the start of the tick
+/// (the car moved during the step, the ground did not). Airborne: the tyre bottom and car up.
+fn ground_contact(
+    transform: &Transform,
+    hardpoint: Vec3,
+    radius: f32,
+    r: &WheelRuntime,
+) -> (Vec3, Vec3) {
+    let up = transform.rotation * Vec3::Y;
+    let bottom = transform.transform_point(hardpoint) - up * (r.extension + radius);
+    if !r.grounded {
+        return (bottom, up);
+    }
+    (
+        bottom - r.normal * (bottom - r.contact).dot(r.normal),
+        r.normal,
+    )
 }
 
 /// `CarImpact` from rapier contact forces: strength from the velocity change, ground-like
@@ -283,5 +306,44 @@ pub(crate) fn report_impacts(
                 normal,
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contacts_follow_the_car_onto_the_plane_its_ray_hit() {
+        // A 20° ramp rising toward −Z; the car sits on it and moves 0.5 u up the ramp in the step.
+        let n = Vec3::new(0.0, 20f32.to_radians().cos(), 20f32.to_radians().sin());
+        let tilt = Quat::from_rotation_arc(Vec3::Y, n);
+        let hardpoint = Vec3::new(0.5, 0.3, -0.6);
+        let ray_hit = Vec3::new(0.5, 0.0, -0.6);
+        let r = WheelRuntime {
+            grounded: true,
+            extension: 0.2,
+            normal: n,
+            contact: tilt * ray_hit,
+            ..default()
+        };
+        let moved =
+            Transform::from_translation(tilt * Vec3::new(0.0, 0.03, -0.5)).with_rotation(tilt);
+        let (contact, normal) = ground_contact(&moved, hardpoint, 0.3, &r);
+        assert_eq!(normal, n);
+        assert!(contact.dot(n).abs() < 1e-5, "on the ramp: {contact}");
+        // Straight under the moved tyre (the bottom point moved along the normal).
+        let bottom = moved.transform_point(hardpoint) - n * 0.5;
+        assert!(
+            (contact - bottom).cross(n).length() < 1e-5,
+            "{contact} vs {bottom}"
+        );
+
+        let airborne = WheelRuntime {
+            extension: 0.25,
+            ..default()
+        };
+        let (bottom, up) = ground_contact(&Transform::default(), hardpoint, 0.3, &airborne);
+        assert!(bottom.distance(hardpoint - Vec3::Y * 0.55) < 1e-6 && up == Vec3::Y);
     }
 }

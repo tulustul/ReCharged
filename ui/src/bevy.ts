@@ -1058,6 +1058,10 @@ ms: number, } | { "kind": "goldenBattery",
 /**
  * Slot 0–3.
  */
+slot: number, } | { "kind": "missedCheckpoint", 
+/**
+ * Slot 0–3.
+ */
 slot: number, } | { "kind": "endsIn", 
 /**
  * Seconds left.

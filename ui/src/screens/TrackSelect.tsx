@@ -18,7 +18,7 @@ import { cycle } from "../nav/focus";
 import { back, go } from "../nav/routes";
 import { useFocusNav } from "../nav/useFocusNav";
 import { sfx } from "../sound";
-import { draft, maxAi, normalize, startMessage, weatherChoices, withTrack, type RaceDraft } from "../state/draft";
+import { draft, maxAi, normalize, startGate, startMessage, weatherChoices, withTrack, type RaceDraft } from "../state/draft";
 import { lobbyChoices } from "../state/lobby";
 import { catalog, lobby, profile, records } from "../state/stores";
 import { isFresh, lockText, trackUnlocked } from "../state/unlocks";
@@ -53,6 +53,7 @@ export function TrackSelect({ inRace }: Props) {
     sfx("select");
     if (inRace) return inRace.onPick({ track: track.id, reverse: d.reverse, mirror: d.mirror });
     if (!versus) return go("carSelect");
+    if (!startGate(performance.now())) return;
     const choices = lobbyChoices.get();
     const cars = cat?.cars.filter((c) => p?.unlocked.cars.includes(c.id)) ?? [];
     const players = slots.map((s) => ({ slot: s.slot, car: cars[choices[s.slot]?.car ?? 0]?.id ?? cars[0]?.id ?? "", paint: choices[s.slot]?.paint ?? 0 }));

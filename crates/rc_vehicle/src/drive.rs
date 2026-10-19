@@ -363,6 +363,7 @@ fn record_wheels(
         r.steer = o.steer;
         r.surface = kinds[i];
         r.normal = contacts[i].map_or(Vec3::Y, |c| c.normal);
+        r.contact = contacts[i].map_or(Vec3::ZERO, |c| c.point);
         r.slip = if o.spinning { o.slip.max(0.7) } else { o.slip };
         let free_spin = cmd.throttle * cmd.drive_mul * top / w.radius;
         r.spin_rate = match (o.grounded, w.driven) {

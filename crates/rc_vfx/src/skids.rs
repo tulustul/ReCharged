@@ -8,7 +8,7 @@ use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
-use crate::cars::{CarFx, Poses, SKID_SLIP};
+use crate::cars::{CarFx, Poses, SKID_SLIP, ground_point};
 use crate::fx::Fx;
 
 /// Segments kept at the High density setting.
@@ -264,23 +264,8 @@ fn spawn_mesh(
     mut state: ResMut<SkidMesh>,
     mut marks: ResMut<SkidMarks>,
 ) {
-    let mesh = meshes.add(
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; 3])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0f32, 1.0, 0.0]; 3])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; 3])
-        .with_inserted_indices(Indices::U32(vec![0, 1, 2])),
-    );
-    let material = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
-        alpha_mode: AlphaMode::Blend,
-        perceptual_roughness: 0.92,
-        reflectance: 0.3,
-        ..default()
-    });
+    let mesh = meshes.add(empty_mesh());
+    let material = materials.add(material());
     let entity = commands
         .spawn((
             Name::new("Skid marks"),
@@ -298,6 +283,29 @@ fn spawn_mesh(
         last_build: 0.0,
     };
     marks.clear();
+}
+
+/// The marks' mesh before the first mark: one degenerate triangle with the marks' attributes.
+pub(crate) fn empty_mesh() -> Mesh {
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; 3])
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0f32, 1.0, 0.0]; 3])
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; 3])
+    .with_inserted_indices(Indices::U32(vec![0, 1, 2]))
+}
+
+/// The marks' material (vertex colours carry colour and fade).
+pub(crate) fn material() -> StandardMaterial {
+    StandardMaterial {
+        base_color: Color::WHITE,
+        alpha_mode: AlphaMode::Blend,
+        perceptual_roughness: 0.92,
+        reflectance: 0.3,
+        ..default()
+    }
 }
 
 fn clear_marks(mut marks: ResMut<SkidMarks>, mut skids: Query<&mut CarSkids>) {
@@ -327,7 +335,6 @@ fn lay_marks(
         let Some(pose) = poses.of(entity) else {
             continue;
         };
-        let up = pose.rotation * Vec3::Y;
         let right = pose.rotation * Vec3::X;
         for (i, w) in t.wheels.iter().enumerate() {
             let color = w
@@ -338,8 +345,11 @@ fn lay_marks(
                 skids.0[i].end();
                 continue;
             };
-            let centre = pose.transform_point(car.shape.contact(i, w.offset)) + up * LIFT_U;
-            let half = right * car.shape.width[i] * 0.45;
+            // On the ground the wheel touches (ramps, curbs), across the tyre within that plane.
+            let (at, up) = ground_point(&pose, &car.shape, i, w);
+            let centre = at + up * LIFT_U;
+            let across = (right - up * right.dot(up)).normalize_or(right);
+            let half = across * car.shape.width[i] * 0.45;
             skids.0[i].advance(centre, half, color, now, &mut marks);
         }
     }

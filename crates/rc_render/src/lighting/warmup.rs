@@ -5,13 +5,15 @@
 //! per racer in front of it), and `"visuals"` completes only when that scene is complete (cars
 //! instanced, the generated environment map attached: both change the pipeline keys) and the
 //! render world has neither queued nor created a pipeline for a few frames (or after a timeout).
+//! rc_vfx adds one never-culled instance of every effect material to the scene it draws.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bevy::prelude::*;
-use bevy::render::render_resource::PipelineCache;
+use bevy::render::render_resource::{PipelineCache, PipelineDescriptor};
 use bevy::render::{Render, RenderApp, RenderSystems};
+use bevy::shader::ShaderDefVal;
 use rc_core::prelude::*;
 use rc_track::Track;
 
@@ -36,13 +38,15 @@ const HEIGHT_PER_EXTENT: f32 = 1.1;
 #[derive(Component, Debug, Clone, Copy)]
 pub(crate) struct WarmupCamera;
 
-/// Pipelines waiting to compile and pipelines created so far, written by the render world every
-/// frame.
+/// Render pipelines waiting to compile (queued or compiling on Bevy's task threads) and created
+/// so far, as the render world saw them at the end of its latest frame (one frame behind the main
+/// world). Read by the warm-up and by the binary, which waits for an idle queue before exiting.
 #[derive(Resource, Debug, Clone, Default)]
-pub(crate) struct PipelineQueue(Arc<[AtomicUsize; 2]>);
+pub struct PipelineQueue(Arc<[AtomicUsize; 2]>);
 
 impl PipelineQueue {
-    fn waiting(&self) -> usize {
+    /// Pipelines queued or compiling.
+    pub fn waiting(&self) -> usize {
         self.0[0].load(Ordering::Relaxed)
     }
 
@@ -60,9 +64,23 @@ pub(super) struct Warmup {
     created: usize,
 }
 
+/// The race start being watched for late pipeline compiles (from entering the race to GO).
+#[derive(Resource, Debug, Default)]
+struct StartWatch {
+    created: usize,
+    frames: u32,
+    worst: f32,
+}
+
 pub(super) fn build(app: &mut App) {
     let queue = PipelineQueue::default();
-    app.insert_resource(queue.clone());
+    app.insert_resource(queue.clone())
+        .add_systems(OnEnter(AppState::InRace), watch_start)
+        .add_systems(OnEnter(RacePhase::Racing), report_start)
+        .add_systems(OnEnter(AppState::Unloading), |mut commands: Commands| {
+            commands.remove_resource::<StartWatch>();
+        })
+        .add_systems(Update, time_start.run_if(resource_exists::<StartWatch>));
     if let Some(render) = app.get_sub_app_mut(RenderApp) {
         render
             .insert_resource(queue)
@@ -70,9 +88,78 @@ pub(super) fn build(app: &mut App) {
     }
 }
 
-fn count_waiting(cache: Res<PipelineCache>, queue: Res<PipelineQueue>) {
+/// Publishes the queue to the main world; names every new pipeline at debug level
+/// (`RUST_LOG=rc_render=debug` shows what a hitch compiled).
+fn count_waiting(cache: Res<PipelineCache>, queue: Res<PipelineQueue>, mut seen: Local<usize>) {
     queue.0[0].store(cache.waiting_pipelines().count(), Ordering::Relaxed);
-    queue.0[1].store(cache.pipelines().count(), Ordering::Relaxed);
+    let created = cache.pipelines().count();
+    queue.0[1].store(created, Ordering::Relaxed);
+    for pipeline in cache.pipelines().skip(*seen) {
+        debug!("visuals: new pipeline {}", describe(&pipeline.descriptor));
+    }
+    *seen = created;
+}
+
+/// Label and shaders of a pipeline, for the debug log.
+fn describe(descriptor: &PipelineDescriptor) -> String {
+    let path = |h: &Handle<Shader>| h.path().map_or_else(|| format!("{h:?}"), |p| p.to_string());
+    match descriptor {
+        PipelineDescriptor::RenderPipelineDescriptor(d) => format!(
+            "{} (vertex {}, fragment {}; {})",
+            d.label.as_deref().unwrap_or("?"),
+            path(&d.vertex.shader),
+            d.fragment
+                .as_ref()
+                .map_or_else(|| "-".into(), |f| path(&f.shader)),
+            defs(&d.vertex.shader_defs)
+        ),
+        PipelineDescriptor::ComputePipelineDescriptor(d) => format!(
+            "{} (compute {})",
+            d.label.as_deref().unwrap_or("?"),
+            path(&d.shader)
+        ),
+        PipelineDescriptor::MeshPipelineDescriptor(d) => {
+            format!("{} (mesh)", d.label.as_deref().unwrap_or("?"))
+        }
+    }
+}
+
+/// The shader defs that are set (`NAME`, `NAME=value`), for the debug log.
+fn defs(defs: &[ShaderDefVal]) -> String {
+    let set = defs.iter().filter_map(|d| match d {
+        ShaderDefVal::Bool(name, true) => Some(name.to_string()),
+        ShaderDefVal::Bool(_, false) => None,
+        ShaderDefVal::Int(name, v) => Some(format!("{name}={v}")),
+        ShaderDefVal::UInt(name, v) => Some(format!("{name}={v}")),
+    });
+    set.collect::<Vec<_>>().join(" ")
+}
+
+fn watch_start(mut commands: Commands, queue: Res<PipelineQueue>) {
+    commands.insert_resource(StartWatch {
+        created: queue.created(),
+        ..default()
+    });
+}
+
+fn time_start(time: Res<Time<Real>>, mut watch: ResMut<StartWatch>) {
+    watch.frames += 1;
+    watch.worst = watch.worst.max(time.delta_secs());
+}
+
+/// GO of the session's first attempt: what the warm-up missed (pipelines compiled while the
+/// Intro and countdown ran) and the worst frame — the hitch the warm-up exists to remove.
+fn report_start(mut commands: Commands, watch: Option<Res<StartWatch>>, queue: Res<PipelineQueue>) {
+    let Some(watch) = watch else {
+        return;
+    };
+    info!(
+        "visuals: race start: {} pipelines compiled after the warm-up, worst frame {:.0} ms ({} frames)",
+        queue.created().saturating_sub(watch.created),
+        watch.worst * 1000.0,
+        watch.frames
+    );
+    commands.remove_resource::<StartWatch>();
 }
 
 /// Spawns the warm-up camera once every loader but ours is done (the scene is complete).
@@ -89,17 +176,40 @@ pub(super) fn start(
     let (min, max) = track.bounds();
     let extent = (max.x - min.x).max(max.z - min.z);
     let centre = Vec3::new((min.x + max.x) * 0.5, 0.0, (min.z + max.z) * 0.5);
+    let camera = commands
+        .spawn((
+            Name::new("Pipeline warm-up camera"),
+            WarmupCamera,
+            QualityCamera,
+            Camera3d::default(),
+            Camera {
+                order: -1,
+                ..default()
+            },
+            Transform::from_translation(centre + Vec3::Y * extent * HEIGHT_PER_EXTENT)
+                .looking_at(centre, Vec3::NEG_Z),
+            DespawnOnExit(AppState::Loading),
+        ))
+        .id();
+    // bevy_ui compiles its pipelines per target format: a 1-player race hosts the HUD on its HDR
+    // game camera, while the loading screen's camera is LDR (and `--quick-race` skips the HDR
+    // menu). A plain node, a gradient (Oklab, bevy-react's default) and a box shadow (the HUD's
+    // glows) on this HDR view cover it.
+    let px = Val::Px(2.0);
     commands.spawn((
-        Name::new("Pipeline warm-up camera"),
-        WarmupCamera,
-        QualityCamera,
-        Camera3d::default(),
-        Camera {
-            order: -1,
+        Name::new("UI warm-up"),
+        Node {
+            width: px,
+            height: px,
             ..default()
         },
-        Transform::from_translation(centre + Vec3::Y * extent * HEIGHT_PER_EXTENT)
-            .looking_at(centre, Vec3::NEG_Z),
+        BackgroundColor(Color::BLACK),
+        BackgroundGradient::from(LinearGradient::to_right(vec![
+            ColorStop::auto(Color::BLACK),
+            ColorStop::auto(Color::WHITE),
+        ])),
+        BoxShadow::new(Color::BLACK, Val::ZERO, Val::ZERO, px, px),
+        UiTargetCamera(camera),
         DespawnOnExit(AppState::Loading),
     ));
     commands.insert_resource(Warmup::default());

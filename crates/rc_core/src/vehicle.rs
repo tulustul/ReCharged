@@ -47,6 +47,12 @@ pub struct WheelState {
     /// Wheel centre offset from its rest position along the car's up axis in u (+ = pushed up
     /// into the body, − = hanging down; visuals add it to the model's rest wheel position).
     pub offset: f32,
+    /// Ground contact in world space after the latest tick: under the tyre, on the surface its
+    /// wheel ray hit (skid marks, debris and splashes sit exactly on ramps and curbs). When not
+    /// `grounded`: the bottom of the tyre.
+    pub contact: Vec3,
+    /// Unit ground normal at `contact` (world space). When not `grounded`: the car's up axis.
+    pub normal: Vec3,
 }
 
 /// Physical state of a car after the latest tick. Written only by rc_vehicle (`SimSet::PostPhysics`).

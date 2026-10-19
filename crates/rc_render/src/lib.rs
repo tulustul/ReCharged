@@ -11,7 +11,7 @@
 //!   (`GameCamera`, `MenuCamera`), `LocalPlayer` racers, `UserPaths`.
 //! - **Outputs:** visual entities only (proxies, lights, sky, showroom), camera rendering
 //!   components, the window's mode/size/vsync, [`MaterialLibrary`], [`ActiveEnvironment`],
-//!   `ShowroomReady`, `LoadingDone("visuals")` / `LoadingFailed`.
+//!   [`PipelineQueue`], `ShowroomReady`, `LoadingDone("visuals")` / `LoadingFailed`.
 //! - **Must never:** write simulation state or rapier bodies, touch the split-screen
 //!   `OverlayCamera`, or load assets per frame.
 
@@ -34,8 +34,8 @@ use rc_core::prelude::*;
 pub use cars::{CarModel, CarModelReady};
 pub use content::ContentVisualsPlugin;
 pub use lighting::{
-    ActiveEnvironment, ENVIRONMENTS_DIR, EnvironmentDef, LUMEN_SCALE, LampGrid, RoomDef,
-    SHOWROOM_ENV, TimeLook, WindowDef, WindowWall, lamp_lumens,
+    ActiveEnvironment, ENVIRONMENTS_DIR, EnvironmentDef, LUMEN_SCALE, LampGrid, PipelineQueue,
+    RoomDef, SHOWROOM_ENV, TimeLook, WindowDef, WindowWall, lamp_lumens,
 };
 pub use materials::{
     CarPaint, MaterialDef, MaterialLibrary, SurfaceExtension, SurfaceMaterial, TEXTURE_SETS,

@@ -139,7 +139,10 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
 
 ## Known limitations
 - Pipelines compile during Loading (the rendering core's warm-up camera, with one car per racer
-  parented to it); variants first needed later (a weather change, a new effect) still hitch once.
+  parented to it, plus every effect material from rc_vfx); variants first needed later still
+  compile once mid-race — seen: cars entering a shadow-casting lamp's cube map at night (three
+  depth-only pipelines) and, in split-screen, the overlay's sprite/blit variants at the start
+  (≈ 30 ms frames).
 - Barrier styles are a code table (`ponytail`: move into the environment files when artists need
   more than one style per environment).
 - Prop glbs that fail to parse stay invisible (no fallback swap); a missing file uses the fallback.

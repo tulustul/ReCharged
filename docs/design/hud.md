@@ -9,7 +9,7 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
 |---|---|---|
 | Racers (grid order: name, car, slot, colour), laps, mode, items, ghost, minimap outline (0–1, ≤ 240 points), HUD settings (speed unit, HUD scale, minimap, reduce flashing) | event `race.setup` | on entering the race and when `RaceConfig`, `TrackSummary` or `Settings` change |
 | Race clock, countdown number, "ends in" seconds, standings (grid indices), per local player: position, lap (`max(lap, 1)`, ≤ laps), lap/last/best/finish ms, km/h, charge, boost ready, spending, item, roulette, wrong way, lock-on, goo fuse, shield | event `race.hud` (`UiHudTick`) | ≤ 10 Hz (`on_real_timer(100 ms)`), only when changed |
-| Countdown 3-2-1, GO, perfect start, stall, TT split, lap (best, fastest from lap 2), final lap, finished, Golden Battery, race-ends-in, hints; hits taken (`Hit`) and landed (`Landed`) | event `race.event` (`UiRaceEvent`) | as they happen (local players only, except the global ones) |
+| Countdown 3-2-1, GO, perfect start, stall, TT split, lap (best, fastest from lap 2), final lap, finished, Golden Battery, missed checkpoint, race-ends-in, hints; hits taken (`Hit`) and landed (`Landed`) | event `race.event` (`UiRaceEvent`) | as they happen (local players only, except the global ones) |
 | Each local player's view in UI px (`PlayerViewports` ÷ `UiScale`) + the free quadrant in 3P | event `viewports` | when changed |
 | All of the above for (re)mounts | request `race.snapshot` → `hud` | on HUD mount |
 | Speed (u/s), charge, charging glow (`charge_rate` / 0.3), rocket arrow (degrees, 0 = ahead, clockwise), a minimap dot per racer (0–1) | shared values bound by `hud.bind` / `hud.unbind` | every frame, `.after(AnimationSet::Tick).before(AnimationSet::Apply)`, compare-before-write |
@@ -40,6 +40,8 @@ player's view. Nothing is sent per frame: per-frame visuals are shared values wr
   meter flash and warning pulses, HUD scale scales everything big, small labels keep a floor.
 - Split-screen: each view gets a dark hairline border and a P1–P4 badge; 4P drops the minimap
   (GDD), 3P shows standings + a large minimap in the free quadrant.
+- A missed checkpoint (rc_race: a checkpoint's `s` passed outside its gate, once per pass) shows
+  the notice "Missed checkpoint — go back" (tone *bad*); the `warnings` demo scene includes it.
 - The race layer keeps the HUD under the pause menu and shows results 2.6 s after the race ends
   so the finish banner gets its moment. In-race, the Golden Battery shows in the HUD, not as a
   toast.
@@ -54,5 +56,4 @@ writes the shared values instead of Rust.
 ## Known limitations
 - The roulette strip ignores the real roulette length (1 s): it spins until the item lands.
 - Shield/goo bars run down from the first value seen (the UI does not know the item tuning).
-- No HUD message for a missed checkpoint (rc_race has no event for it).
 - Opponent name tags and 3D lock-on markers are rc_vfx's (GDD §13), not HUD overlays.

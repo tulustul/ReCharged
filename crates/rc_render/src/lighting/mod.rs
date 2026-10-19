@@ -25,6 +25,7 @@ use crate::sky::{atmosphere, light_transform};
 use crate::weather_fx::{LightLook, Look, LookSet};
 
 pub use env::*;
+pub use warmup::PipelineQueue;
 pub(crate) use warmup::WarmupCamera;
 
 /// Environment of the menu showroom.

@@ -84,6 +84,8 @@ export function onRaceEvent(e: UiRaceEvent) {
       return moment(e.slot, "banner", { kind: "finished", id, rank: e.rank, ms: e.ms });
     case "goldenBattery":
       return notify(e.slot, "gold", words.notice.goldenBattery);
+    case "missedCheckpoint":
+      return notify(e.slot, "bad", words.notice.missedCheckpoint);
     case "hint":
       return moment(e.slot, "hint", { id, hint: e.hint }, ms.hint);
     case "hit":

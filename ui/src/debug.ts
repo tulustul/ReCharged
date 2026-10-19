@@ -1,7 +1,8 @@
-// Scripted steps for automated screenshots and smoke runs (`RECHARGED_UI_SCRIPT`, see rc_ui
-// `debug.rs`): `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample
-// data for screens whose data only exists after real races (`demo hud …`: the race HUD, see
-// `hud/demo.ts`), `tab <id>` is handled by tabbed screens. Navigation itself is scripted with real `ui.nav` steps (`nav down`, `nav confirm`).
+// Scripted steps for automated screenshots (`RECHARGED_UI_SCRIPT`, see rc_ui `debug.rs`):
+// `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample data for
+// screens whose data only exists after real races (`demo hud …`: the race HUD, see `hud/demo.ts`),
+// `tab <id>` is handled by tabbed screens. Navigation is scripted through the real input path
+// (`--input-script`, `docs/design/automation.md`).
 import type { AppStatus, UiCupStandings, UiResults, UiVersusScore } from "./bevy";
 import { useDebug } from "./hooks";
 import { demoHud, endHudDemo } from "./hud/demo";

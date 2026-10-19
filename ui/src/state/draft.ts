@@ -90,6 +90,22 @@ export function withTrack(d: RaceDraft, track: UiTrack, profile: UiProfile | nul
   return normalize({ ...d, laps: track.defaultLaps }, track, profile, players);
 }
 
+/** One Confirm starts one race: further `race.start`s within this window are dropped (ms). */
+export const START_REPEAT_MS = 1500;
+
+/** A gate letting one call through per `windowMs` (`now` in ms). */
+export function oncePer(windowMs: number): (now: number) => boolean {
+  let last = -Infinity;
+  return (now) => {
+    if (now - last < windowMs) return false;
+    last = now;
+    return true;
+  };
+}
+
+/** The gate of `race.start` (Car select and the Versus track pick share it). */
+export const startGate = hmrSingleton("__rc_startGate", () => oncePer(START_REPEAT_MS));
+
 /** The `race.start` message for a draft and its players. */
 export function startMessage(d: RaceDraft, players: UiPlayerChoice[]): StartRace {
   const mode: StartRace["mode"] =

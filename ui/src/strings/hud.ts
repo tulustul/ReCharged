@@ -51,6 +51,7 @@ export const hud = {
     stall: "Too early — wheelspin!",
     fastestLap: "Fastest lap!",
     goldenBattery: "Golden Battery found!",
+    missedCheckpoint: "Missed checkpoint — go back",
     hitBy: (item: string, who: string | null) => (who ? `Hit by ${item} — ${who}` : `Hit by ${item}`),
     blocked: (item: string) => `Shield blocked the ${item}`,
     landed: (item: string, who: string) => `${item} hit ${who}!`,

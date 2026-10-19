@@ -16,7 +16,7 @@ sends intents. Everything crosses typed channels generated into `ui/src/bevy.ts`
 | `ui/src/hud/` | the race HUD (T05b, `docs/design/hud.md`) |
 | `ui/src/strings/` | every user-facing string, one file per area |
 | `ui/src/debug.ts` | scripted verbs (`go`, `demo`) and sample data for screenshots |
-| `assets/fonts/` | Saira (variable, upright = body, italic = `"Display"`), SIL OFL 1.1 (`Saira-OFL.txt`); registered by `rc_ui::with_fonts` in the binary |
+| `assets/fonts/` | Saira (variable, upright = body, italic = `"Display"`), SIL OFL 1.1 (`Saira-OFL.txt`); registered by `rc_ui::with_fonts` in the binary; the Credits roll carries the font notice |
 
 `App.tsx` picks the layer by app state: menus (router + Backdrop), Loading, or the RaceLayer
 (the HUD — hidden under the pause menu —, pause, post-race flow; results wait 2.6 s after the
@@ -39,6 +39,10 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
   recompile after a race), so the navy layers stay 1 s and then fade out over the showroom.
 - **Transitions**: screen changes arm a `morphFilter` only while in flight (`routes.ts`): crossfade
   everywhere, the custom `chargeSwap` (a crackling cyan/volt front) only Main menu → mode.
+- **Credits**: a roll over the showroom from `strings/credits.ts` (team, tools, generators, the
+  Saira OFL notice); its distance and duration follow the list (57 UI px/s).
+- **Loading**: the progress bar's glow (`boxShadow`) also compiles bevy_ui's box-shadow pipeline
+  for the LDR camera split-screen races share, so their HUD glows never compile mid-race.
 
 ## Navigation model
 - Input: **only** the `ui.nav` event (rc_input `UiNav`) plus pointer events. `Feeds` routes each
@@ -62,6 +66,9 @@ linear light, so translucent fills are navy-tinted (white-tinted ones read grey)
   error (locked/invalid), unlock (unlock toasts).
 
 ## Data flow
+One Confirm starts one race: Car select and the Versus track pick send `race.start` through
+`startGate` (`state/draft.ts`), which drops repeats within 1.5 s (a double press or a duplicated
+nav event once sent it twice).
 Every store is an hmr-safe singleton seeded by a snapshot request when `Feeds` mounts, then kept
 current by events; app-state changes re-request what they invalidate (profile/records on menu
 entry, `race.snapshot` on loading/finish). Settings and bindings are fetched by their screens;
@@ -92,14 +99,14 @@ NEW badges come from `Profile::new_unlocks`; focusing an item sends `profile.see
   + the HUD's setup/tick/views).
 
 ## Automation & screenshots
-`RECHARGED_UI_SCRIPT="<secs> <action>; …"` (timed from `ui.ready`): `nav <action> [slot|-]
-[device]` sends a real `ui.nav`, `pause` sends `GameCommand::Pause`, anything else is a `debug.act`
-for React: `go <route> [mode]`, `demo results|cupResults|versusResults|pause|racing|loading|lobby|
-cupEnd|unlocks|dialog|menu`, `demo hud [1-4] <scene>` (see `hud.md`), `tab <id>` (Settings, How to play, Records). Example acceptance run
-(Title → Main → Quick Race → Track → Car → race → Pause → Quit):
-`RECHARGED_UI_SCRIPT="3.2 nav confirm; 4.8 nav down; 5.6 nav confirm; 7.6 nav confirm; 9.4 nav
-confirm; 16 pause; 18 nav down; 18.4 nav down; 18.8 nav down; 19.2 nav down; 20 nav confirm; 21 nav
-left; 21.6 nav confirm" cargo run -p recharged -- --user-data-dir target/agent-data/T05 --exit-after 26`.
+`RECHARGED_UI_SCRIPT="<secs> <action>; …"` (timed from `ui.ready`) sends each action to React as
+a `debug.act` fixture: `go <route> [mode]`, `demo results|cupResults|versusResults|pause|racing|
+loading|lobby|cupEnd|unlocks|dialog|menu`, `demo hud [1-4] <scene>` (see `hud.md`), `tab <id>`
+(Settings, How to play, Records), e.g. `RECHARGED_UI_SCRIPT="1 go credits" cargo run -p recharged
+-- --user-data-dir target/agent-data/<id> --screenshot <png> --screenshot-at 5 --exit-after 8`.
+Navigation and pausing go through the real input path with `--input-script`
+(`docs/design/automation.md`, e.g. `tools/scripts/keyboard_only.script`); `nav`/`pause` steps
+here are rejected with a pointer to it.
 
 ## Tests
 `npm test` (node --test, no deps): focus model, nav layers, router, slider/list maths, stores,

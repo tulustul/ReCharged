@@ -5712,8 +5712,6 @@ dependencies = [
  "bevy_kira_audio",
  "rc_core",
  "rc_testkit",
- "ron",
- "serde",
 ]
 
 [[package]]
@@ -5899,8 +5897,6 @@ dependencies = [
  "bevy",
  "rc_core",
  "rc_testkit",
- "ron",
- "serde",
 ]
 
 [[package]]
