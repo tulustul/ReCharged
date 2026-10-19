@@ -30,9 +30,9 @@
 | T20b | QA fixes — UI, flow, accessibility (Q1–Q3, Q5, Q10–Q18) | T18 | done |
 | T20c | QA fixes — rendering, performance, memory, audio logs (Q8, Q9, Q19–Q21, B28–B31) | T18 | done |
 | T21 | final regression QA (DoD on the final build) | T19, T20 | done (`docs/qa/final-report.md`: DoD 1–8 pass; R1–R7) |
-| T22a | final fixes — grid, hazards, AI traffic (R1, R2) | T21 | in progress |
-| T22b | final fixes — presentation polish (R4–R7, B36, B37) | T21 | in progress |
-| T22c | memory growth investigation (R3) | T21 | in progress |
+| T22a | final fixes — grid, hazards, AI traffic (R1, R2) | T21 | done |
+| T22b | final fixes — presentation polish (R4–R7, B36, B37) | T21 | done |
+| T22c | memory growth investigation (R3) | T21 | done |
 
 Milestones: M1 walking skeleton (T01–T05 basics) → M2 vertical slice on Toy Town (+2P smoke test)
 → M3 systems complete → M4 content complete → M5 polish & QA.

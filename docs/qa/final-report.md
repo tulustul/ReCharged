@@ -278,3 +278,18 @@ Every first-pass issue is fixed except two that are only partly done: Q6 (hazard
 - **R3:** confirm whether the slow RSS growth stops or continues past 30 min.
 
 R4–R7 are polish, along with the still-open B36/B37 and B6 (a human listening pass).
+
+## 10. Fix status (orchestrator-maintained, after T22)
+| Issue | Status |
+|---|---|
+| R1 | fixed in T22a (410edaa): players start behind the AI field (GDD §3.2); Oil Slick / Spring Pad are used up after 3 cars. 72 headless 8-car item races: Oil 2.89 → 1.85 victims per drop, drops in the first 10 s 4.48 → 2.68 per drop and at most 3 (was 9); Spring 1.90 → 1.66 |
+| R2 | fixed in T22a: a stopped or crawling non-AI car is steered around like a hazard, never followed. Car parked on pole: Toy Town ≤ 2.3 s, Test Oval ≤ 1.5 s, Backyard ≤ 2.6 s to pass (was 8.8–9.2 s and up to 20 s); Sofa Circuit pole is ≤ 1.1 s on 3 of 6 seeds, 4–8 s on the others (`docs/design/rc_ai.md`, known limitations) |
+| R3 | fixed in T22c (b953855): Bevy 0.20 keeps the GPU-preprocessing bind groups of every view that ever rendered (`docs/upstream-notes.md` U5); `rc_render/src/preprocess_fix.rs` prunes them. RSS slope after first visits +22–26 MB/min → +1–4 MB/min (40-min A/B), flat over a 25-min run of the final tree; the rest is Bevy's `DespawnOnExit` index leak (U6, ≈ 1 MB/min, documented). Note: `VmRSS` counts the NVIDIA mappings twice (≈ 0.6–0.9 GB of the 4.6 GB QA saw) |
+| R4 | fixed in T22b (c7ce373): the thunder variants split the Storm strike intensities in thirds |
+| R5 | fixed in T22b: every look keeps the same grading stages in use, so one tonemapping pipeline serves every environment, time and weather; race start 0 pipelines in all 8 non-clear cells |
+| R6 | fixed in T22b: logo, bar and tagline at the top of the Title; the car shows below |
+| R7 | fixed in T22b: "Browse" move hint |
+| B36, B37 | fixed in T22b: Room focus on Cup select / Track select / Versus lobby; per-car podium foot offsets measured from the thumbnails |
+| Tied split, save toast | fixed in T22b: neutral "±0.00"; toasts sit halfway down the right edge |
+| Q6 (partly in T21) | closed by R1 |
+| Q21 (partly in T21) | closed by R3 |
