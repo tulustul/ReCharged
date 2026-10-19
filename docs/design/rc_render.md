@@ -16,6 +16,7 @@ crate; `lib.rs` registers both).
 | `showroom/` | menu garage set, turntable, `CarModel` swap without gaps, `ShowroomReady` |
 
 Shaders (WESL, `assets/shaders/render/`): `surface.wesl` (macro variation, wetness/puddles, snow),
+`car_status.wesl` (status effects on car bodies),
 `clouds.wesl` (cloud deck), `window_glass.wesl` (outside light, rain beads/streaks, lightning).
 
 ## Lifecycle
@@ -90,7 +91,8 @@ instead), then per `view_quality(settings, views)`:
 | volumetric fog | Ultra + setting | off | off |
 | sun shadows | 2048 × 4 cascades (Ultra 4096) | 2048 × 3 | Low: 1024 × 2 |
 
-Leaving TAA removes `TemporalJitter`/`MipBias` too (they would keep jittering); prepasses this
+Motion blur runs at shutter 0.5 (2 samples) and eases to 1.25 (4 samples) while the view's
+player spends charge (`VehicleTelemetry::charge_boost`). Leaving TAA removes `TemporalJitter`/`MipBias` too (they would keep jittering); prepasses this
 module added are removed when no effect needs them. The split overlay camera is never touched.
 Window: mode/vsync on every settings change (vsync never in automated runs: the binary presents
 them unsynced), size only when the setting changes and never with

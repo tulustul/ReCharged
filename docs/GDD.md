@@ -456,7 +456,7 @@ players' cars get headlights.
 
 ## 11. Camera [CAM-1]
 - **Chase** (default), **Far chase**, **Hood** modes (cycle button). Spring-damped follow with
-  velocity look-ahead; FOV widening up to +12° with speed/boost; subtle shake on impacts and
+  velocity look-ahead; FOV widening up to +12° with speed/boost (+18° while spending charge); subtle shake on impacts and
   landings (setting).
 - **FOV setting** = horizontal FOV at 16:9 (Hor+ for other aspects); 2P top/bottom viewports are
   clamped to ≤ 100° horizontal.

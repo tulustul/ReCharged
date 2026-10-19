@@ -45,10 +45,12 @@ const FLYBY_ANGLE: f32 = 1.2 * PI;
 /// Look-ahead along the heading: seconds of speed, capped in u.
 const LOOK_AHEAD_S: f32 = 0.12;
 const LOOK_AHEAD_MAX_U: f32 = 4.0;
-/// FOV widening (GDD §11: up to +12°): at [`FULL_SPEED_UPS`] and while boosting, in degrees.
+/// FOV widening (GDD §11: up to +12°, +18° spending charge): at [`FULL_SPEED_UPS`], while an
+/// item boost runs and while the charge boost spends charge, in degrees.
 const WIDEN_SPEED_DEG: f32 = 8.0;
 const WIDEN_BOOST_DEG: f32 = 4.0;
-const MAX_WIDEN_DEG: f32 = 12.0;
+const WIDEN_CHARGE_DEG: f32 = 10.0;
+const MAX_WIDEN_DEG: f32 = 18.0;
 /// Speed of full widening, u/s (the 5★ top speed, GDD §5.1).
 const FULL_SPEED_UPS: f32 = 36.0;
 
@@ -137,10 +139,17 @@ pub(crate) fn flyby_pose(car: Vec3, car_yaw: f32, t: f32) -> Transform {
     look(eye, car + Vec3::Y * CHASE.look_height)
 }
 
-/// FOV widening target in degrees for a speed (u/s) and boost state.
-pub(crate) fn widen_target(speed: f32, boosting: bool) -> f32 {
+/// FOV widening target in degrees for a speed (u/s) and boost state (`charging`: the charge
+/// boost is the one in effect).
+pub(crate) fn widen_target(speed: f32, boosting: bool, charging: bool) -> f32 {
     let speed_part = WIDEN_SPEED_DEG * (speed / FULL_SPEED_UPS).clamp(0.0, 1.0);
-    let boost_part = if boosting { WIDEN_BOOST_DEG } else { 0.0 };
+    let boost_part = if charging {
+        WIDEN_CHARGE_DEG
+    } else if boosting {
+        WIDEN_BOOST_DEG
+    } else {
+        0.0
+    };
     (speed_part + boost_part).min(MAX_WIDEN_DEG)
 }
 
@@ -224,10 +233,13 @@ mod tests {
     }
 
     #[test]
-    fn widening_grows_with_speed_and_boost_up_to_12_degrees() {
-        assert_eq!(widen_target(0.0, false), 0.0);
-        assert!(widen_target(18.0, false) > 0.0);
-        assert_eq!(widen_target(FULL_SPEED_UPS * 3.0, true), MAX_WIDEN_DEG);
-        assert!(widen_target(0.0, true) > 0.0);
+    fn widening_grows_with_speed_and_boost_and_most_when_spending_charge() {
+        assert_eq!(widen_target(0.0, false, false), 0.0);
+        assert!(widen_target(18.0, false, false) > 0.0);
+        assert_eq!(widen_target(FULL_SPEED_UPS * 3.0, true, false), 12.0);
+        assert!(widen_target(0.0, true, false) > 0.0);
+        let charge = widen_target(FULL_SPEED_UPS, true, true);
+        assert!(charge > widen_target(FULL_SPEED_UPS, true, false));
+        assert_eq!(charge, MAX_WIDEN_DEG);
     }
 }

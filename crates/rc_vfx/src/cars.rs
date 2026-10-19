@@ -65,7 +65,7 @@ impl CarShape {
         self.wheels[2].y + self.radius[2] * 1.6
     }
 
-    /// Half the car's length (shield bubble, respawn ring).
+    /// Half the car's length (respawn ring, charge streaks).
     pub fn half_length(&self) -> f32 {
         let front = self.wheels[0].z.min(self.wheels[1].z) - self.radius[0];
         let rear = self.wheels[2].z.max(self.wheels[3].z) + self.radius[2];
@@ -118,9 +118,13 @@ pub(crate) struct CarFx {
     pub debris: [Emitter; 4],
     pub flame: Emitter,
     pub arcs: Emitter,
+    /// Energy streaks shed by the body while spending charge.
+    pub trail: Emitter,
     /// Smoothed drift charge rate, 0–1.25 of `driving::DRIFT_RATE_FULL`.
     pub charge: f32,
     pub was_boosting: bool,
+    /// A wheel touched a water body last frame (entry splash on the rising edge).
+    pub in_water: bool,
 }
 
 /// Marker on effect entities whose `Transform` rc_vfx writes every frame (keeps them out of

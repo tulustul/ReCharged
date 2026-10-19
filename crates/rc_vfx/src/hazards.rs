@@ -1,15 +1,16 @@
 //! Hazard and status visuals: the Goo Bomb riding its carrier (pulsing and blinking faster as the
 //! fuse runs out, its blast radius telegraphed on the ground at the end), Oil Slick puddles and
 //! Spring Pads drawn at their trigger radius (`ItemRadius`: what you see is what triggers), and
-//! the Shield Bubble (flashes when it blocks, blinks before it expires, bursts when it pops).
+//! the Shield Bubble's burst when it pops (the shield itself is drawn by the car body's shader,
+//! rc_render).
 
 use bevy::light::NotShadowCaster;
 use bevy::mesh::MeshTag;
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
-use crate::assets::{BubbleMaterial, VfxAssets};
-use crate::cars::{CarFx, FxVisual, Poses};
+use crate::assets::VfxAssets;
+use crate::cars::{FxVisual, Poses};
 use crate::fx::{Fx, sprite};
 use crate::items::Follows;
 use crate::particles::{Facing, Look, Particle, Shape, pack_tag};
@@ -22,8 +23,6 @@ const GOO_WARN_S: f32 = 2.0;
 /// Oil puddles spread over this long and dry up over the last `OIL_DRY_S` of their life.
 const OIL_SPREAD_S: f32 = 0.4;
 const OIL_DRY_S: f32 = 1.5;
-/// Shield blinks during its last seconds.
-const SHIELD_WARN_S: f32 = 2.0;
 /// Spring Pad bounce: duration (s) and plate travel (u).
 const BOUNCE_S: f32 = 0.6;
 const BOUNCE_U: f32 = 0.35;
@@ -51,14 +50,6 @@ struct PadFx {
     coils: [Entity; 3],
     ring: Entity,
     bounce: f32,
-}
-
-/// The bubble of a shielded racer.
-#[derive(Component, Debug)]
-struct ShieldFx {
-    racer: Entity,
-    material: Handle<BubbleMaterial>,
-    flash: f32,
 }
 
 /// Marker of hazard parts posed by their visual (keeps their transform queries disjoint).
@@ -418,94 +409,25 @@ fn spring_pads(
     }
 }
 
-/// Bubble size around a car: a little larger than its body.
-fn bubble_scale(car: Option<&CarFx>) -> Vec3 {
-    let half = car.map_or(1.15, |c| c.shape.half_length());
-    Vec3::new(half * 1.6, half * 1.25, half * 2.15)
-}
-
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+/// A burst where a racer's shield ended (popped by a hit or expired).
 fn shields(
-    time: Res<Time>,
     mut fx: ResMut<Fx>,
-    mut commands: Commands,
-    mut hits: MessageReader<HitEvent>,
-    assets: Res<VfxAssets>,
-    mut bubbles: ResMut<Assets<BubbleMaterial>>,
     poses: Poses,
-    racers: Query<(Entity, &StatusEffects, Option<&CarFx>), With<Racer>>,
-    mut visuals: Query<(Entity, &mut ShieldFx, &mut Transform), With<FxVisual>>,
+    racers: Query<(Entity, &StatusEffects), With<Racer>>,
+    mut shielded: Local<Vec<Entity>>,
 ) {
-    let dt = time.delta_secs();
-    let now = time.elapsed_secs();
-    let blocked: Vec<Entity> = hits
-        .read()
-        .filter(|h| h.blocked)
-        .map(|h| h.victim)
-        .collect();
-    // Existing bubbles: follow, flash, blink, pop.
-    let mut have = Vec::new();
-    for (visual, mut shield, mut transform) in &mut visuals {
-        let state = racers.get(shield.racer).ok();
-        let left = state.and_then(|(_, e, _)| e.shield);
-        let Some(pose) = poses.of(shield.racer) else {
-            commands.entity(visual).despawn();
-            continue;
-        };
-        let up = pose.rotation * Vec3::Y;
-        let centre = pose.translation + up * 0.45;
-        let Some(left) = left else {
-            shield_pop(&mut fx, centre);
-            commands.entity(visual).despawn();
-            continue;
-        };
-        have.push(shield.racer);
-        if blocked.contains(&shield.racer) {
-            shield.flash = 1.0;
-        }
-        shield.flash = (shield.flash - dt * 3.0).max(0.0);
-        transform.translation = centre;
-        transform.rotation = pose.rotation;
-        transform.scale = bubble_scale(state.and_then(|(_, _, c)| c));
-        let blink = if left < SHIELD_WARN_S && (now * 8.0).sin() < 0.0 {
-            0.35
-        } else {
-            1.0
-        };
-        let flash = if fx.calm {
-            shield.flash * 0.3
-        } else {
-            shield.flash
-        };
-        if let Some(mut m) = bubbles.get_mut(&shield.material) {
-            m.params.y = assets.shield.params.y * blink;
-            m.params.w = flash;
+    for (racer, effects) in &racers {
+        let had = shielded.contains(&racer);
+        if effects.shielded() && !had {
+            shielded.push(racer);
+        } else if !effects.shielded() && had {
+            shielded.retain(|&e| e != racer);
+            if let Some(pose) = poses.of(racer) {
+                shield_pop(&mut fx, pose.translation + pose.rotation * Vec3::Y * 0.45);
+            }
         }
     }
-    // New shields.
-    for (racer, effects, car) in &racers {
-        if !effects.shielded() || have.contains(&racer) {
-            continue;
-        }
-        let Some(pose) = poses.of(racer) else {
-            continue;
-        };
-        let material = bubbles.add(assets.shield.clone());
-        commands.spawn((
-            FxVisual,
-            ShieldFx {
-                racer,
-                material: material.clone(),
-                flash: 0.6,
-            },
-            Mesh3d(assets.sphere.clone()),
-            MeshMaterial3d(material),
-            pose.with_scale(bubble_scale(car)),
-            NotShadowCaster,
-            DespawnOnExit(RaceAttempt),
-            Name::new("Shield Bubble"),
-        ));
-    }
+    shielded.retain(|&e| racers.contains(e));
 }
 
 fn shield_pop(fx: &mut Fx, at: Vec3) {
@@ -552,20 +474,5 @@ mod tests {
         assert!((goo_blink_period(0.0) - 0.12).abs() < 1e-5);
         assert!(goo_blink_period(2.0) < goo_blink_period(4.0));
         assert_eq!(goo_blink_period(20.0), 1.0, "clamped");
-    }
-
-    #[test]
-    fn bubbles_cover_bigger_cars() {
-        let big = CarFx::new(crate::cars::CarShape {
-            wheels: [
-                Vec3::new(-0.8, 0.5, -1.0),
-                Vec3::new(0.8, 0.5, -1.0),
-                Vec3::new(-0.8, 0.5, 1.0),
-                Vec3::new(0.8, 0.5, 1.0),
-            ],
-            radius: [0.5; 4],
-            width: [0.4; 4],
-        });
-        assert!(bubble_scale(Some(&big)).z > bubble_scale(None).z);
     }
 }

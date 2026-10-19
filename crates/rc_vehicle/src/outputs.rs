@@ -238,6 +238,7 @@ pub(crate) fn write_telemetry(
             surface: state.surface,
             wheels,
             boosting: state.boosting,
+            charge_boost: state.draining,
             up_dot: (transform.rotation * Vec3::Y).y,
             clean_landing: state.clean_landing,
             charge_rate: state.charge_rate,

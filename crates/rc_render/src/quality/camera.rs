@@ -27,6 +27,11 @@ const SSAO_THICKNESS_U: f32 = 0.35;
 /// Motion blur: shutter angle (fraction of a frame) and samples.
 const MOTION_BLUR_SHUTTER: f32 = 0.5;
 const MOTION_BLUR_SAMPLES: u32 = 2;
+/// Motion blur while the followed racer spends charge (non-physical streaks past 1.0), and how
+/// fast the shutter eases between the two (1/s).
+const CHARGE_BLUR_SHUTTER: f32 = 1.25;
+const CHARGE_BLUR_SAMPLES: u32 = 4;
+const CHARGE_BLUR_RATE: f32 = 6.0;
 /// Volumetric fog raymarch steps.
 const VOLUMETRIC_STEPS: u32 = 48;
 
@@ -49,7 +54,40 @@ pub(super) fn build(app: &mut App) {
     app.add_observer(mark::<GameCamera>)
         .add_observer(mark::<MenuCamera>)
         .add_observer(decorate)
-        .add_systems(Update, apply_quality.in_set(VisualSet));
+        .add_systems(
+            Update,
+            (apply_quality, charge_blur.after(apply_quality)).in_set(VisualSet),
+        );
+}
+
+/// A game camera's motion blur stretches while its player spends charge (only where the
+/// quality has motion blur at all).
+fn charge_blur(
+    time: Res<Time>,
+    mut cameras: Query<(&GameCamera, &mut MotionBlur)>,
+    racers: Query<(&LocalPlayer, &VehicleTelemetry)>,
+) {
+    let k = 1.0 - (-CHARGE_BLUR_RATE * time.delta_secs()).exp();
+    for (camera, mut blur) in &mut cameras {
+        let charging = racers
+            .iter()
+            .any(|(p, t)| p.0 == camera.slot && t.charge_boost);
+        let target = if charging {
+            CHARGE_BLUR_SHUTTER
+        } else {
+            MOTION_BLUR_SHUTTER
+        };
+        let shutter = blur.shutter_angle + (target - blur.shutter_angle) * k;
+        let samples = if shutter > (MOTION_BLUR_SHUTTER + CHARGE_BLUR_SHUTTER) * 0.5 {
+            CHARGE_BLUR_SAMPLES
+        } else {
+            MOTION_BLUR_SAMPLES
+        };
+        if (shutter - blur.shutter_angle).abs() > 1e-3 || samples != blur.samples {
+            blur.shutter_angle = shutter;
+            blur.samples = samples;
+        }
+    }
 }
 
 fn mark<C: Component>(add: On<Add<C>>, mut commands: Commands) {

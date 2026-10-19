@@ -116,7 +116,8 @@ on which cars a session showed).
   turntable. `CarModelReady` marks an instanced, painted model. Inserting an equal value is a
   no-op; a different value re-instances.
 - On `WorldInstanceReady` one pass assigns the final material of every mesh: `paint` /
-  `paint_accent` ← `MaterialLibrary::car_paint` (shared per car + paint); `light_head` 1× at
+  `paint_accent` ← per-instance `CarBodyMaterial`s (`MaterialLibrary::car_paint` + the status
+  extension, see below); `light_head` 1× at
   Night, 0.3× by day; `light_brake` per-instance copies at 0.2×, lit to 1× while
   `CarControl.brake > 0.05`; `light_tail` and `glow` as authored (art bible §1.2).
 - Wheels (`wheels.rs`, tested): node = rest translation + Y·`offset`, rotation =
@@ -128,6 +129,12 @@ on which cars a session showed).
 - Time Trial ghost (`GhostCar`): every material copied translucent (α 0.35, `Blend`, back faces
   culled), no shadow casting, lamps kept. Respawn ghosting (`StatusEffects.ghost`): the model
   blinks at 6 Hz and ends visible.
+- Status effects (`status.rs`, `car_status.wesl`, tested): the body shader, not attached meshes,
+  shows the racer's `StatusEffects` — shield: cyan fresnel rim with rising bands, flare on a
+  blocked `HitEvent`, blink in its last 2 s; spending charge (`charge_boost`): fainter electric
+  rim; power loss: flickering electric veins; grip loss: dark oil film with a rainbow sheen.
+  The glow is added after lighting (as emission the clear coat would dim the rim). *Reduce
+  flashing*: flare × 0.3, veins × 0.5.
 
 ## Captures (`capture/`)
 Both run on the race started by `--quick-race`, through a capture camera with `QualityCamera`

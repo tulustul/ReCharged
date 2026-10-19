@@ -80,6 +80,9 @@ pub struct VehicleTelemetry {
     pub wheels: [WheelState; 4],
     /// Any boost is active.
     pub boosting: bool,
+    /// The charge boost is the boost in effect, spending charge (camera, motion blur and body
+    /// effects of using charge).
+    pub charge_boost: bool,
     /// Dot product of the car's up axis with world up (< 0.3 = on its side/roof).
     pub up_dot: f32,
     /// The latest landing was clean (all wheels within 0.15 s, tilt < 20°).

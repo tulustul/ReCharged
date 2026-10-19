@@ -126,8 +126,6 @@ pub struct VfxAssets {
     pub plasma: Handle<StandardMaterial>,
     /// Dark oil with a rainbow sheen (Oil Slick).
     pub oil: Handle<StandardMaterial>,
-    /// Cyan shield shell (template; shields clone it to flash on hits).
-    pub shield: BubbleMaterial,
     /// Faint violet field showing a Shock Orb's knock radius.
     pub orb_field: Handle<BubbleMaterial>,
 }
@@ -238,7 +236,6 @@ fn create_assets(
             alpha_mode: AlphaMode::Blend,
             ..default()
         }),
-        shield: BubbleMaterial::new(LinearRgba::rgb(0.4, 1.3, 2.4), 2.2),
         orb_field: bubbles.add(BubbleMaterial::new(LinearRgba::rgb(0.5, 0.3, 1.2), 0.3)),
     });
 }

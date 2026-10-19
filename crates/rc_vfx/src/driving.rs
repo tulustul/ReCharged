@@ -135,6 +135,15 @@ const SPLASH: Look = Look {
     ..DUST
 };
 
+/// Water-body splash size at `speed` u/s: 1 at a crawl, growing with speed to 4 at the 5★ top
+/// speed and 5 at full boost.
+pub fn splash_scale(speed: f32) -> f32 {
+    1.0 + 3.0 * (speed / FULL_SPLASH_UPS).clamp(0.0, 4.0 / 3.0)
+}
+
+/// Speed of a 4× water splash, u/s (the 5★ top speed, GDD §5.1).
+const FULL_SPLASH_UPS: f32 = 36.0;
+
 /// What a wheel throws up on a surface (weather included).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Debris {
@@ -255,27 +264,69 @@ fn sparks_and_debris(
             fx.spawn(Particle::new(glow, at + up * 0.05, vel, dt * 2.0));
         }
 
-        // Wheel debris by surface.
+        // Wheel debris by surface; water bodies throw more and bigger the faster the car goes.
+        let splash = splash_scale(t.speed);
+        let (mut wading, mut entry) = (0, Vec3::ZERO);
         for (i, w) in t.wheels.iter().enumerate() {
             let Some(surface) = w.surface.filter(|_| w.grounded) else {
                 continue;
             };
+            let at = ground_point(&pose, &car.shape, i, w).0;
+            let body = surface == SurfaceKind::Water;
+            if body {
+                wading += 1;
+                entry += at;
+            }
+            let scale = if body { splash } else { 1.0 };
             let debris = debris_for(surface, wet, snow);
             let front = if i < 2 { 0.4 } else { 1.0 };
-            let rate = debris_rate(debris, t.speed, w.slip) * front * lod;
+            let rate = debris_rate(debris, t.speed, w.slip) * front * scale * lod;
             let n = car.debris[i].count(rate, dt);
-            if n == 0 {
-                continue;
-            }
-            let at = ground_point(&pose, &car.shape, i, w).0;
             for _ in 0..n {
-                throw_debris(&mut fx, debris, at, vel, back, up, t.speed);
+                throw_debris(&mut fx, debris, at, vel, back, up, t.speed, scale);
             }
         }
+        if wading > 0 && !car.in_water {
+            water_entry(&mut fx, entry / wading as f32, vel, up, splash);
+        }
+        car.in_water = wading > 0;
     }
 }
 
-/// One debris particle from a contact patch at `at` of a car moving at `vel`.
+/// The burst of a car driving (or landing) into a water body at `at`: a crown of drops, white
+/// sheets and a ring on the surface, all of `scale` ([`splash_scale`]).
+fn water_entry(fx: &mut Fx, at: Vec3, vel: Vec3, up: Vec3, scale: f32) {
+    let lift = 0.6 + 0.4 * scale;
+    for _ in 0..fx.n((14.0 + 30.0 * scale) as u32) {
+        let out = Vec3::new(fx.rng.signed(1.0), 0.0, fx.rng.signed(1.0)).normalize_or_zero();
+        let v =
+            vel * 0.5 + out * fx.rng.range(1.0, 3.5) * lift + up * fx.rng.range(3.0, 5.5) * lift;
+        let p = Particle::new(SPRAY, at + out * 0.3, v, fx.rng.range(0.5, 0.9))
+            .scaled(fx.rng.range(1.0, 1.6) * lift)
+            .floored(at.y - 0.02);
+        fx.spawn(p);
+    }
+    for _ in 0..fx.n((3.0 + 5.0 * scale) as u32) {
+        let v = vel * 0.45 + fx.rng.cone(up, 0.9) * fx.rng.range(1.5, 3.5) * lift;
+        let p = Particle::new(SPLASH, at + up * 0.15, v, fx.rng.range(0.5, 0.9))
+            .spinning(fx.rng.angle(), fx.rng.signed(2.0))
+            .scaled(fx.rng.range(0.8, 1.3) * scale);
+        fx.spawn(p);
+    }
+    let ring = Look {
+        shape: Shape::Ring,
+        facing: Facing::Flat,
+        size: [0.4, 2.0 * scale],
+        fade_out: 0.8,
+        ..SPLASH
+    };
+    let flat = Quat::from_rotation_arc(Vec3::Z, up);
+    fx.spawn(Particle::new(ring, at + up * 0.03, vel * 0.3, 0.5).rotated(flat));
+}
+
+/// One debris particle from a contact patch at `at` of a car moving at `vel` (water `scale`:
+/// [`splash_scale`] in a water body, else 1).
+#[allow(clippy::too_many_arguments)]
 fn throw_debris(
     fx: &mut Fx,
     debris: Debris,
@@ -284,6 +335,7 @@ fn throw_debris(
     back: Vec3,
     up: Vec3,
     speed: f32,
+    scale: f32,
 ) {
     let kick = (speed / 25.0).clamp(0.3, 1.4);
     let rng = &mut fx.rng;
@@ -353,15 +405,21 @@ fn throw_debris(
             (p, dust)
         }
         Debris::Water => {
-            let side = Vec3::new(rng.signed(1.0), 0.0, rng.signed(1.0)) * 2.5;
-            let v =
-                vel * 0.35 + back * rng.range(1.0, 3.5) * kick + up * rng.range(2.0, 5.0) + side;
+            let lift = scale.sqrt();
+            let side = Vec3::new(rng.signed(1.0), 0.0, rng.signed(1.0)) * 2.5 * lift;
+            let v = vel * 0.35
+                + back * rng.range(1.0, 3.5) * kick
+                + up * rng.range(2.0, 5.0) * lift
+                + side;
             let p = Particle::new(SPRAY, at + jitter + up * 0.05, v, rng.range(0.35, 0.6))
+                .scaled(lift)
                 .floored(at.y - 0.02);
             let sheet = (rng.unit() < 0.35).then(|| {
-                let v = vel * 0.4 + back * rng.range(0.5, 2.0) * kick + up * rng.range(1.0, 2.5);
+                let v =
+                    vel * 0.4 + back * rng.range(0.5, 2.0) * kick + up * rng.range(1.0, 2.5) * lift;
                 Particle::new(SPLASH, at + up * 0.1, v, rng.range(0.35, 0.55))
                     .spinning(rng.angle(), rng.signed(2.0))
+                    .scaled(scale)
             });
             (p, sheet)
         }
@@ -401,6 +459,28 @@ const ARC: Look = Look {
     ..Look::DEFAULT
 };
 
+/// Energy streaks streaming off the body while the charge boost spends charge.
+const CHARGE_STREAK: Look = Look {
+    shape: Shape::Streak,
+    facing: Facing::Velocity,
+    emissive: true,
+    color: [
+        LinearRgba::rgb(3.0, 9.0, 14.0),
+        LinearRgba::rgb(0.6, 1.5, 6.0),
+    ],
+    size: [0.04, 0.015],
+    fade_out: 0.6,
+    drag: 1.0,
+    stretch: 0.05,
+    aspect: 3.0,
+    ..Look::DEFAULT
+};
+
+/// Particle rates while spending charge, relative to an item boost's flame and arcs.
+const CHARGE_FX: f32 = 2.2;
+/// Energy streaks per second off a car spending charge.
+const CHARGE_STREAK_RATE: f32 = 90.0;
+
 /// Warm palette of the Turbo Cell's flame (charge boosts burn electric blue).
 const TURBO: [LinearRgba; 2] = [
     LinearRgba::rgb(12.0, 8.0, 3.0),
@@ -425,6 +505,7 @@ fn boost_flames(
             continue;
         };
         let turbo = effects.boost().is_some_and(|b| b.freeze_charge);
+        let more = if t.charge_boost { CHARGE_FX } else { 1.0 };
         let colors = if turbo { TURBO } else { FLAME.color };
         let vel = car_velocity(&pose, t);
         let back = pose.rotation * Vec3::Z;
@@ -433,7 +514,7 @@ fn boost_flames(
             color: colors,
             ..FLAME
         };
-        let n = car.flame.count(170.0 * fx.density, dt);
+        let n = car.flame.count(170.0 * more * fx.density, dt);
         for _ in 0..n {
             let v = vel + back * fx.rng.range(8.0, 13.0) + fx.rng.dir() * 0.7;
             let p = Particle::new(
@@ -458,7 +539,7 @@ fn boost_flames(
             .rotated(Quat::from_rotation_arc(Vec3::Y, back));
         fx.spawn(core);
         // Electric arcs crawling over the rear.
-        let n = car.arcs.count(16.0 * fx.density, dt);
+        let n = car.arcs.count(16.0 * more * fx.density, dt);
         for _ in 0..n {
             let from = nozzle + fx.rng.dir() * 0.25;
             let to = from + back * fx.rng.range(0.1, 0.4) + fx.rng.dir() * 0.35;
@@ -471,6 +552,29 @@ fn boost_flames(
                 ..ARC
             };
             zigzag(&mut fx, arc, from, to, 3, 0.12, vel, 0.07);
+        }
+        // Spending charge: energy streams off the whole body.
+        let rate = if t.charge_boost {
+            CHARGE_STREAK_RATE * fx.density
+        } else {
+            0.0
+        };
+        let n = car.trail.count(rate, dt);
+        let half = car.shape.half_length();
+        for _ in 0..n {
+            let local = Vec3::new(
+                fx.rng.signed(0.7),
+                fx.rng.range(0.15, car.shape.roof()),
+                fx.rng.signed(half),
+            );
+            let v = vel * 0.8 + back * fx.rng.range(4.0, 9.0) + fx.rng.dir() * 0.4;
+            let life = fx.rng.range(0.15, 0.35);
+            fx.spawn(Particle::new(
+                CHARGE_STREAK,
+                pose.transform_point(local),
+                v,
+                life,
+            ));
         }
         if started && !fx.calm {
             let flash = Look {
@@ -494,6 +598,14 @@ fn boost_flames(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn water_splashes_grow_with_speed() {
+        assert_eq!(splash_scale(0.0), 1.0);
+        assert!(splash_scale(12.0) < splash_scale(24.0));
+        assert!((splash_scale(FULL_SPLASH_UPS) - 4.0).abs() < 1e-5);
+        assert_eq!(splash_scale(500.0), 5.0, "capped");
+    }
 
     #[test]
     fn spark_colour_and_size_follow_the_charge_rate() {

@@ -113,6 +113,7 @@ pub(crate) struct Subject {
     pub pose: Transform,
     pub speed: f32,
     pub boosting: bool,
+    pub charging: bool,
     pub look_back: bool,
 }
 
@@ -281,6 +282,7 @@ impl Targets<'_, '_> {
             pose,
             speed: telemetry.map_or(0.0, |t| t.speed),
             boosting: telemetry.is_some_and(|t| t.boosting),
+            charging: telemetry.is_some_and(|t| t.charge_boost),
             look_back: control.is_some_and(|c| c.look_back),
         })
     }
@@ -361,7 +363,7 @@ pub(crate) fn follow_racers(
         pose.rotation *= shake::offset(&mut rig, frame.dt, shake_on);
         *transform = pose;
 
-        let target = widen_target(subject.speed, subject.boosting);
+        let target = widen_target(subject.speed, subject.boosting, subject.charging);
         rig.widen = damp(
             rig.widen,
             target,
@@ -400,6 +402,7 @@ mod tests {
             pose,
             speed: 0.0,
             boosting: false,
+            charging: false,
             look_back: false,
         }
     }

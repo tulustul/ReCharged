@@ -2,9 +2,11 @@
 //! racer and ghost proxy (and of the showroom's turntable via [`CarModel`]), recoloured with the
 //! chosen paint, lamps at art-bible levels (brake idle 0.2× → 1× when braking, headlights 0.3× by
 //! day), wheels from telemetry ([`wheels`]), a swaying antenna ([`antenna`]), Time Trial ghosts
-//! translucent and respawn ghosting blinking (GDD §5.4).
+//! translucent, respawn ghosting blinking (GDD §5.4) and status effects shown by the body's
+//! shader ([`status`]).
 
 mod antenna;
+mod status;
 mod wheels;
 
 use std::collections::HashMap;
@@ -19,6 +21,7 @@ use rc_core::prelude::*;
 use crate::content::{ContentLoad, is_night};
 use crate::lighting::{ActiveEnvironment, WarmupCamera};
 use crate::materials::MaterialLibrary;
+use status::CarBodyMaterial;
 
 /// Brake lamps when not braking, relative to the glb's "on" strength (art bible §1.2).
 const BRAKE_IDLE: f32 = 0.2;
@@ -73,6 +76,8 @@ pub(crate) struct CarParts {
     /// This instance's brake-lamp materials with their authored ("on") emission.
     brakes: Vec<(Handle<StandardMaterial>, LinearRgba)>,
     braking: bool,
+    /// This instance's body (`paint`, `paint_accent`) materials.
+    body: Vec<Handle<CarBodyMaterial>>,
 }
 
 /// Car scenes by car, kept for the app's lifetime (restarts and next races reuse them). Every
@@ -99,6 +104,7 @@ impl CarScenes {
 }
 
 pub(crate) fn build(app: &mut App) {
+    status::build(app);
     app.init_resource::<CarScenes>()
         .add_observer(attach_to_proxies)
         .add_observer(warm_up_cars)
@@ -115,6 +121,7 @@ pub(crate) fn build(app: &mut App) {
                     antenna::sway,
                     brake_lamps,
                     respawn_blink,
+                    status::shade,
                 )
                     .in_set(VisualSet),
             ),
@@ -141,6 +148,7 @@ fn attach_to_proxies(
                     paint: racer.paint,
                 },
                 DrivenBy(sim),
+                status::Flare::default(),
                 ChildOf(proxy),
             ));
         }
@@ -278,6 +286,7 @@ fn prepare_instance(
     env: Option<Res<ActiveEnvironment>>,
     mut library: ResMut<MaterialLibrary>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut bodies: ResMut<Assets<CarBodyMaterial>>,
     mut commands: Commands,
 ) {
     let root = ready.entity;
@@ -302,6 +311,8 @@ fn prepare_instance(
     let mut parts = CarParts::default();
     let mut made: HashMap<(AssetId<StandardMaterial>, &str), Handle<StandardMaterial>> =
         HashMap::new();
+    let mut made_bodies: HashMap<(AssetId<StandardMaterial>, &str), Handle<CarBodyMaterial>> =
+        HashMap::new();
     let mut sway = None;
     for entity in children.iter_descendants(root) {
         if let Ok((name, transform)) = nodes.get(entity) {
@@ -320,6 +331,35 @@ fn prepare_instance(
             ("paint_accent", Some(p)) => p.accent.clone(),
             _ => current.0.clone(),
         };
+        if matches!(role, "paint" | "paint_accent") {
+            // Per instance: the body shows this racer's status effects.
+            let key = (base.id(), role);
+            let handle = match made_bodies.get(&key) {
+                Some(h) => h.clone(),
+                None => {
+                    let Some(mut m) = materials.get(&base).cloned() else {
+                        continue;
+                    };
+                    if ghost {
+                        ghostify(&mut m);
+                    }
+                    let h = bodies.add(CarBodyMaterial {
+                        base: m,
+                        extension: default(),
+                    });
+                    parts.body.push(h.clone());
+                    made_bodies.insert(key, h.clone());
+                    h
+                }
+            };
+            let mut e = commands.entity(entity);
+            e.remove::<MeshMaterial3d<StandardMaterial>>()
+                .insert(MeshMaterial3d(handle));
+            if ghost {
+                e.insert(NotShadowCaster);
+            }
+            continue;
+        }
         let level = match role {
             "light_head" => Some(head),
             "light_brake" => Some(BRAKE_IDLE),

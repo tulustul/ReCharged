@@ -10,7 +10,7 @@ each `GameCamera`); it never writes simulation state.
 |---|---|
 | `particles.rs`, `pool.rs`, `fx.rs` | particle data & tag packing; emitter maths and the fixed-slot pool; the `Fx` context, slot entities, settings, sprites, zigzag helpers |
 | `assets.rs` | shared meshes/materials (particle quad + material, `BubbleMaterial`, item primitives, oil texture) |
-| `cars.rs`, `driving.rs`, `car_events.rs`, `skids.rs` | car geometry/poses; sparks, debris, boost; landing, impact, respawn, confetti, stun; skid marks |
+| `cars.rs`, `driving.rs`, `car_events.rs`, `skids.rs` | car geometry/poses; sparks, debris, water-body splashes, boost; landing, impact, respawn, confetti, stun; skid marks |
 | `items.rs`, `projectiles.rs`, `hazards.rs`, `blasts.rs` | cubes & Golden Battery; rocket, orb, leech, EMP wind-up; goo, oil, spring pad, shield; explosions, hits, Storm Strike |
 | `weather.rs`, `splashes.rs`, `lightning.rs`, `tags.rs` (+ `tags/markers.rs`) | per-camera precipitation; rain splashes; sky lightning; name tags & lock-on markers (colour-blind marker shapes) |
 | `warmup.rs` | one never-culled instance of every effect material in the menu and during Loading (pipeline warm-up) |
@@ -63,8 +63,9 @@ comes from telemetry (`forward_speed`, `speed × sin(slip)`).
 | Effect | Trigger | Look |
 |---|---|---|
 | Drift sparks | `drifting` and `charge_rate > 0` (sparks teach the mechanic) | streaks + hot spot at the rear contacts; colour amber → electric cyan → violet and width 0.035 → 0.1 u with `charge_rate / 0.22` (smoothed); rate 70–270/s per wheel |
-| Debris | grounded wheel, by surface & weather (`debris_for`) | dust + pebbles (dirt), grass chips (grass), mud blobs (wet dirt), spray + white sheets (water, wet hard floors), powder (snow cover), tyre smoke (hard floors, only while sliding) |
-| Boost | `boosting` | electric plasma jet + flame (Turbo Cell: warm palette), crawling arcs, start flash + ring |
+| Debris | grounded wheel, by surface & weather (`debris_for`) | dust + pebbles (dirt), grass chips (grass), mud blobs (wet dirt), spray + white sheets (water, wet hard floors; in a water body more and bigger with speed, `splash_scale` 1× crawling → 4× at 36 u/s), powder (snow cover), tyre smoke (hard floors, only while sliding) |
+| Water entry | a wheel reaches a water body (driving or landing in) | crown of drops, white sheets and a surface ring, all scaled by `splash_scale` |
+| Boost | `boosting` | electric plasma jet + flame (Turbo Cell: warm palette), crawling arcs, start flash + ring; spending charge (`charge_boost`): 2.2× flame and arcs plus energy streaks streaming off the whole body |
 | Landing | `CarLanded` ≥ 0.12 | radial puffs in the ground's colour; clean landing adds a cyan charge ring |
 | Impact | `CarImpact` ≥ 0.12 | sparks around the normal, flash for strong hits |
 | Respawn | `CarRespawned` | `ToTrack`: scan ring rising through the car, beam, converging sparkles; flip: sparkles |
@@ -88,7 +89,7 @@ and drawn at `ItemRadius` wherever a reach matters — **what you see is what tr
 | Goo Bomb | glossy slime blob on its carrier, red light blinking 1 s → 0.12 s as the fuse runs out, drips; last 2 s: red ring of the blast radius on the ground; blast: slime splatter across the radius |
 | Oil Slick | dark puddle with thin-film sheen (generated texture) at its radius; spreads in 0.4 s, shrinks over its last 1.5 s |
 | Spring Pad | rubber base, chrome coils, yellow plate, glowing ring at its radius; bounces (damped spring) + sparks when it launches someone; shrinks away over its last 1.5 s like a drying puddle (a used-up pad gets exactly that long) |
-| Shield Bubble | fresnel energy shell (`bubble.wesl`) around the car; flashes on blocked hits, blinks in the last 2 s, bursts into shards when it ends |
+| Shield Bubble | drawn by the car body's shader (rc_render `car_status.wesl`: cyan rim, flare on blocked hits, blink in the last 2 s); rc_vfx bursts it into shards when it ends |
 | Storm Strike | `HitEvent { by: StormStrike }`: jagged bolt (midpoint displacement) from 26 u above, branches, glow, flash, sparks |
 | Hits | orb / leech / EMP zaps, oil splashes, blue deflection sparks on blocked hits |
 
@@ -165,7 +166,7 @@ model has one), spark colour/size mapping, debris and mark tables, car velocity,
 on the wheel ray's plane (curb face, airborne fallback, mean plane), splashes on that plane and
 far ones snapped to Toy Town's banked, raised ribbon (none 3 u above it); skid ribbon
 building (joined segments, restart after jumps, cap keeps the newest, 2 triangles per segment,
-fading); goo blink period; bubble size; respawn pop; bolt paths; precipitation look (snow by
+fading); goo blink period; water splash scale; respawn pop; bolt paths; precipitation look (snow by
 `snowing`, density × setting × views, indoor → none, wind slant, night dimming), precipitation
 mesh, lightning flicker, layers; atlas rows/UVs, tag size and near fade, marker shapes; *Reduce flashing* dims the rocket,
 goo, EMP and Storm Strike blasts to ≤ 40 % of their peak. Headless ECS: a drifting racer emits
