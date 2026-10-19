@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`); v2.2 post-QA tuning: Toy Town and Wrench Works default to 4 laps (§7.1); Oil Slick / Spring Pad last 15 s, softer pad launch, Goo Bomb near-miss pass (§6.2); steering assist brakes before corners, relaxed throttle-only pace (§15) |
+| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`); v2.2 post-QA tuning: Toy Town and Wrench Works default to 4 laps (§7.1); Oil Slick / Spring Pad last 15 s, softer pad launch, Goo Bomb near-miss pass (§6.2); steering assist brakes before corners, relaxed throttle-only pace (§15); v2.3 post-final-QA: local players start behind the AI field (§3.2), Oil Slick / Spring Pad are used up after 3 cars (§6.2), AI steer around stopped cars (§8.1) |
 | Owner | Game designer / orchestrator |
 | Engine | Bevy 0.20, bevy-react 0.8.1 (UI), bevy_rapier3d 0.37 (physics), bevy_kira_audio 0.27 (audio) |
 | Companion docs | `docs/ARCHITECTURE.md` (technical design), `docs/PRACTICES.md` (engineering rules) |
@@ -114,6 +114,11 @@ effect — §10.2.)
    last 10 s are shown as "Race ends in 10…"; on expiry every unfinished racer is classified by
    progress with a projected time.
 5. **Results** (UI-13), then the mode's post-race flow (§3.3).
+
+**Grid.** AI rivals fill the front of the grid in a seeded order and the local players start
+behind them, as in most kart racers: a race is a climb through the field, and a human never
+leads a bunched pack from pole. Humans line up in slot order; from the second race of a Versus
+session on, in reverse order of the session points (the leader starts last).
 
 ### 3.3 Post-race flows [RACE-2]
 | Mode | Results actions | Notes |
@@ -265,8 +270,8 @@ Holding **Look back** while using an item fires it **backward** where noted.
 | **Shock Orb** | fire forward | Slow (24 u/s) plasma ball that **follows the track**, bouncing off walls; knocks any car within 3 u sideways + up. Lives 10 s or 3 hits; never hits its owner. | Steer around it |
 | **EMP Pulse** | instant | 0.4 s wind-up glow, then a 12 u radius pulse: other cars `PowerLoss(0)` for 2.0 s (steering works) and lose 50 % charge. | Keep distance, shield |
 | **Goo Bomb** | instant | Sticks to your car with a 6 s fuse and beeping; its carrier drives at 1.1× top speed. **Bump another car — or pass within 0.6 u of it — to pass it on** (once per approach; 0.5 s no-pass-back). Explodes: tumble everyone within 7 u, the carrier included. | Pass it on! |
-| **Oil Slick** | drop behind | 2.5 u puddle for 15 s; driving through: `Grip(0.2)` for 1.2 s + spin torque | Steer around |
-| **Spring Pad** | drop behind | 1.6 u springy pad for 15 s; a car crossing it is launched (up 8 u/s, forward 2 u/s, small random spin). Skilled players can turn the air into charge. | Steer around, shield |
+| **Oil Slick** | drop behind | 2.5 u puddle for 15 s, used up once it has caught 3 cars; driving through: `Grip(0.2)` for 1.2 s + spin torque | Steer around |
+| **Spring Pad** | drop behind | 1.6 u springy pad for 15 s, used up after 3 launches; a car crossing it is launched (up 8 u/s, forward 2 u/s, small random spin). Skilled players can turn the air into charge. | Steer around, shield |
 | **Shield Bubble** | instant | 10 s bubble (§5.5); bumping with it pushes others harder | — |
 | **Storm Strike** | instant | *Rare, positions 6–8 only.* Lightning hits every car ahead, one by one 0.25 s apart: `PowerLoss(0)` 1.5 s + small hop. | Shield |
 
@@ -333,7 +338,8 @@ Allowed presets:
 
 ### 8.1 Behaviour
 - Follow a precomputed **racing line** with a speed profile from curvature; each AI drives a
-  personal lateral offset for variety; overtakes by shifting lanes when blocked; avoids hazards
+  personal lateral offset for variety; overtakes by shifting lanes when blocked, and steers around
+  a stopped or crawling car like an obstacle instead of queuing behind it; avoids hazards
   (oil, spring pads, orbs) it can see; brakes for sharp turns; ignores small dynamic props.
 - Uses the charge boost on straights; drifts in long corners to charge.
 - Item use: rockets when a target is in the lock cone (backward when a car is close behind and
