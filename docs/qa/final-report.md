@@ -293,3 +293,12 @@ R4–R7 are polish, along with the still-open B36/B37 and B6 (a human listening 
 | Tied split, save toast | fixed in T22b: neutral "±0.00"; toasts sit halfway down the right edge |
 | Q6 (partly in T21) | closed by R1 |
 | Q21 (partly in T21) | closed by R3 |
+
+## 11. Final verification of the shipped build (after T22)
+Build 9d85d3d (code of 6761e4e), dev profile, isolated runs (`target/final/`):
+- `./tools/ci.sh`: pass (614 Rust tests, 39 UI tests, clippy, fmt, bindings, UI build).
+- Bench (1080p High): 1P 177–193 fps (max frame ≤ 15.2 ms), 2P 145–157, 3P 143, 4P 104–120 (max ≤ 14.1 ms),
+  storm night 1P 182 / 4P 104. Backyard Bash 1P is 177 fps (T21: 196): the players now start
+  behind the field, which the camera sees from the start. Every row is far above the targets (60 / 50 fps).
+- Input scripts: `smoke` ×2, `keyboard_only`, `gamepad_only`, `kb_modes`, `pad_modes`: all exit 0.
+- `every_layout`: 28/28 pass. Determinism: both tests pass.
