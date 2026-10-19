@@ -327,6 +327,19 @@ Allowed presets:
 - Laps count only if checkpoints were passed in order. Intentional shortcuts lie inside the
   checkpoint corridors.
 - **Wrong way** warning after 2 s driving against the track direction above 5 u/s.
+- **Lost** warning when a racer is outside the legal corridor for 0.5 s, or moves above 5 u/s with
+  less than 30 % of it along the track for 2 s (driving sideways, circling an open floor): an
+  arrow points back to the track (10 u ahead on the centreline); outside the corridor it also
+  counts down to the automatic respawn. Off again after 0.5 s back in the corridor making
+  progress. An automatic respawn says why it happened (off the track, fell, stuck).
+- **Way-finding** (generated for every layout from its corners, so reverse and mirror get their
+  own): where the ribbon is Invisible, the racing edges are taped onto the floor (themed:
+  blue painter's tape in the house, store-blue lane tape in the supermarket, hazard yellow in
+  the workshop, white line paint in the garden, orange chalk on the street) except along
+  barriers; before every corner of ≥ 40° a floor arrow bends its way (hairpins get two);
+  corners of ≥ 45° get chevron boards on the outside (one per 45°) facing the approaching cars;
+  where the floor runs on straight ahead of a corner past the legal corridor, a taped cross
+  closes it.
 - Barriers keep cars on track where needed (themed: foam bumpers, books, curbs, plastic toy-
   track walls, shelf edges, tyre walls). Open areas (lawns, floors) are drivable off the racing
   ribbon with their own surfaces; leaving them triggers the off-track rule (§5.4).
@@ -509,12 +522,20 @@ Per player viewport (compact layout in split-screen; scaled by *HUD scale*):
 - **Item slot** (top-right) with roulette animation.
 - **Speed** (digital, km/h or mph) and **Charge meter** (battery icon filling, glows when
   boost-ready, flashes while spending) — bottom-right.
-- **Minimap** (bottom-left; 1P and 2P; in 3P the fourth quadrant): track outline, racer dots in
-  their colours, own dot highlighted.
+- **Minimap** (bottom-left; 1P and 2P; in 3P the fourth quadrant): the track as a ribbon between
+  its racing edges with the start line and chevrons for the direction of travel, racer dots in
+  their colours. A player's own minimap is heading-up (it turns with their view), follows them
+  (about 150 u across), shows them as an arrow in the middle and highlights their next
+  checkpoint; the shared 3P map stays north-up and whole.
+- **Turn indicator** (top centre): the corner ahead from ≈ 2.5 s before it (30–90 u) until its
+  end — an arrow bending its way (slight, square, hairpin) coloured by how hard it is (white
+  easy, yellow medium, red sharp), with words outside compact views ("HAIRPIN LEFT", "SHARP
+  RIGHT", "LEFT", "EASY RIGHT"); hidden while lost or driving the wrong way.
 - **Warnings**: rocket lock-on arrow (direction of the incoming rocket), Goo Bomb fuse, shield
-  timer, wrong way.
+  timer, wrong way, lost ("THIS WAY" / "OFF TRACK" with an arrow to the track and the respawn
+  countdown, §7.3).
 - **Countdown**, **notifications** ("Hit by Spark Rocket — Mayhem", "Fastest lap!", "Golden
-  Battery found!"), **onboarding hints** (once each, setting): drift → charge, boost ready, item
+  Battery found!", "Off the track too long — put back"), **onboarding hints** (once each, setting): drift → charge, boost ready, item
   ready, "Hold Reset" after 3 s stuck, wrong way.
 - **Finish**: big "1st!" banner, then spectate hint; "Waiting for other players" (Versus);
   "Race ends in 10…" during the soft-lock guard.

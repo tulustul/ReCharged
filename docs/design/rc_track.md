@@ -274,7 +274,8 @@ usable without an `App`: `Track::load(assets_dir, &variant)` (e.g. from tools an
 | `checkpoint_of(s) -> usize` | last checkpoint at or before `s` (checkpoint 0 = start line at `s = 0`) |
 | `respawn_before(s, last_valid_checkpoint) -> Transform` | last respawn point at or before `s`, never past the next checkpoint still to validate |
 | `is_on_drivable(pos) -> bool` | over the ribbon (not Invisible, not a gap) or a ground polygon, from 1 u below to 3 u above it; props not counted |
-| `outline_2d() -> Vec<Vec2>`, `summary() -> TrackSummary` | minimap outline (x, z, every ≈ 2 u); the rc_core summary |
+| `outline_2d() -> Vec<Vec2>`, `edges_2d() -> Vec<[Vec2; 2]>`, `summary() -> TrackSummary` | minimap outline (x, z, every ≈ 2 u) and the racing edges (left, right) at the same points; the rc_core summary (+ checkpoint gates across the racing width and the corners) |
+| `turns() -> &[TrackTurn]` | corners in travel order: `{ start_s, span, right, angle (rad), severity 1–3 }` (see *Decisions*) |
 | `checkpoints() -> &[TrackFrame]` | ≥ 8 gates (position ± half width), sorted by `s` |
 | `respawn_points() -> &[RespawnPoint]` | `{ s, transform }` every ≈ 15 u and 6 u past every jump landing (`LANDING_RESPAWN_U`: a car that fails after the landing restarts there, not before the ramp where it may fail again — a loop seen on wrench_works), 0.5 u above the surface |
 | `grid() -> &[Transform]` | 8 poses, pole first, 2 staggered columns, 0.15 u above the surface |
@@ -320,6 +321,13 @@ usable without an `App`: `Track::load(assets_dir, &variant)` (e.g. from tools an
 - **Props in per-environment files** (orchestrator request): no write conflicts between
   environment agents; duplicates are load errors.
 - Build cost: toy_town builds in ≈ 40 ms (debug), well inside the 3 s loading budget.
+- **Corners** (`turns.rs`, for the HUD's turn indicator and rc_render's way-finding marks): the
+  centreline's heading change per sample seen from above (jumps fly straight), averaged over
+  ±3 u; a corner is a run turning one way faster than 1/40 rad/u (radius < 40 u), runs of the same
+  way closer than 4 u join, and it must turn ≥ 25°. Severity 3 (sharp) from 150° or a slowest
+  reference target speed under 50 % of top speed, 2 from 75° or under 75 %, else 1. Found per
+  variant, so mirror swaps every direction and reverse drives the same corners. `cargo test -p
+  rc_track print_corners -- --ignored --nocapture` lists them per track.
 
 ## Tests (`cargo test -p rc_track`)
 - Unit (per module): RON round-trip and terse syntax, field validation messages, `dir` filtering,
@@ -327,7 +335,10 @@ usable without an `App`: `Track::load(assets_dir, &variant)` (e.g. from tools an
   tangents, helix frames, loop rejection, triangulation (concave, both windings, degenerate,
   self-intersection), outward-facing swept profiles, UVs, racing line margins/locking/lap time,
   speed limits, curvature, prop catalog parsing/merging/duplicates, wedge orientation.
-- Pipeline (`src/tests.rs`): every track file in all four variants without lints; the sunken-edge
+- Pipeline (`src/tests.rs`): every track file in all four variants without lints; corners on
+  every track (their signed angles add up to whole turns — two on Toy Town, whose helix crosses
+  itself — mirror swaps their directions, reverse keeps their total, the summary carries them
+  with edges and gates); the sunken-edge
   lint on a 20°-banked oval over a mat (ribbon at y 0.3: both turns linted; at 1.85, the §A5
   height: clean; at 1.73, 0.08 u of lip left: linted); a respawn point follows every jump landing;
   loops close;

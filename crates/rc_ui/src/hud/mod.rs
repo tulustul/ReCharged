@@ -16,11 +16,12 @@ use rc_core::prelude::*;
 use crate::race::{UiMode, UiRacer};
 use crate::settings::UiSpeedUnit;
 
+mod nav;
 mod systems;
 mod view;
 
+pub use nav::MinimapFit;
 pub(crate) use view::HudView;
-pub use view::MinimapFit;
 
 /// Cadence of `race.hud`.
 const TICK: Duration = Duration::from_millis(100);
@@ -44,6 +45,10 @@ mirror_enum!(
     /// [`HintKind`].
     UiHint = HintKind { DriftCharge, BoostReady, ItemReady, HoldReset, WrongWay }
 );
+mirror_enum!(
+    /// [`RespawnCause`].
+    UiRespawnCause = RespawnCause { OffTrack, Fell, Stuck }
+);
 
 /// Bevy → React event `race.setup`: what the HUD draws for the whole attempt — racers (by grid
 /// index), minimap outline, laps — and the HUD settings; re-sent whenever one of them changes.
@@ -64,6 +69,14 @@ pub struct UiHudSetup {
     pub racers: Vec<UiRacer>,
     /// Minimap outline: x, y pairs in the 0–1 square (aspect kept, centred).
     pub outline: Vec<f32>,
+    /// Minimap left racing edge: x, y pairs at the outline's points.
+    pub left: Vec<f32>,
+    /// Minimap right racing edge: x, y pairs at the outline's points.
+    pub right: Vec<f32>,
+    /// Minimap checkpoint gates in order: x1, y1, x2, y2 each.
+    pub gates: Vec<f32>,
+    /// Magnification of each player's heading-up minimap over the whole-track square (≥ 1).
+    pub map_zoom: f32,
     /// Speed unit setting.
     pub speed_unit: UiSpeedUnit,
     /// HUD scale setting (0.75–1.25).
@@ -117,6 +130,27 @@ pub struct UiPlayerHud {
     pub goo: Option<f32>,
     /// Shield seconds left.
     pub shield: Option<f32>,
+    /// Lost (off the legal corridor or getting nowhere): the `guide` arrow points back.
+    pub lost: bool,
+    /// Seconds until the automatic off-track respawn, while it is pending.
+    pub respawn_in: Option<f32>,
+    /// The corner ahead (or being driven) for the turn indicator.
+    pub turn: Option<UiTurn>,
+    /// Next checkpoint to pass (index into the setup's gates).
+    pub next_gate: u8,
+}
+
+/// A corner for the turn indicator.
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct UiTurn {
+    /// Turns right.
+    pub right: bool,
+    /// 1 easy, 2 medium, 3 sharp.
+    pub severity: u8,
+    /// Heading change in whole degrees.
+    pub angle: u16,
 }
 
 /// Bevy → React event `race.hud`: every local player's HUD values, at most 10 Hz, only when
@@ -205,6 +239,13 @@ pub enum UiRaceEvent {
     MissedCheckpoint {
         /// Slot 0–3.
         slot: u8,
+    },
+    /// The car was put back on the track by itself.
+    Rescued {
+        /// Slot 0–3.
+        slot: u8,
+        /// Why.
+        cause: UiRespawnCause,
     },
     /// The soft-lock guard's last ten seconds.
     EndsIn {
@@ -303,6 +344,10 @@ pub struct UiPlayerValues {
     pub glow: SharedId,
     /// Direction of a rocket locked on this car: degrees clockwise from straight ahead.
     pub arrow: SharedId,
+    /// Direction back to the track (`RaceProgress::rejoin`): degrees clockwise from straight ahead.
+    pub guide: SharedId,
+    /// Rotation of the heading-up minimap: degrees clockwise (the player's view direction up).
+    pub heading: SharedId,
 }
 
 /// A minimap dot: position in the minimap's 0–1 square.

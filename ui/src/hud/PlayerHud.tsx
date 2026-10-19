@@ -1,6 +1,7 @@
 // One player's HUD inside their view (GDD §13): position, lap and times top-left, item top-right,
-// speed and charge bottom-right, minimap bottom-left (1P/2P), and a centre column for notices,
-// warnings, the countdown/banners and hints. Sizes follow the view (`hudLayout`) and HUD scale.
+// speed and charge bottom-right, the heading-up minimap bottom-left (1P/2P), and a centre column for
+// the turn indicator, notices, warnings, the countdown/banners (wrong way, lost) and hints. Sizes
+// follow the view (`hudLayout`) and HUD scale.
 import type { UiHudSetup, UiHudTick, UiRacePhase, UiViewport } from "../bevy";
 import { useStore } from "../state/useStore";
 import { Center } from "./Center";
@@ -12,6 +13,7 @@ import { Minimap } from "./Minimap";
 import { Notices } from "./Notices";
 import { Standing } from "./Standing";
 import { countdown, moments, notices, type Moments } from "./store";
+import { TurnNote, turnNoteHeight } from "./TurnNote";
 import type { Dot, PlayerValues } from "./values";
 import { Warnings } from "./Warnings";
 
@@ -33,6 +35,9 @@ export function PlayerHud({ view, setup, tick, values, dots, views, phase }: Pro
   const items = setup.items && setup.mode.kind !== "timeTrial";
   const waiting = finished && setup.mode.kind === "versus" && tick.players.some((x) => x.finishMs === null);
   const shownCount = count ? count.n : phase === "countdown" && tick.countdown > 0 ? tick.countdown : null;
+  const wrongWay = p.wrongWay && !finished;
+  const lost = p.lost && !wrongWay ? { guide: values.guide, respawnIn: p.respawnIn } : null;
+  const turn = phase === "racing" && !wrongWay && !lost ? p.turn : null;
   return (
     <node style={{ positionType: "absolute", left: rect.x, top: rect.y, width: rect.w, height: rect.h, overflowX: "clip", overflowY: "clip", border: views > 1 ? 1 : 0, borderColor: "rgba(0, 0, 0, 0.6)" }}>
       <node style={{ positionType: "absolute", left: pad, top: pad }}>
@@ -48,16 +53,30 @@ export function PlayerHud({ view, setup, tick, values, dots, views, phase }: Pro
       </node>
       {showMap && (
         <node style={{ positionType: "absolute", left: pad, bottom: pad }}>
-          <Minimap size={Math.round(Math.min(270 * k, rect.h * 0.42))} outline={setup.outline} racers={setup.racers} dots={dots} own={[p.racer]} k={k} markers={setup.colorblindMarkers} />
+          <Minimap
+            size={Math.round(Math.min(270 * k, rect.h * 0.42))}
+            lines={setup}
+            racers={setup.racers}
+            dots={dots}
+            own={[p.racer]}
+            k={k}
+            markers={setup.colorblindMarkers}
+            heading={values.heading}
+            zoom={setup.mapZoom}
+            gate={finished ? undefined : p.nextGate}
+          />
         </node>
       )}
       <node style={{ positionType: "absolute", left: 0, right: 0, top: Math.round(rect.h * (compact ? 0.06 : 0.08)), flexDirection: "column", alignItems: "center", gap: Math.round(12 * k) }}>
+        {/* Full views keep its place, so notices never jump when a corner comes up; compact ones
+            cannot spare the height above the centre banners. */}
+        {compact ? turn && <TurnNote turn={turn} k={k} compact /> : <node style={{ height: turnNoteHeight(k), alignItems: "center", justifyContent: "center" }}>{turn && <TurnNote turn={turn} k={k} compact={false} />}</node>}
         <Notices list={list} k={k} />
         <Warnings lockOn={p.lockOn} goo={p.goo} shield={p.shield} arrow={values.arrow} k={k} calm={calm} />
       </node>
       {/* Above the car (the chase camera keeps it in the middle of the view). */}
       <node style={{ positionType: "absolute", left: 0, right: 0, top: Math.round(rect.h * (compact ? 0.13 : 0.2)), flexDirection: "column", alignItems: "center" }}>
-        <Center count={shownCount} countId={count?.id ?? -tick.countdown} banner={m.banner} wrongWay={p.wrongWay && !finished} waiting={waiting} k={k} calm={calm} maxH={rect.h} />
+        <Center count={shownCount} countId={count?.id ?? -tick.countdown} banner={m.banner} wrongWay={wrongWay} lost={lost} waiting={waiting} k={k} calm={calm} maxH={rect.h} />
       </node>
       {/* Below the car, between the minimap and the gauges. */}
       <node style={{ positionType: "absolute", left: 0, right: 0, bottom: pad, flexDirection: "column", alignItems: "center" }}>

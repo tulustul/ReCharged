@@ -201,6 +201,13 @@ pub struct RaceProgress {
     pub last_valid_checkpoint: usize,
     /// Seconds off the drivable area.
     pub off_track_time: f32,
+    /// Lost (GDD §7.3): outside the legal corridor, or moving without getting anywhere along the
+    /// track; the HUD then points to `rejoin`. Never together with `wrong_way` (its own warning).
+    pub lost: bool,
+    /// Where to head to get back on the track: the centreline a little ahead of the car (world).
+    pub rejoin: Vec3,
+    /// Seconds until the automatic off-track respawn, while one is pending (outside the corridor).
+    pub respawn_in: Option<f32>,
 }
 
 /// Global state of the current attempt. Written only by rc_race; reset in `OnEnter(Setup)`.
@@ -309,12 +316,25 @@ pub enum RaceEventKind {
     MissedCheckpoint,
     /// Wrong-way warning on/off.
     WrongWay(bool),
+    /// The car was put back on the track without the player asking (GDD §5.4).
+    AutoRespawn(RespawnCause),
     /// The Golden Battery was collected.
     GoldenBattery,
     /// Soft-lock guard countdown (last 10 s).
     RaceEndsIn(u8),
     /// Show an onboarding hint.
     Hint(HintKind),
+}
+
+/// Why rc_race respawned a car by itself (GDD §5.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RespawnCause {
+    /// Off the track (outside the legal corridor or airborne) for too long.
+    OffTrack,
+    /// Fell below the kill height.
+    Fell,
+    /// Stuck: no speed with the throttle held.
+    Stuck,
 }
 
 /// A race happening (producer race; consumers ui, audio, game, vfx).

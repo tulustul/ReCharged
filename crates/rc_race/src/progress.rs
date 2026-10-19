@@ -16,6 +16,8 @@ use rc_core::prelude::*;
 use rc_track::{Track, TrackFrame};
 
 use crate::ghost::GhostRun;
+use crate::lost::{Lost, REJOIN_AHEAD_U};
+use crate::recovery::OFF_TRACK_DEPTH_U;
 use crate::spawn::autopilot;
 
 /// A crossing counts only this close to the gate plane along the track (u): a car moves < 1 u
@@ -78,6 +80,10 @@ pub(crate) struct Tracker {
     pub crossings: usize,
     /// Wrong-way warning.
     pub wrong_way: WrongWay,
+    /// Lost warning.
+    pub lost: Lost,
+    /// Position of the latest tick (the lost rule's speed).
+    pub pos: Option<Vec3>,
     /// The gate whose missed pass was reported; re-armed once the car is back behind it (so a
     /// car jittering on the gate line outside the gate reports it once).
     pub missed: Option<usize>,
@@ -140,17 +146,31 @@ impl Tracker {
         let hint = self.s.filter(|_| !tick.teleported);
         let tp = track.project(tick.pos, hint);
         (self.s, self.lateral, self.height) = (Some(tp.s), tp.lateral, tp.height);
+        let last_pos = self.pos.replace(tick.pos).filter(|_| hint.is_some());
         if progress.finished {
             return;
         }
+        progress.rejoin = track.frame_at(tp.s + REJOIN_AHEAD_U).position;
         let cps = track.checkpoints();
         let length = track.length();
+        if !tick.racing || hint.is_none() {
+            self.lost = Lost::default();
+            progress.lost = false;
+        }
         if let (true, Some(s0)) = (tick.racing, hint) {
             let d = track.delta_s(s0, tp.s);
             if let Some(on) = self.wrong_way.step(d / SIM_DT) {
                 progress.wrong_way = on;
                 emit(Happening::WrongWay(on));
             }
+            let frame = track.frame_at(tp.s);
+            let outside = tp.lateral.abs() > frame.half_width + frame.offroad_margin
+                || tp.height < -OFF_TRACK_DEPTH_U;
+            let speed = last_pos.map_or(0.0, |p| p.distance(tick.pos) / SIM_DT);
+            if progress.wrong_way {
+                self.lost = Lost::default();
+            }
+            progress.lost = !progress.wrong_way && self.lost.step(outside, speed, d / SIM_DT);
             if self
                 .missed
                 .is_some_and(|m| track.delta_s(tp.s, cps[m].s) > GATE_DEPTH_U)
@@ -228,6 +248,7 @@ impl Tracker {
         });
         if progress.lap >= tick.laps {
             progress.finished = true;
+            progress.lost = false;
             self.finish = Some(tick.now);
             return true;
         }
@@ -526,10 +547,34 @@ pub(crate) mod tests {
         assert!(car.events.contains(&Happening::WrongWay(true)));
         assert!(car.progress.total_distance < before);
         assert_eq!(car.progress.last_valid_checkpoint, validated);
+        assert!(!car.progress.lost, "backwards is wrong way, not lost");
         car.drive(0.4, 10.0, 0.0);
         assert!(car.progress.wrong_way, "hysteresis: still on");
         car.drive(0.2, 10.0, 0.0);
         assert!(!car.progress.wrong_way);
+    }
+
+    #[test]
+    fn leaving_the_corridor_is_lost_and_points_back_ahead() {
+        let track = track(false);
+        let mut car = Drive::new(&track);
+        car.drive(2.0, 30.0, 0.0);
+        assert!(!car.progress.lost);
+        let f = track.frame_at(car.s);
+        let wide = f.half_width + f.offroad_margin + 3.0;
+        car.drive(0.4, 30.0, wide);
+        assert!(!car.progress.lost, "not before 0.5 s outside");
+        car.drive(0.2, 30.0, wide);
+        assert!(car.progress.lost);
+        let ahead = track.frame_at(car.s + 10.0).position;
+        assert!(
+            car.progress.rejoin.distance(ahead) < 0.5,
+            "the centreline ahead"
+        );
+        car.drive(0.4, 30.0, 0.0);
+        assert!(car.progress.lost, "hysteresis: still on");
+        car.drive(0.2, 30.0, 0.0);
+        assert!(!car.progress.lost, "found again");
     }
 
     #[test]

@@ -15,6 +15,11 @@
         "trim": (set: Some("concrete"), color: (0.75, 0.42, 0.3)),
         "wall": (set: Some("plywood"), color: (0.62, 0.52, 0.42), roughness: 1.2),
         "ribbon_side": (set: Some("dirt"), color: (0.9, 0.9, 0.9)),
+        // Way-finding (GDD §7.3): white line paint on the grass, plywood boards with white
+        // chevrons.
+        "guide_tape": (color: (0.95, 0.95, 0.92), roughness: 0.85, variation: 0.1, emissive: (0.02, 0.02, 0.02)),
+        "guide_board": (set: Some("plywood"), color: (0.85, 0.75, 0.62)),
+        "guide_chevron": (color: (0.95, 0.95, 0.92), roughness: 0.6, variation: 0.0, emissive: (0.12, 0.12, 0.115)),
     },
     surfaces: { Wood: "deck" },
     morning: (

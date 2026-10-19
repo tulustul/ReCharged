@@ -1,13 +1,13 @@
-// HUD demo scenes for screenshots (`RECHARGED_UI_SCRIPT`: `demo hud [1-4] [racing|warnings|roulette|
-// finish|tt|countdown]`). Over a real race the real views, racers and outline stay; without one the
+// HUD demo scenes for screenshots (`RECHARGED_UI_SCRIPT`: `demo hud [1-4] [racing|warnings|nav|
+// roulette|finish|tt|countdown]`; `nav`: a sharp corner ahead, lost, off the track, wrong way). Over a real race the real views, racers and outline stay; without one the
 // scene brings its own. While `demoMode` is on the feed leaves these stores alone.
 import type { UiHudSetup, UiHudTick, UiPlayerHud, UiRacer, UiRaceEvent } from "../bevy";
 import { slotColor } from "../theme/tokens";
 import { countdown, hudSetup, hudTick, hudViews, liveSetup, onRaceEvent, resetMoments } from "./store";
 import { demoValues, MAX_PLAYERS, type DemoValues } from "./values";
 
-export type HudScene = "racing" | "warnings" | "roulette" | "finish" | "tt" | "countdown";
-const SCENES: HudScene[] = ["racing", "warnings", "roulette", "finish", "tt", "countdown"];
+export type HudScene = "racing" | "warnings" | "nav" | "roulette" | "finish" | "tt" | "countdown";
+const SCENES: HudScene[] = ["racing", "warnings", "nav", "roulette", "finish", "tt", "countdown"];
 
 const RIVALS = ["Mayhem", "Dash", "Penny", "Turbo Tom", "Glitch", "Rusty", "Nova"];
 const RIVAL_COLORS: [number, number, number][] = [
@@ -72,10 +72,21 @@ function player(slot: number, racer: number, i: number, scene: HudScene): UiPlay
     lockOn: false,
     goo: null,
     shield: null,
+    lost: false,
+    respawnIn: null,
+    turn: ([{ right: true, severity: 2, angle: 88 }, null, { right: false, severity: 1, angle: 34 }, null] as const)[i] ?? null,
+    nextGate: 3 + i,
   };
   switch (scene) {
     case "warnings":
       return { ...base, lockOn: i === 0, goo: i === 1 ? 2.4 : null, shield: i === 2 || i === 0 ? 6.2 : null, wrongWay: i === 3, roulette: false, item: base.item ?? "gooBomb" };
+    case "nav":
+      return [
+        { ...base, turn: { right: false, severity: 3, angle: 178 } },
+        { ...base, lost: true, turn: null },
+        { ...base, lost: true, respawnIn: 1.6, turn: null, kmh: 18 },
+        { ...base, wrongWay: true, turn: null },
+      ][i] ?? base;
     case "roulette":
       return { ...base, item: null, roulette: true, lap: 3 };
     case "finish":
@@ -106,6 +117,8 @@ function events(slots: number[], scene: HudScene): UiRaceEvent[] {
         { kind: "hit", slot: c, by: "sparkRocket", attacker: "Penny", blocked: true },
         { kind: "missedCheckpoint", slot: a },
       ];
+    case "nav":
+      return [{ kind: "rescued", slot: b, cause: "offTrack" }];
     case "roulette":
       return [
         { kind: "finalLap", slot: a },
@@ -143,6 +156,10 @@ export function demoHud(arg: string): "racing" | "countdown" {
     ghost: scene === "tt",
     racers: scene === "tt" ? racers.filter((r) => r.slot !== null).slice(0, 1) : racers,
     outline: base && base.outline.length >= 4 ? base.outline : sampleOutline(),
+    left: base?.left ?? [],
+    right: base?.right ?? [],
+    gates: base?.gates ?? [],
+    mapZoom: base?.mapZoom ?? 1,
     speedUnit: base?.speedUnit ?? "kmh",
     hudScale: base?.hudScale ?? 1,
     minimap: true,
@@ -166,7 +183,14 @@ export function demoHud(arg: string): "racing" | "countdown" {
   const pts = setup.outline;
   const n = pts.length / 2;
   const values: DemoValues = {
-    players: Array.from({ length: MAX_PLAYERS }, (_, i) => ({ speed: [35, 28, 39, 12][i] ?? 30, charge: tick.players[i]?.charge ?? 0.5, glow: [0.7, 0, 0.3, 0][i] ?? 0, arrow: 140 })),
+    players: Array.from({ length: MAX_PLAYERS }, (_, i) => ({
+      speed: [35, 28, 39, 12][i] ?? 30,
+      charge: tick.players[i]?.charge ?? 0.5,
+      glow: [0.7, 0, 0.3, 0][i] ?? 0,
+      arrow: 140,
+      guide: [0, 115, -70, 180][i] ?? 0,
+      heading: [0, 35, -50, 120][i] ?? 0,
+    })),
     dots: setup.racers.map((_, i) => {
       const at = Math.floor(((0.12 + i * 0.075) % 1) * n) * 2;
       return [pts[at] ?? 0.5, pts[at + 1] ?? 0.5];

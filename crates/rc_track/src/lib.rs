@@ -29,6 +29,7 @@ mod racing;
 mod spawn;
 mod spline;
 mod track;
+mod turns;
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
@@ -47,6 +48,7 @@ pub use props::{MAX_DYNAMIC_PROPS, PROPS_DIR, Primitive, PropCatalog, PropDef};
 pub use racing::{LINE_MARGIN_U, LOCKED_OFFSET_U, SpeedModel};
 pub use spline::{MIN_UP_Y, SAMPLE_SPACING_U};
 pub use track::*;
+pub use turns::{MERGE_U, MIN_ANGLE_DEG, MIN_TURN_RATE, SMOOTH_U};
 
 /// Loading-gate key of this crate.
 pub const LOADING_KEY: &str = "track";

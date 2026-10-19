@@ -141,11 +141,33 @@ pub struct Prop {
     pub dynamic: bool,
 }
 
+/// A corner of the layout (found by rc_track from the centreline's heading): the HUD's turn
+/// indicator and the turn signs along the track.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct TrackTurn {
+    /// Arc length where the turn starts (u, from the start line in the travel direction).
+    pub start_s: f32,
+    /// Arc length it lasts (u); `start_s + span` may run past the start line.
+    pub span: f32,
+    /// Turns right (seen from above, in the travel direction).
+    pub right: bool,
+    /// Heading change (radians, positive).
+    pub angle: f32,
+    /// How hard: 1 easy, 2 medium, 3 sharp (a hairpin or a hard stop).
+    pub severity: u8,
+}
+
 /// Track facts for UI and records. Written by rc_track when the track is built (session resource).
 #[derive(Resource, Debug, Clone, Default, PartialEq)]
 pub struct TrackSummary {
     /// Top-down centreline outline (world X/Z) for the minimap.
     pub outline_2d: Vec<Vec2>,
+    /// The racing edges (world X/Z: left, right) at the `outline_2d` points.
+    pub edges_2d: Vec<[Vec2; 2]>,
+    /// Checkpoint gates across the racing width (world X/Z: left, right end), in order.
+    pub gates_2d: Vec<[Vec2; 2]>,
+    /// Corners in travel order.
+    pub turns: Vec<TrackTurn>,
     /// Lap length in u.
     pub length: f32,
     /// Number of checkpoints per lap.

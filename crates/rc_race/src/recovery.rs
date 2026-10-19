@@ -39,7 +39,7 @@ const UPSIDE_DOWN_UP_DOT: f32 = 0.3;
 /// A flipped car is put back this much higher (u).
 const FLIP_LIFT_U: f32 = 0.5;
 /// More than this below the surface it follows counts as off the track (fell off, u).
-const OFF_TRACK_DEPTH_U: f32 = 3.0;
+pub(crate) const OFF_TRACK_DEPTH_U: f32 = 3.0;
 /// Ghosting after every respawn (GDD §5.4).
 const RESPAWN_GHOST: Effect = Effect::Ghost { secs: 1.5 };
 
@@ -68,6 +68,8 @@ pub(crate) struct Recovery {
     pub stuck: u32,
     /// Ticks until the next respawn may happen.
     cooldown: u32,
+    /// Why this tick's respawn happened by itself (`None`: none, or the player asked).
+    pub auto: Option<RespawnCause>,
 }
 
 impl Recovery {
@@ -91,19 +93,33 @@ impl Recovery {
             }
             (self.held, self.hold_fired) = (0, false);
         }
-        let off_limit = if s.assist {
-            OFF_TRACK_ASSIST_TICKS
+        let cause = if s.below_kill {
+            Some(RespawnCause::Fell)
+        } else if self.off_track > off_track_limit(s.assist) {
+            Some(RespawnCause::OffTrack)
+        } else if self.stuck >= STUCK_TICKS {
+            Some(RespawnCause::Stuck)
         } else {
-            OFF_TRACK_TICKS
+            None
         };
-        let automatic = s.below_kill || self.off_track > off_limit || self.stuck >= STUCK_TICKS;
-        if automatic && ready {
+        self.auto = None;
+        if let (Some(cause), true) = (cause, ready) {
+            self.auto = kind.is_none().then_some(cause);
             kind = Some(RespawnKind::ToTrack);
         }
         if kind.is_some() {
             (self.cooldown, self.off_track, self.stuck) = (COOLDOWN_TICKS, 0, 0);
         }
         kind
+    }
+}
+
+/// Ticks off the track before the automatic respawn.
+fn off_track_limit(assist: bool) -> u32 {
+    if assist {
+        OFF_TRACK_ASSIST_TICKS
+    } else {
+        OFF_TRACK_TICKS
     }
 }
 
@@ -135,6 +151,7 @@ pub(crate) fn decide_respawns(
     mut racers: Query<RecoveryItem>,
     mut respawns: MessageWriter<RespawnCar>,
     mut effects: MessageWriter<ApplyEffect>,
+    mut events: MessageWriter<RaceEvent>,
 ) {
     let Some(track) = track else {
         return;
@@ -147,13 +164,13 @@ pub(crate) fn decide_respawns(
             continue;
         };
         let frame = track.frame_at(s);
+        let outside = tracker.lateral.abs() > frame.half_width + frame.offroad_margin
+            || tracker.height < -OFF_TRACK_DEPTH_U;
         let signals = Signals {
             reset_held: control.reset_held,
             upside_down: telemetry.up_dot < UPSIDE_DOWN_UP_DOT,
             below_kill: transform.translation.y < track.kill_height(),
-            off_track: telemetry.grounded_wheels == 0
-                || tracker.lateral.abs() > frame.half_width + frame.offroad_margin
-                || tracker.height < -OFF_TRACK_DEPTH_U,
+            off_track: telemetry.grounded_wheels == 0 || outside,
             stuck: telemetry.speed < STUCK_SPEED_UPS && control.throttle >= STUCK_THROTTLE,
             assist: assist && who == (true, false),
         };
@@ -161,6 +178,19 @@ pub(crate) fn decide_respawns(
         let off_time = ticks_to_secs(recovery.off_track);
         if progress.off_track_time != off_time {
             progress.off_track_time = off_time;
+        }
+        // Only leaving the corridor counts down on the HUD (a jump's air time would flicker it).
+        let respawn_in = (outside && recovery.off_track > 0).then(|| {
+            ticks_to_secs(off_track_limit(signals.assist).saturating_sub(recovery.off_track))
+        });
+        if progress.respawn_in != respawn_in {
+            progress.respawn_in = respawn_in;
+        }
+        if let Some(cause) = recovery.auto {
+            events.write(RaceEvent {
+                racer: Some(car),
+                kind: RaceEventKind::AutoRespawn(cause),
+            });
         }
         let Some(kind) = decision else {
             continue;
@@ -222,6 +252,13 @@ mod tests {
     #[test]
     fn holding_respawns_once_after_point_four_seconds() {
         let mut r = Recovery::default();
+        let mut causes = Vec::new();
+        for _ in 0..30 {
+            r.step(HELD);
+            causes.extend(r.auto);
+        }
+        assert!(causes.is_empty(), "the player asked: no automatic cause");
+        let mut r = Recovery::default();
         assert_eq!(run(&mut r, HELD, 200), [(23, RespawnKind::ToTrack)]);
         let released = Signals {
             upside_down: true,
@@ -238,6 +275,7 @@ mod tests {
             ..IDLE
         };
         assert_eq!(r.step(kill), Some(RespawnKind::ToTrack));
+        assert_eq!(r.auto, Some(RespawnCause::Fell));
         // Still below the kill height (the teleport is pending): waits for the 2 s cooldown.
         assert_eq!(run(&mut r, kill, 200), [(119, RespawnKind::ToTrack)]);
         run(&mut r, HELD, 5);
@@ -258,7 +296,9 @@ mod tests {
             off_track: true,
             ..IDLE
         };
-        assert_eq!(run(&mut Recovery::default(), off, 400)[0].0, 180, "> 3 s");
+        let mut r = Recovery::default();
+        assert_eq!(run(&mut r, off, 181)[0].0, 180, "> 3 s");
+        assert_eq!(r.auto, Some(RespawnCause::OffTrack));
         let assisted = Signals {
             assist: true,
             ..off
@@ -276,7 +316,10 @@ mod tests {
         assert_eq!(run(&mut r, stuck, 239), []);
         assert_eq!(r.stuck, 239);
         assert_eq!(r.step(stuck), Some(RespawnKind::ToTrack), "4 s");
+        assert_eq!(r.auto, Some(RespawnCause::Stuck));
         assert_eq!(r.stuck, 0, "timers restart after a respawn");
+        r.step(IDLE);
+        assert_eq!(r.auto, None, "only the respawn's tick carries a cause");
         let mut r = Recovery::default();
         run(&mut r, off, 150);
         r.step(IDLE);

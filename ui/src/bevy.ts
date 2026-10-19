@@ -697,6 +697,22 @@ racers: Array<UiRacer>,
  */
 outline: Array<number>, 
 /**
+ * Minimap left racing edge: x, y pairs at the outline's points.
+ */
+left: Array<number>, 
+/**
+ * Minimap right racing edge: x, y pairs at the outline's points.
+ */
+right: Array<number>, 
+/**
+ * Minimap checkpoint gates in order: x1, y1, x2, y2 each.
+ */
+gates: Array<number>, 
+/**
+ * Magnification of each player's heading-up minimap over the whole-track square (≥ 1).
+ */
+mapZoom: number, 
+/**
  * Speed unit setting.
  */
 speedUnit: UiSpeedUnit, 
@@ -1010,7 +1026,23 @@ goo: number | null,
 /**
  * Shield seconds left.
  */
-shield: number | null, };
+shield: number | null, 
+/**
+ * Lost (off the legal corridor or getting nowhere): the `guide` arrow points back.
+ */
+lost: boolean, 
+/**
+ * Seconds until the automatic off-track respawn, while it is pending.
+ */
+respawnIn: number | null, 
+/**
+ * The corner ahead (or being driven) for the turn indicator.
+ */
+turn: UiTurn | null, 
+/**
+ * Next checkpoint to pass (index into the setup's gates).
+ */
+nextGate: number, };
 export type UiPlayerValues = { 
 /**
  * Slot 0–3.
@@ -1031,7 +1063,15 @@ glow: number,
 /**
  * Direction of a rocket locked on this car: degrees clockwise from straight ahead.
  */
-arrow: number, };
+arrow: number, 
+/**
+ * Direction back to the track (`RaceProgress::rejoin`): degrees clockwise from straight ahead.
+ */
+guide: number, 
+/**
+ * Rotation of the heading-up minimap: degrees clockwise (the player's view direction up).
+ */
+heading: number, };
 export type UiProfile = { 
 /**
  * Unlocked content.
@@ -1122,7 +1162,15 @@ slot: number, } | { "kind": "missedCheckpoint",
 /**
  * Slot 0–3.
  */
-slot: number, } | { "kind": "endsIn", 
+slot: number, } | { "kind": "rescued", 
+/**
+ * Slot 0–3.
+ */
+slot: number, 
+/**
+ * Why.
+ */
+cause: UiRespawnCause, } | { "kind": "endsIn", 
 /**
  * Seconds left.
  */
@@ -1283,6 +1331,7 @@ w: number,
  * Height.
  */
 h: number, };
+export type UiRespawnCause = "offTrack" | "fell" | "stuck";
 export type UiResultEntry = { 
 /**
  * Final position, 1-based.
@@ -1506,6 +1555,19 @@ weather: Array<UiWeatherKind>,
  */
 unlock: UiUnlockRule, };
 export type UiTrophy = "bronze" | "silver" | "gold";
+export type UiTurn = { 
+/**
+ * Turns right.
+ */
+right: boolean, 
+/**
+ * 1 easy, 2 medium, 3 sharp.
+ */
+severity: number, 
+/**
+ * Heading change in whole degrees.
+ */
+angle: number, };
 export type UiUnlock = { 
 /**
  * What unlocks.

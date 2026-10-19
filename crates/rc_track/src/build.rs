@@ -15,6 +15,7 @@ use crate::mesh::{ground_mesh, self_intersects, style_profile};
 use crate::props::{MAX_DYNAMIC_PROPS, PropCatalog};
 use crate::spline::{Centreline, Sample, centreline};
 use crate::track::*;
+use crate::turns::turns;
 
 /// Barrier thickness (u; the spec asks for ≥ 0.5 so fast cars cannot tunnel).
 pub const WALL_THICKNESS_U: f32 = 0.6;
@@ -107,6 +108,7 @@ impl Track {
             ground,
             shortcuts: Vec::new(),
             jumps: Vec::new(),
+            turns: Vec::new(),
             golden_battery: layout.golden_battery,
             kill_height: layout.kill_height,
             wall_height: layout.wall_height,
@@ -121,6 +123,7 @@ impl Track {
             .collect();
         track.place(&layout, &gaps)?;
         track.fit_racing_line(&gaps);
+        track.turns = turns(&track.nodes, track.ds);
         track.jumps = layout
             .gaps
             .iter()

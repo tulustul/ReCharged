@@ -1,6 +1,7 @@
 // Per-frame HUD visuals as shared values (zero bridge traffic per frame): React creates them once,
-// sends their ids with `hud.bind`, and rc_ui writes them every frame — speed, charge, charging glow
-// and the rocket arrow per player, a minimap dot per racer. Demo scenes write them from JS instead.
+// sends their ids with `hud.bind`, and rc_ui writes them every frame — speed, charge, charging glow,
+// the rocket arrow, the way back to the track and the minimap heading per player, a minimap dot per
+// racer. Demo scenes write them from JS instead.
 import { useEffect } from "react";
 import { useSharedValue, type SharedValue } from "bevy-react";
 
@@ -12,19 +13,19 @@ export const MAX_RACERS = 8;
 /** Speed (u/s) that fills the speed bar: the fastest car's top speed × the 1.5 boost cap. */
 export const GAUGE_MAX = 54;
 
-export type PlayerValues = { speed: SharedValue; charge: SharedValue; glow: SharedValue; arrow: SharedValue };
+export type PlayerValues = { speed: SharedValue; charge: SharedValue; glow: SharedValue; arrow: SharedValue; guide: SharedValue; heading: SharedValue };
 export type Dot = { x: SharedValue; y: SharedValue };
 export type HudValues = { players: PlayerValues[]; dots: Dot[] };
 
 /** Values a demo scene shows (Rust does not drive them then). */
-export type DemoValues = { players: { speed: number; charge: number; glow: number; arrow: number }[]; dots: [number, number][] };
+export type DemoValues = { players: { speed: number; charge: number; glow: number; arrow: number; guide: number; heading: number }[]; dots: [number, number][] };
 export const demoValues = hmrSingleton("__rc_hud_demoValues", () => createStore<DemoValues | null>(null));
 
 // The loops below always run the same number of times, so the hook order is stable.
 function usePlayers(): PlayerValues[] {
   const players: PlayerValues[] = [];
   for (let i = 0; i < MAX_PLAYERS; i++) {
-    players.push({ speed: useSharedValue(0), charge: useSharedValue(0), glow: useSharedValue(0), arrow: useSharedValue(0) });
+    players.push({ speed: useSharedValue(0), charge: useSharedValue(0), glow: useSharedValue(0), arrow: useSharedValue(0), guide: useSharedValue(0), heading: useSharedValue(0) });
   }
   return players;
 }
@@ -48,6 +49,8 @@ export function useHudValues(demo: DemoValues | null): HudValues {
         v.charge.value = p.charge;
         v.glow.value = p.glow;
         v.arrow.value = p.arrow;
+        v.guide.value = p.guide;
+        v.heading.value = p.heading;
       });
       demo.dots.forEach(([x, y], i) => {
         if (!dots[i]) return;
@@ -57,7 +60,7 @@ export function useHudValues(demo: DemoValues | null): HudValues {
       return;
     }
     bevy.hud.bind({
-      players: players.map((p, slot) => ({ slot, speed: p.speed.id, charge: p.charge.id, glow: p.glow.id, arrow: p.arrow.id })),
+      players: players.map((p, slot) => ({ slot, speed: p.speed.id, charge: p.charge.id, glow: p.glow.id, arrow: p.arrow.id, guide: p.guide.id, heading: p.heading.id })),
       dots: dots.map((d) => ({ x: d.x.id, y: d.y.id })),
     });
     return () => bevy.hud.unbind(null);

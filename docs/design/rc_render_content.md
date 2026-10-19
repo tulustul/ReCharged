@@ -52,6 +52,23 @@ on which cars a session showed).
   | `house` | 0.6 u, 0.02 gaps | `book_red/cream/green/blue/mustard/cream` (book rows; env materials) |
   | `supermarket` | 6 u, no gaps | role `barrier` (one painted-steel kick plate, #8E959C) |
   | others | the collider sweep | role `barrier` |
+- **Way-finding marks** (`guides.rs`, GDD §7.3; decorative, no colliders, per layout from
+  `Track::turns()`): **tape** (0.5 u) along both racing edges where the ribbon is Invisible, both
+  tape edges lie on the same floor polygon (within 0.12 u of the surface) and no barrier stands;
+  **floor arrows** 5 u long ending 5 u before every corner of ≥ 40° (sharp ones: a second 14 u
+  earlier), in the HUD turn icon's shape, on the floor or the ribbon top, all or nothing;
+  **chevron boards** (2.2 × 1.32 u, two chevrons pointing the corner's way, on a post down to the
+  floor below) on the outside of corners of ≥ 45°, one per 45° (≤ 4), facing the centreline 15 u
+  before them — behind a barrier and above it, beside a raised ribbon 1 u past its lip, on open
+  floors at the corridor's edge (≤ 8 u out) pulled in 1 u at a time (≥ 1.4 u) until no prop
+  collider, room wall or other part of the track is within 1 u; **crosses** (3 u) where the ray
+  straight ahead of a corner leaves the legal corridor over open floor without a barrier, 1.5 u
+  past its edge. Roles `guide_tape` (tape, arrows, crosses; no shadows), `guide_board` (boards,
+  posts), `guide_chevron` — built-ins white / black / yellow with a little glow (`emissive`, not
+  scaled by exposure, so they read at night); environments retheme them: blue painter's tape and
+  cardboard boards (house), store-blue tape and white boards with red chevrons (supermarket),
+  hazard yellow (workshop), white line paint and plywood boards (garden), orange chalk (street),
+  red toy boards (toy store).
 - **Room shell** (`shell.rs`): wall inner faces stand exactly on `Track::bounds()` (the collider
   shell), 1 u thick; ceiling at `ActiveEnvironment.def.room.height`. Window openings from
   `room.windows` are cut by splitting each wall into solid pieces (`wall_pieces`, tested); frames

@@ -83,7 +83,7 @@ pub(crate) fn block_style(environment: &str) -> Option<BlockStyle> {
 
 /// Where rc_track stands its barriers (`docs/design/rc_track.md`, ribbon styles): the inner
 /// face's reach beyond the half width, and the depth below the driving surface.
-fn wall_edge(style: RibbonStyle) -> (f32, f32) {
+pub(super) fn wall_edge(style: RibbonStyle) -> (f32, f32) {
     match style {
         RibbonStyle::ToyTrack => (0.35, 0.25),
         RibbonStyle::Asphalt => (0.9, 0.3),
@@ -93,7 +93,7 @@ fn wall_edge(style: RibbonStyle) -> (f32, f32) {
 }
 
 /// Maximal runs `(first sample, sample count)` of a cyclic flag over `n` samples.
-fn runs(n: usize, has: impl Fn(usize) -> bool) -> Vec<(usize, usize)> {
+pub(super) fn runs(n: usize, has: impl Fn(usize) -> bool) -> Vec<(usize, usize)> {
     let Some(start) = (0..n).find(|&i| has(i) && !has((i + n - 1) % n)) else {
         return if n > 0 && has(0) {
             vec![(0, n)]
@@ -194,7 +194,7 @@ pub(crate) fn block_meshes(track: &Track, style: &BlockStyle) -> Vec<MeshData> {
     out
 }
 
-fn append(dst: &mut MeshData, src: MeshData) {
+pub(super) fn append(dst: &mut MeshData, src: MeshData) {
     let base = dst.positions.len() as u32;
     dst.positions.extend(src.positions);
     dst.normals.extend(src.normals);

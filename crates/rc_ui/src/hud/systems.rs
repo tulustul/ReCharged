@@ -6,7 +6,8 @@ use bevy_react::animations::{SharedId, SharedValues};
 use bevy_react::prelude::*;
 use rc_core::prelude::*;
 
-use super::view::{MinimapFit, race_event};
+use super::nav::{MinimapFit, bearing_from, map_rotation};
+use super::view::race_event;
 use super::{HudBindings, HudView, UiHudSetup, UiHudTick, UiRaceEvent, UiViewports};
 
 /// Charge gain (meter per second) that lights the charging glow fully (drift alone peaks at 0.22).
@@ -19,6 +20,7 @@ type RacerPose = (
     &'static Transform,
     &'static VehicleTelemetry,
     &'static Charge,
+    &'static RaceProgress,
     Option<&'static LocalPlayer>,
 );
 
@@ -115,6 +117,7 @@ pub(super) fn drive_values(
     summary: Option<Res<TrackSummary>>,
     racers: Query<RacerPose>,
     rockets: Query<(&Projectile, &ItemTarget, &Transform)>,
+    cameras: Query<(&GameCamera, &GlobalTransform)>,
     mut fit: Local<Option<MinimapFit>>,
     mut values: ResMut<SharedValues>,
 ) {
@@ -124,14 +127,14 @@ pub(super) fn drive_values(
     if let Some(summary) = summary.as_ref()
         && (summary.is_changed() || fit.is_none())
     {
-        *fit = Some(MinimapFit::new(&summary.outline_2d));
+        *fit = Some(MinimapFit::of(summary));
     }
     let mut set = |id: SharedId, v: f32| {
         if values.get(id) != Some(v) {
             values.set(id, v);
         }
     };
-    for (entity, racer, t, tel, charge, local) in &racers {
+    for (entity, racer, t, tel, charge, progress, local) in &racers {
         if let (Some(fit), Some(dot)) = (fit.as_ref(), bound.dots.get(racer.index)) {
             let p = fit.project(Vec2::new(t.translation.x, t.translation.z));
             set(dot.x, p.x);
@@ -151,6 +154,15 @@ pub(super) fn drive_values(
             .min_by(|a, b| a.length_squared().total_cmp(&b.length_squared()));
         if let Some(local) = nearest {
             set(ids.arrow, local.x.atan2(-local.z).to_degrees());
+        }
+        set(ids.guide, bearing_from(t, progress.rejoin));
+        // Heading-up minimap: the player's view direction (the car's without a camera).
+        let view = cameras
+            .iter()
+            .find(|(c, _)| c.slot == local.map_or(PlayerSlot(0), |l| l.0))
+            .map_or(*t.forward(), |(_, g)| *g.forward());
+        if let Some(dir) = Vec2::new(view.x, view.z).try_normalize() {
+            set(ids.heading, map_rotation(dir));
         }
     }
 }

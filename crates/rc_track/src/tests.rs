@@ -527,3 +527,75 @@ fn a_track_crossing_itself_at_one_height_is_linted() {
         t.lints()
     );
 }
+
+#[test]
+fn corners_follow_every_track_both_ways() {
+    for id in track_ids() {
+        let [fwd, rev, mirror, _] =
+            variants(&id).map(|v| Track::load(&assets(), &v).expect("loads"));
+        let t = fwd.turns();
+        assert!(t.len() >= 2, "{id}: {t:?}");
+        // The signed heading changes of a closed loop's corners add up to about a whole number of
+        // full turns (one; two where the track crosses over itself, like Toy Town's helix).
+        let net: f32 = t
+            .iter()
+            .map(|c| if c.right { c.angle } else { -c.angle })
+            .sum();
+        let turns = (net.abs().to_degrees() / 360.0).round();
+        assert!(
+            turns >= 1.0 && (net.abs().to_degrees() - 360.0 * turns).abs() < 70.0,
+            "{id}: corners turn {:.0}° in all",
+            net.to_degrees()
+        );
+        for c in t {
+            assert!((1..=3).contains(&c.severity) && c.span > 0.0, "{id}: {c:?}");
+            assert!(c.angle.to_degrees() >= MIN_ANGLE_DEG, "{id}: {c:?}");
+        }
+        assert!(
+            t.windows(2).all(|w| w[0].start_s < w[1].start_s),
+            "{id}: sorted"
+        );
+        let rights = |tr: &Track| tr.turns().iter().filter(|c| c.right).count();
+        let lefts = |tr: &Track| tr.turns().iter().filter(|c| !c.right).count();
+        assert_eq!(
+            (rights(&mirror), lefts(&mirror)),
+            (lefts(&fwd), rights(&fwd)),
+            "{id}: mirroring swaps every corner's direction"
+        );
+        // Reverse drives the same corners the other way round.
+        let total = |tr: &Track| tr.turns().iter().map(|c| c.angle).sum::<f32>();
+        assert!(
+            (total(&rev) - total(&fwd)).abs() < 0.35 * total(&fwd),
+            "{id}: reverse {:.0}° vs forward {:.0}°",
+            total(&rev).to_degrees(),
+            total(&fwd).to_degrees()
+        );
+        let summary = fwd.summary();
+        assert_eq!(summary.edges_2d.len(), summary.outline_2d.len(), "{id}");
+        assert_eq!(summary.gates_2d.len(), fwd.checkpoints().len(), "{id}");
+        assert_eq!(summary.turns, t, "{id}");
+    }
+}
+
+/// `cargo test -p rc_track print_corners -- --ignored --nocapture`: every corner of every track.
+#[test]
+#[ignore]
+fn print_corners() {
+    for id in track_ids() {
+        let t = Track::load(&assets(), &variants(&id)[0]).expect("loads");
+        println!("{id}: {:.0} u", t.length());
+        for c in t.turns() {
+            println!(
+                "  s {:6.1} +{:5.1}  {} {:4.0}°  sev {}  v {:4.1}",
+                c.start_s,
+                c.span,
+                if c.right { "R" } else { "L" },
+                c.angle.to_degrees(),
+                c.severity,
+                (0..=(c.span as usize))
+                    .map(|k| t.target_speed_at(c.start_s + k as f32))
+                    .fold(f32::INFINITY, f32::min)
+            );
+        }
+    }
+}

@@ -292,7 +292,7 @@ Spawned by rc_race in `OnEnter(RaceAttempt)`, scoped `DespawnOnExit(RaceAttempt)
 | `CarControl { throttle, brake, steer, drift, boost, use_item, look_back, reset_held }` | input (`LocalPlayer`, `!AiDriver`) / ai (`AiDriver`); assist may adjust `steer`, `throttle`, `brake` (§3.2) | vehicle, items, race | driving intent; `use_item` is an edge consumed in the tick; `reset_held` is a level — rc_race times the hold in fixed ticks |
 | `VehicleTelemetry { speed, forward_speed, rpm, throttle_load, grounded_wheels, airborne_time, slip_angle, drifting, surface, wheels: [WheelState;4], boosting, up_dot, clean_landing }` | vehicle | render, vfx, audio, ui, ai, race | physical state |
 | `Charge(f32)` (0–1) | vehicle | ui, ai, vfx, audio | battery meter |
-| `RaceProgress { lap, next_checkpoint, distance, total_distance, rank, finished, lap_times, best_lap, wrong_way, last_valid_checkpoint, off_track_time }` | race | ui, ai, items, game, audio, camera | standing in the race |
+| `RaceProgress { lap, next_checkpoint, distance, total_distance, rank, finished, lap_times, best_lap, wrong_way, last_valid_checkpoint, off_track_time, lost, rejoin, respawn_in }` | race | ui, ai, items, game, audio, camera | standing in the race |
 | `ItemSlot { item: Option<ItemKind>, roulette: f32 }` | items | ui, ai | held item |
 | `StatusEffects` (timed effects; getters `power_mul()`, `grip_mul()`, `top_speed_mul()`, `boost()`, `shielded()`, `ghosted()`) | items | vehicle, render, vfx, ui, ai | effect state |
 | `CatchUp(f32)` (±0.06) | ai | vehicle | catch-up top-speed scaling |
@@ -327,7 +327,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `ItemEvent { racer, kind: Picked / Ready(ItemKind) / Used(ItemKind) / LockOn { target } / LockLost }` | items | ui, audio, vfx, ai |
 | `HitEvent { victim, attacker, by: ItemKind, blocked }` | items | ui, audio, vfx, input, game (stats) |
 | `Explosion { position, radius, kind }` | items | vfx, audio, camera |
-| `RaceEvent { racer: Option<Entity>, kind }` — CountdownTick(n), Go, PerfectStart, Stall, CheckpointSplit(delta), LapCompleted{lap,time,best}, FinalLap, Finished{rank,time}, WrongWay(bool), GoldenBattery, RaceEndsIn(secs), Hint(HintKind) | race | ui, audio, game, vfx |
+| `RaceEvent { racer: Option<Entity>, kind }` — CountdownTick(n), Go, PerfectStart, Stall, CheckpointSplit(delta), LapCompleted{lap,time,best}, FinalLap, Finished{rank,time}, MissedCheckpoint, WrongWay(bool), AutoRespawn(RespawnCause: OffTrack / Fell / Stuck), GoldenBattery, RaceEndsIn(secs), Hint(HintKind) | race | ui, audio, game, vfx |
 | `WeatherEvent::{ Lightning { intensity }, Changed(WeatherKind) }` | weather | render, vfx, audio |
 | `UiNav { action: NavAction, slot: Option<PlayerSlot>, device: DeviceKind, repeat: bool }` | input | ui (→ `ui.nav` React event) |
 | `RebindRequest { scheme, action }` / `RebindResult { scheme, action, binding: Option<Binding>, conflict, previous }` (on a conflict the two actions swap: the other one gets `previous`) | ui / input | input / ui |
@@ -348,7 +348,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `RaceStatus { phase_ticks, race_ticks, countdown, total_laps, leader_lap, ends_in, attempt }` | race | ui, audio, camera |
 | `Standings(Vec<Entity>)` | race | ui, items (odds), ai |
 | `RaceResults { entries, ghost: Option<GhostData>, geometry_hash }` | race (on finish) | game, ui |
-| `TrackSummary { outline_2d, length, checkpoints, geometry_hash }` | track | ui (minimap), game (records) |
+| `TrackSummary { outline_2d, edges_2d, gates_2d, turns: Vec<TrackTurn { start_s, span, right, angle, severity }>, length, checkpoints, geometry_hash }` | track | ui (minimap, turn indicator), game (records) |
 | `WeatherState { kind, time, precipitation, wetness, snow_cover, wind, fog, cloudiness, lightning, outside_only }` | weather | vehicle, render, vfx, audio, ui |
 | `LocalPlayers { slots: Vec<SlotBinding { slot, devices, last_used: DeviceKind }> }` | input | game, ui, camera |
 | `LobbyState { open: bool, max_slots }` | game | input |
@@ -390,7 +390,8 @@ Each subsystem owns its crate, its data files and a short note `docs/design/<cra
 - **Build (pure):** centripetal Catmull-Rom → arc-length samples (0.5 u) → frames (bank; helices OK,
   no loops) → `TrackGeometry` (ribbon runs per surface, walls ≥ 0.5 u thick, curbs) → checkpoints
   (≥ 8), respawn points (15 u), grid (8 slots), item rows (4–5 cubes), racing line + speed
-  profile, `geometry_hash`.
+  profile, corners (`turns.rs`: heading rate over ±3 u, runs faster than 1/40 rad/u of ≥ 25°, severity
+  from the reference speed and the angle), `geometry_hash`.
 - **Runtime:** `Track` resource with `project(pos, hint_s)`, `frame_at`, `racing_line_at`,
   `target_speed_at`, `respawn_before(s, last_valid_checkpoint)`, `checkpoint_of`, `length`,
   `is_on_drivable(pos)`; writes `TrackSummary`. Spawns colliders (ribbon runs and ground areas
@@ -450,10 +451,12 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
 - Phases Intro → Countdown → Racing → Finished; perfect start / stall (`ApplyEffect`); AI
   perfect-start chance is decided by rc_ai's throttle timing.
 - Progress with continuity hints; checkpoint validation; lap timing in ticks; standings (finished
-  by time, then `total_distance`); wrong way (> 5 u/s for 2 s); soft-lock guard (GDD §3.2) with
+  by time, then `total_distance`); wrong way (> 5 u/s for 2 s); lost (outside the corridor 0.5 s, or
+  getting nowhere 2 s) with the `rejoin` point and the respawn countdown; soft-lock guard (GDD §3.2) with
   `RaceEndsIn`; projected times.
 - **Sole owner of reset & respawn decisions:** reset tap (flip if `up_dot` < 0.3) / hold 0.4 s
-  (respawn), kill height, off-track (> 3 s, assist 2 s), stuck (4 s) → `RespawnCar { kind }`.
+  (respawn), kill height, off-track (> 3 s, assist 2 s), stuck (4 s) → `RespawnCar { kind }`;
+  automatic ones also `RaceEvent::AutoRespawn(cause)`.
 - Ghost recording at 20 Hz; `RaceResults` (with ghost & geometry hash) when the race ends;
   onboarding `Hint` events (rules in GDD §13, filtered by rc_game's `hints_seen`).
 
@@ -521,7 +524,8 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
   Night.
 - **Materials:** `MaterialLibrary` of PBR surface materials and car paints.
 - **Track visuals:** meshes from `TrackGeometry` (styled ribbon or none for Invisible), barriers,
-  ground, room shell, prop glb scenes, decorative-only props.
+  ground, room shell, prop glb scenes, decorative-only props, way-finding marks (`guides.rs`: edge
+  tape on Invisible floors, corner arrows, chevron boards, crosses; GDD §7.3).
 - **Car visuals:** car glb on the proxy, paint, wheel spin/steer/suspension from telemetry,
   brake/head lights, ghost/respawn translucency.
 - **Showroom** for menus from `MenuBackdrop`; **captures**: track previews, car thumbnails,
@@ -575,7 +579,7 @@ indoors). Pause pauses Engines/Sfx/Ambience. No audio device → muted, no panic
   - requests: `app.snapshot`, `race.snapshot`, `catalog.get`, `profile.get`, `settings.get`,
     `records.get`, `bindings.get`, `lobby.snapshot` — **every store fetches a snapshot on mount**
     (events are not buffered).
-  - per-frame visuals (gauges, charge bar, minimap dots) via shared values set from Rust
+  - per-frame visuals (gauges, charge bar, minimap dots and heading, the rocket and rejoin arrows) via shared values set from Rust
     `.after(AnimationSet::Tick).before(AnimationSet::Apply)`.
   - `ReactUiPlugin.hot_reload(cfg!(debug_assertions))`; missing `ui.ready` 15 s after start is
     an error (automation runs exit non-zero).
@@ -590,7 +594,7 @@ indoors). Pause pauses Engines/Sfx/Ambience. No audio device → muted, no panic
   theme/      design tokens (colours, fonts, spacing, motion)
   components/ Button, Panel, Tabs, Slider, Toggle, Select, Carousel, StatBar, Toast, Dialog, Glyph…
   screens/    Title, MainMenu, CupSelect, CupStandings, CupEnd, TrackSelect, CarSelect, Lobby, Garage, Records, HowToPlay, Settings, Credits, Loading, Pause, Results, VersusScore
-  hud/        Hud (per viewport rect from `viewports`), Position, LapTimer, ItemSlot, Speed, ChargeMeter, Minimap, Countdown, Notifications, Warnings, Hints, Finish
+  hud/        Hud (per viewport rect from `viewports`), Position, LapTimer, ItemSlot, Speed, ChargeMeter, Minimap (heading-up ribbon), TurnNote, Countdown, Notifications, Warnings, Center (banners: wrong way, lost), Hints, Finish
   strings/    <area>.ts — every user-facing string
   sound.ts    UI cue helper
   ```

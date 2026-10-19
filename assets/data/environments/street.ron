@@ -16,6 +16,9 @@
         "garden_wall_b": (set: Some("stone"), color: (0.8, 0.72, 0.62), tile_u: 3.0, variation: 0.2),
         "wall": (set: Some("plaster"), color: (0.85, 0.82, 0.76)),
         "ribbon_side": (set: Some("concrete"), color: (0.6, 0.6, 0.6)),
+        // Way-finding (GDD §7.3): orange chalk on the road, the lawns and the sidewalk; black and
+        // yellow road chevrons.
+        "guide_tape": (color: (0.98, 0.55, 0.12), roughness: 0.95, variation: 0.12, emissive: (0.03, 0.017, 0.004)),
     },
     surfaces: { Stone: "sidewalk" },
     // Low warm ESE sun down Maple Street, long shadows, cool sky fill, a light haze.

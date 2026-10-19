@@ -37,7 +37,7 @@ export function Panel({ rect, setup, tick, dots }: { rect: UiRect; setup: UiHudS
           );
         })}
       </node>
-      {setup.outline.length >= 4 && <Minimap size={map} outline={setup.outline} racers={setup.racers} dots={dots} own={humans} k={k} labels dotScale={1.7} markers={setup.colorblindMarkers} />}
+      {setup.outline.length >= 4 && <Minimap size={map} lines={setup} racers={setup.racers} dots={dots} own={humans} k={k} labels dotScale={1.7} markers={setup.colorblindMarkers} />}
     </node>
   );
 }

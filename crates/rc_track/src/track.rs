@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use bevy::math::{Mat3, Quat, Vec2, Vec3};
 use bevy::prelude::{Resource, Transform};
-use rc_core::{SurfaceKind, TrackSummary, TrackVariant};
+use rc_core::{SurfaceKind, TrackSummary, TrackTurn, TrackVariant};
 
 use crate::def::RibbonStyle;
 use crate::geometry::TrackGeometry;
@@ -58,6 +58,14 @@ impl TrackFrame {
     pub fn point(&self, lateral: f32, height: f32) -> Vec3 {
         self.position + self.right * lateral + self.up * height
     }
+}
+
+/// Where a frame's racing edges lie seen from above (x, z: left, right).
+fn edges_xz(f: &TrackFrame) -> [Vec2; 2] {
+    [-f.half_width, f.half_width].map(|l| {
+        let p = f.point(l, 0.0);
+        Vec2::new(p.x, p.z)
+    })
 }
 
 /// A world position expressed in track coordinates.
@@ -210,6 +218,7 @@ pub struct Track {
     pub(crate) ground: Vec<GroundArea>,
     pub(crate) shortcuts: Vec<Shortcut>,
     pub(crate) jumps: Vec<Jump>,
+    pub(crate) turns: Vec<TrackTurn>,
     pub(crate) golden_battery: Option<Vec3>,
     pub(crate) kill_height: f32,
     pub(crate) wall_height: f32,
@@ -391,18 +400,33 @@ impl Track {
 
     /// Top-down centreline (world x, z) every ≈ 2 u, for minimaps.
     pub fn outline_2d(&self) -> Vec<Vec2> {
-        let step = ((2.0 / self.ds).round() as usize).max(1);
-        self.nodes
-            .iter()
-            .step_by(step)
-            .map(|n| Vec2::new(n.frame.position.x, n.frame.position.z))
+        self.outline_frames()
+            .map(|f| Vec2::new(f.position.x, f.position.z))
             .collect()
+    }
+
+    /// The racing edges (world x, z: left, right) at the [`Track::outline_2d`] points.
+    pub fn edges_2d(&self) -> Vec<[Vec2; 2]> {
+        self.outline_frames().map(edges_xz).collect()
+    }
+
+    fn outline_frames(&self) -> impl Iterator<Item = &TrackFrame> {
+        let step = ((2.0 / self.ds).round() as usize).max(1);
+        self.nodes.iter().step_by(step).map(|n| &n.frame)
+    }
+
+    /// Corners in travel order (see `turns.rs`).
+    pub fn turns(&self) -> &[TrackTurn] {
+        &self.turns
     }
 
     /// The facts rc_ui and rc_game need.
     pub fn summary(&self) -> TrackSummary {
         TrackSummary {
             outline_2d: self.outline_2d(),
+            edges_2d: self.edges_2d(),
+            gates_2d: self.checkpoints.iter().map(edges_xz).collect(),
+            turns: self.turns.clone(),
             length: self.length,
             checkpoints: self.checkpoints.len(),
             geometry_hash: self.geometry_hash,

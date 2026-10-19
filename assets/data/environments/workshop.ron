@@ -31,6 +31,8 @@
         "trim": (color: (0.95, 0.72, 0.02), roughness: 0.6, variation: 0.08),
         "barrier": (set: Some("rubber"), color: (0.9, 0.9, 0.9)),
         "ribbon_side": (set: Some("metal"), color: (0.35, 0.36, 0.38)),
+        // Way-finding (GDD §7.3): hazard-yellow floor tape, black boards with yellow chevrons.
+        "guide_tape": (color: (0.95, 0.74, 0.05), roughness: 0.6, variation: 0.0, emissive: (0.033, 0.026, 0.002)),
     },
     surfaces: { Asphalt: "floor", Carpet: "rubber_mat", Wood: "plywood" },
     morning: (

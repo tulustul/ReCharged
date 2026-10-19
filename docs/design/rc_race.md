@@ -62,6 +62,12 @@ auto-accelerate only in Racing, so it never stalls.
   distance: ≤ 0 on the grid, continuous across the line, frozen at laps × length on finishing.
 - **Wrong way:** on after 120 ticks moving < −5 u/s along the track, off after 30 ticks moving
   forward (hysteresis); `RaceEvent::WrongWay(bool)`.
+- **Lost** (`lost.rs`, GDD §7.3): on after 30 ticks outside the legal corridor (|lateral| > half
+  width + margin, or > 3 u below the surface) or 120 ticks moving > 5 u/s with < 30 % of the motion
+  along the track (speed from the position change per tick); off after 30 ticks inside the
+  corridor with ≥ 60 % along it (or slower than 5 u/s). Never with the wrong-way warning (reset
+  while it is on), not before GO, after a teleport or once finished. `rejoin` = the centreline
+  10 u ahead of the projection, every tick until the finish (the HUD's arrow).
 - **Standings:** finished racers by finish tick, then by `total_distance`; ties keep the previous
   order, then grid order (deterministic). `Finished { rank, time }` comes with the standings of
   the finishing tick. `RaceStatus.leader_lap` = the leader's lap.
@@ -77,7 +83,10 @@ auto-accelerate only in Racing, so it never stalls.
 | off-track > 180 ticks (> 120 with steering assist, humans only): no wheel grounded, or \|lateral\| > half width + off-road margin, or > 3 u below the surface (fell off an upper level) | `ToTrack` |
 | stuck: speed < 1 u/s with throttle ≥ 0.5 for 240 ticks | `ToTrack` |
 
-Every respawn also sends `ApplyEffect(Ghost 1.5 s)`. Cooldown 120 ticks: triggers wait for it
+Every respawn also sends `ApplyEffect(Ghost 1.5 s)`; an automatic one (kill height, off-track,
+stuck — not a hold) also `RaceEvent::AutoRespawn(cause)` (`Fell`, `OffTrack`, `Stuck`; the player
+is told why). `respawn_in` = seconds left on the off-track timer while the car is outside the
+corridor (airborne alone does not show it: every jump would). Cooldown 120 ticks: triggers wait for it
 (a hold or an automatic trigger fires when it ends), taps during it are dropped. `ToTrack` uses
 `Track::respawn_before(s, last_valid_checkpoint)`: never past the next gate still to pass. Timers
 reset on every respawn; `off_track_time` mirrors the off-track timer.
@@ -107,7 +116,8 @@ Time Trial human's `GhostData` (`time_ticks` = finish, `geometry_hash` from `Tra
 
 ## Events produced
 `CountdownTick(n)`, `Go` (racer `None`); `PerfectStart`, `Stall`, `CheckpointSplit`,
-`MissedCheckpoint`, `LapCompleted`, `FinalLap`, `Finished`, `WrongWay`, `GoldenBattery`, `Hint`
+`MissedCheckpoint`, `LapCompleted`, `FinalLap`, `Finished`, `WrongWay`, `AutoRespawn`,
+`GoldenBattery`, `Hint`
 (racer `Some`);
 `RaceEndsIn(n)` (`None`). Messages: `RespawnCar`, `ApplyEffect`, `Teleported` (spawns).
 
@@ -129,7 +139,8 @@ Time Trial human's `GhostData` (`time_ticks` = finish, `geometry_hash` from `Tra
   its notice once per pass — not again while jittering on the gate line — backwards), crossing wrap,
   standings (finishers, distance, ties, same-tick finishes), wrong-way hysteresis, soft-lock start
   for 0/1/2+ humans, projected times, respawn table (tap vs hold, cooldown, off-track with/without
-  assist, stuck), flip pose, start windows, phase table, countdown numbers, ghost playback and
+  assist, stuck, automatic causes), lost rule (corridor, sideways, hysteresis, slow cars and
+  hairpins never), lost vs wrong way and the rejoin point on `test_oval`, flip pose, start windows, phase table, countdown numbers, ghost playback and
   splits, hint triggers.
 - Headless (`tests/race.rs`, rc_testkit): an 8-car 2-lap race on the full sim stack
   (`SimPlugins` without `AiPlugin`; scripted pure-pursuit pilots write `CarControl`, real physics)

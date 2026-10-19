@@ -21,6 +21,7 @@
 mod finish;
 mod ghost;
 mod hints;
+mod lost;
 mod phases;
 mod progress;
 mod recovery;

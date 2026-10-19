@@ -1,11 +1,13 @@
 //! Track visuals (ARCHITECTURE §5.9): the session's `TrackGeometry` as meshes — ribbon runs
-//! (driving surface, lips or curbs, sides), barriers in the environment's style ([`barriers`])
-//! and ground polygons — plus the room shell or the outdoor ground beyond the play area
+//! (driving surface, lips or curbs, sides), barriers in the environment's style ([`barriers`]),
+//! way-finding marks ([`guides`]: edge tape, corner arrows, chevron boards, crosses) and ground
+//! polygons — plus the room shell or the outdoor ground beyond the play area
 //! ([`shell`]), all in the environment's
 //! `MaterialLibrary` materials (surfaces by `SurfaceKind`, everything else by role name, so each
 //! environment file picks its look). Built once per session while `Loading`, session-scoped.
 
 mod barriers;
+mod guides;
 pub(crate) mod shell;
 
 use bevy::light::NotShadowCaster;
@@ -111,6 +113,15 @@ fn build_track(
                 piece(wall, barrier.clone(), true, "barrier");
             }
         }
+    }
+    let marks = guides::guides(&track);
+    for (mesh, role, casts, name) in [
+        (&marks.tape, "guide_tape", false, "guide tape"),
+        (&marks.boards, "guide_board", true, "guide boards"),
+        (&marks.chevrons, "guide_chevron", false, "guide chevrons"),
+    ] {
+        let material = library.named(role).unwrap_or_else(|| barrier.clone());
+        piece(mesh, material, casts, name);
     }
     let floor = track
         .ground()

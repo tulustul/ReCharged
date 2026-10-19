@@ -1,70 +1,17 @@
 //! Reading the race for the HUD: [`HudView`] builds `race.setup`, `race.hud`, `viewports` and the
-//! snapshot; [`MinimapFit`] maps the world onto the minimap; the `RaceEvent` → `race.event` map.
+//! snapshot (minimap data and the turn indicator: `nav.rs`); the `RaceEvent` → `race.event` map.
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
+use super::nav::{MapLines, MinimapFit, turn_ahead};
 use super::{
-    UiHudSetup, UiHudSnapshot, UiHudTick, UiPlayerHud, UiRaceEvent, UiRect, UiViewport, UiViewports,
+    UiHudSetup, UiHudSnapshot, UiHudTick, UiPlayerHud, UiRaceEvent, UiRect, UiTurn, UiViewport,
+    UiViewports,
 };
 use crate::race::UiRacer;
 use crate::results::ticks_to_ms;
-
-/// Most outline points sent for the minimap.
-const OUTLINE_POINTS: usize = 240;
-/// Minimap margin inside its 0–1 square.
-pub(super) const MAP_PAD: f32 = 0.06;
-
-/// Maps world X/Z onto the minimap's 0–1 square: aspect kept, centred, padded by [`MAP_PAD`].
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MinimapFit {
-    origin: Vec2,
-    scale: f32,
-    offset: Vec2,
-}
-
-impl MinimapFit {
-    /// The fit of a track outline (world X/Z).
-    pub fn new(outline: &[Vec2]) -> Self {
-        let Some(&first) = outline.first() else {
-            return Self {
-                origin: Vec2::ZERO,
-                scale: 0.0,
-                offset: Vec2::splat(0.5),
-            };
-        };
-        let (min, max) = outline
-            .iter()
-            .fold((first, first), |(lo, hi), &p| (lo.min(p), hi.max(p)));
-        let scale = (1.0 - 2.0 * MAP_PAD) / (max - min).max_element().max(1e-3);
-        Self {
-            origin: min,
-            scale,
-            offset: (Vec2::ONE - (max - min) * scale) / 2.0,
-        }
-    }
-
-    /// World X/Z → minimap 0–1.
-    pub fn project(&self, p: Vec2) -> Vec2 {
-        (p - self.origin) * self.scale + self.offset
-    }
-}
-
-/// The outline as flat minimap x, y pairs (at most [`OUTLINE_POINTS`] points).
-pub(super) fn outline_points(outline: &[Vec2]) -> Vec<f32> {
-    let fit = MinimapFit::new(outline);
-    let step = outline.len().div_ceil(OUTLINE_POINTS).max(1);
-    let round = |v: f32| (v * 10_000.0).round() / 10_000.0;
-    outline
-        .iter()
-        .step_by(step)
-        .flat_map(|&p| {
-            let q = fit.project(p);
-            [round(q.x), round(q.y)]
-        })
-        .collect()
-}
 
 fn tenths(v: f32) -> f32 {
     (v * 10.0).round() / 10.0
@@ -107,6 +54,10 @@ pub(super) fn race_event(
             hint: hint.into(),
         },
         (K::MissedCheckpoint, Some(slot)) => UiRaceEvent::MissedCheckpoint { slot },
+        (K::AutoRespawn(cause), Some(slot)) => UiRaceEvent::Rescued {
+            slot,
+            cause: cause.into(),
+        },
         // `race.hud` carries the warning while it lasts.
         (K::WrongWay(_), Some(_)) => return None,
     })
@@ -151,17 +102,21 @@ impl HudView<'_, '_> {
         let config = self.config.as_deref()?;
         let defaults = Settings::default();
         let settings = self.settings.as_deref().unwrap_or(&defaults);
+        let (lines, map_zoom) = self.summary.as_deref().map_or_else(
+            || (MapLines::default(), 1.0),
+            |s| (MapLines::of(s), MinimapFit::of(s).zoom()),
+        );
         Some(UiHudSetup {
             mode: (&config.mode).into(),
             laps: config.laps,
             items: config.items,
             ghost: config.ghost.is_some(),
             racers: UiRacer::of(config),
-            outline: self
-                .summary
-                .as_deref()
-                .map(|s| outline_points(&s.outline_2d))
-                .unwrap_or_default(),
+            outline: lines.outline,
+            left: lines.left,
+            right: lines.right,
+            gates: lines.gates,
+            map_zoom: (map_zoom * 100.0).round() / 100.0,
             speed_unit: settings.gameplay.speed_unit.into(),
             hud_scale: settings.gameplay.hud_scale,
             minimap: settings.gameplay.minimap,
@@ -218,6 +173,10 @@ impl HudView<'_, '_> {
                             .find(|i| i.1.is_some_and(|h| h.kind == HazardKind::GooBomb))
                             .map(|i| tenths(i.3.map_or(0.0, |t| t.0))),
                         shield: effects.shield.map(tenths),
+                        lost: progress.lost && !finished,
+                        respawn_in: progress.respawn_in.map(tenths),
+                        turn: self.turn(progress, tel.speed).filter(|_| !finished),
+                        next_gate: progress.next_checkpoint as u8,
                     })
                 },
             )
@@ -229,6 +188,17 @@ impl HudView<'_, '_> {
             ends_in: status.ends_in.map(|s| s.ceil().clamp(0.0, 255.0) as u8),
             standings,
             players,
+        })
+    }
+
+    /// The turn indicator of a racer at `progress` moving at `speed` u/s.
+    fn turn(&self, progress: &RaceProgress, speed: f32) -> Option<UiTurn> {
+        let summary = self.summary.as_deref()?;
+        let t = turn_ahead(&summary.turns, summary.length, progress.distance, speed)?;
+        Some(UiTurn {
+            right: t.right,
+            severity: t.severity,
+            angle: t.angle.to_degrees().round() as u16,
         })
     }
 
@@ -343,28 +313,6 @@ mod tests {
     }
 
     #[test]
-    fn the_minimap_keeps_the_aspect_and_centres_the_track() {
-        let fit = MinimapFit::new(&[
-            Vec2::new(0.0, 0.0),
-            Vec2::new(10.0, 0.0),
-            Vec2::new(10.0, 5.0),
-            Vec2::new(0.0, 5.0),
-        ]);
-        let near = |a: Vec2, b: Vec2| a.distance(b) < 1e-5;
-        assert!(near(fit.project(Vec2::new(5.0, 2.5)), Vec2::splat(0.5)));
-        assert!(near(fit.project(Vec2::ZERO), Vec2::new(MAP_PAD, 0.28)));
-        assert!(near(
-            fit.project(Vec2::new(10.0, 5.0)),
-            Vec2::new(1.0 - MAP_PAD, 0.72)
-        ));
-        assert_eq!(
-            MinimapFit::new(&[]).project(Vec2::splat(7.0)),
-            Vec2::splat(0.5)
-        );
-        assert_eq!(outline_points(&[Vec2::ZERO; 1000]).len(), 2 * 200);
-    }
-
-    #[test]
     fn race_events_reach_only_local_players_except_global_ones() {
         assert_eq!(
             race_event(RaceEventKind::Go, None, false),
@@ -412,6 +360,17 @@ mod tests {
             race_event(RaceEventKind::MissedCheckpoint, None, false),
             None,
             "rivals' misses are theirs"
+        );
+        assert_eq!(
+            race_event(
+                RaceEventKind::AutoRespawn(RespawnCause::OffTrack),
+                Some(1),
+                false
+            ),
+            Some(UiRaceEvent::Rescued {
+                slot: 1,
+                cause: crate::hud::UiRespawnCause::OffTrack
+            })
         );
     }
 }

@@ -79,6 +79,8 @@ pub struct MaterialDef {
     pub clearcoat_roughness: f32,
     /// Receives wetness, puddles and snow from the weather (outdoor ground).
     pub weather: bool,
+    /// Glow, linear RGB (not scaled by exposure: way-finding marks that stay readable at night).
+    pub emissive: [f32; 3],
 }
 
 impl Default for MaterialDef {
@@ -94,6 +96,7 @@ impl Default for MaterialDef {
             clearcoat: 0.0,
             clearcoat_roughness: 0.1,
             weather: true,
+            emissive: [0.0; 3],
         }
     }
 }
@@ -217,6 +220,23 @@ pub fn builtin_materials() -> Vec<(String, MaterialDef)> {
         ("trim", MaterialDef::textured("wood_planks", [1.0; 3], 1.0)),
         ("barrier", plastic([0.91, 0.90, 0.87])),
         ("ribbon_side", plastic([0.2, 0.2, 0.21])),
+        // Way-finding marks (`track_visuals/guides.rs`): white floor tape, black boards with
+        // glowing yellow chevrons; environments retheme them.
+        (
+            "guide_tape",
+            MaterialDef {
+                emissive: [0.03, 0.03, 0.028],
+                ..MaterialDef::flat([0.92, 0.92, 0.88], 0.6)
+            },
+        ),
+        ("guide_board", MaterialDef::flat([0.05, 0.055, 0.07], 0.5)),
+        (
+            "guide_chevron",
+            MaterialDef {
+                emissive: [0.22, 0.17, 0.02],
+                ..MaterialDef::flat([0.96, 0.78, 0.08], 0.35)
+            },
+        ),
     ];
     out.extend(roles.into_iter().map(|(n, d)| (n.to_string(), d)));
     out
@@ -309,6 +329,7 @@ impl MaterialLibrary {
             clearcoat: def.clearcoat.clamp(0.0, 1.0),
             clearcoat_perceptual_roughness: def.clearcoat_roughness.clamp(0.02, 1.0),
             uv_transform: Affine2::from_scale(Vec2::splat(1.0 / tile)),
+            emissive: LinearRgba::rgb(def.emissive[0], def.emissive[1], def.emissive[2]),
             ..default()
         };
         SurfaceMaterial {

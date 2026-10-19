@@ -92,6 +92,8 @@ export function onRaceEvent(e: UiRaceEvent) {
       return notify(e.slot, "gold", words.notice.goldenBattery);
     case "missedCheckpoint":
       return notify(e.slot, "bad", words.notice.missedCheckpoint);
+    case "rescued":
+      return notify(e.slot, "info", words.notice.rescued[e.cause]);
     case "hint":
       return moment(e.slot, "hint", { id, hint: e.hint }, ms.hint);
     case "hit":
