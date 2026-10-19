@@ -45,6 +45,23 @@ once and test that build (record `git log -1 --oneline`).
 Check `pgrep -a recharged` before every windowed run (the user may be playing; never open a window
 over a session that isn't an automated agent run). Use `--user-data-dir target/qa2/data/<run>`.
 
+## Notes since T20c (read before measuring)
+- **Loads (Q9):** automated runs (any automation flag) compile pipelines synchronously and skip the
+  menu warm-up, so a cold `--quick-race` is expected at 3.7–4.8 s in release — record it, but it is
+  not the budget. The budget (ARCHITECTURE §9) is for races started from the menu after the warm-up.
+  Measure it with T20c's measurement build `target/agent-data/T20c/bin/recharged-measure-dev9` (the
+  final dev code with the automated skip disabled: the title freezes ~32 s while it warms up; see
+  T20c's `target/agent-data/T20c/{load.sh,batch9.sh,run.sh}` for its scripts), plus one human-mode
+  run (no automation flags, `RUST_LOG=rc_render=debug`, ~45 s): the log shows each warm-up stage,
+  `menu warm-up done in … s` and every menu frame over 25 ms.
+- **Stopping human-mode runs:** a game started as a background job of a script inherits SIGINT
+  ignored (Ctrl+C / `kill -INT` do nothing); use `kill -TERM`.
+- **Audio (Q19):** `RUST_LOG=rc_audio=debug` logs `audio cue <id>: <bus> bus, <dB> dB` per cue
+  (≤ 1 line per cue per second).
+- **Memory (Q21):** the soak census now also compares Mesh / Image / StandardMaterial / audio-source
+  counts; T20c measured 10-min dev soak RSS 1.43 → 2.97 GB (QA: 4.46 GB).
+- T20c's evidence (bench tables, contact sheets, RSS logs) is in `target/agent-data/T20c/`.
+
 ## Report
 A DoD table (pass / partial / fail with evidence), a fix-verification table (each Q1–Q22 and each
 T19/T20 item: verified / not verified / regressed), then new issues `R1…Rn` in the format of the
