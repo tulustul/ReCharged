@@ -287,6 +287,16 @@ fn versus_request(track: &str) -> RaceRequest {
     }
 }
 
+/// The grid: player names, "AI" for rivals.
+fn grid(app: &App) -> Vec<String> {
+    let config = app.world().resource::<RaceConfig>();
+    let name = |r: &RacerSetup| match r.controller {
+        Controller::Human { .. } => r.name.clone(),
+        Controller::Ai { .. } => "AI".into(),
+    };
+    config.racers.iter().map(name).collect()
+}
+
 fn versus_points(app: &App, slot: u8) -> u32 {
     app.world()
         .resource::<VersusSession>()
@@ -307,7 +317,9 @@ fn versus_keeps_a_scoreboard_over_rematches_and_tracks_and_ai_takes_over_dropped
         !app.world().resource::<LobbyState>().open,
         "the lobby closes for the race"
     );
-    // Grid order P1, P2, AI, AI; everyone finishes in grid order.
+    // The rivals fill the front of the grid, P1 and P2 start behind them in slot order.
+    assert_eq!(grid(&app), ["AI", "AI", "P1", "P2"]);
+    // P1 and P2 finish first, then the rivals.
     assert_eq!(
         app.world().resource::<RaceOutcome>().points,
         [Some(10), Some(8), None, None],
@@ -317,13 +329,25 @@ fn versus_keeps_a_scoreboard_over_rematches_and_tracks_and_ai_takes_over_dropped
 
     app.world_mut().resource_mut::<FinishOrder>().0 = vec![1, 0, 2, 3];
     send(&mut app, GameCommand::Rematch);
-    wait_for_next_outcome(&mut app);
+    wait_for_phase(&mut app, RacePhase::Countdown);
+    assert_eq!(
+        grid(&app),
+        ["AI", "AI", "P2", "P1"],
+        "the leader starts last"
+    );
+    wait_for_outcome(&mut app);
     assert_eq!(counters(&app).loads, 1, "rematch does not reload");
     assert_eq!((versus_points(&app, 0), versus_points(&app, 1)), (18, 18));
 
     send(&mut app, GameCommand::Restart); // replays the rematch: its points are reverted
     step(&mut app, 2);
     assert_eq!((versus_points(&app, 0), versus_points(&app, 1)), (10, 8));
+    wait_for_phase(&mut app, RacePhase::Countdown);
+    assert_eq!(
+        grid(&app),
+        ["AI", "AI", "P2", "P1"],
+        "a restart keeps the race's grid"
+    );
     wait_for_outcome(&mut app);
     assert_eq!(
         app.world()

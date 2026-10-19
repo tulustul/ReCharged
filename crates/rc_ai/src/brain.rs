@@ -13,6 +13,11 @@ use crate::shortcut::{ShortcutChoice, ShortcutPlan, take_chance};
 
 /// A racer moving farther than this in one tick was teleported (u).
 const TELEPORT_STEP_U: f32 = 4.0;
+/// A racer slower than this along the track (u/s) for this long in the race (s) is stopped or
+/// crawling (only a car the AI does not drive counts, [`crate::scene::Other`]). Counting only from
+/// GO keeps the grid, where every car stands still until GO, out of it.
+const CRAWL_UPS: f32 = 2.0;
+const STOPPED_SECS: f32 = 0.5;
 /// Perfect starts press the throttle this long before GO (s, GDD §3.2 window: 0.3 s) …
 const PERFECT_PRESS_SECS: (f32, f32) = (0.06, 0.24);
 /// … other starts react this long after GO (s).
@@ -37,13 +42,23 @@ pub struct TrackView {
     pub progress: f32,
     /// Teleported (spawn, respawn) since the previous tick.
     pub teleported: bool,
+    /// Seconds of the race (from GO) the racer has been slower than 2 u/s along the track.
+    pub crawl_secs: f32,
     /// `s` is a valid projection hint.
     fresh: bool,
+}
+
+impl TrackView {
+    /// Standing still or crawling for a while: an obstacle to steer around, not a car to follow.
+    pub fn stopped(&self) -> bool {
+        self.crawl_secs >= STOPPED_SECS
+    }
 }
 
 /// `SimSet::Drivers` (first): track coordinates of every racer.
 pub(crate) fn observe_racers(
     track: Option<Res<Track>>,
+    phase: Option<Res<State<RacePhase>>>,
     mut respawned: MessageReader<CarRespawned>,
     mut racers: Query<(Entity, &Transform, &mut TrackView)>,
     mut teleports: Local<Vec<Entity>>,
@@ -51,27 +66,35 @@ pub(crate) fn observe_racers(
     teleports.clear();
     teleports.extend(respawned.read().map(|m| m.car));
     let Some(track) = track else { return };
+    let racing = phase.is_some_and(|p| matches!(p.get(), RacePhase::Racing | RacePhase::Finished));
     for (entity, transform, mut view) in &mut racers {
         let pos = transform.translation;
         let continuous =
             view.fresh && pos.distance(view.pos) < TELEPORT_STEP_U && !teleports.contains(&entity);
         let tp = track.project(pos, continuous.then_some(view.s));
+        let vel = if continuous {
+            (pos - view.pos) / SIM_DT
+        } else {
+            Vec3::ZERO
+        };
+        let crawling = racing && continuous && vel.dot(track.frame_at(tp.s).forward) < CRAWL_UPS;
         *view = TrackView {
             s: tp.s,
             lateral: tp.lateral,
             height: tp.height,
             pos,
-            vel: if continuous {
-                (pos - view.pos) / SIM_DT
-            } else {
-                Vec3::ZERO
-            },
+            vel,
             progress: if continuous {
                 track.delta_s(view.s, tp.s)
             } else {
                 0.0
             },
             teleported: !continuous,
+            crawl_secs: if crawling {
+                view.crawl_secs + SIM_DT
+            } else {
+                0.0
+            },
             fresh: true,
         };
     }

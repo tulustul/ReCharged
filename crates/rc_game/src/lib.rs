@@ -290,6 +290,7 @@ impl Plugin for GameFlowPlugin {
         prefs::build(app);
         results::build(app);
         save::build(app);
+        series::build(app);
         soak::build(app);
     }
 }

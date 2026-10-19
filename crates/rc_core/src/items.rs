@@ -228,6 +228,12 @@ pub struct Hazard {
     pub owner: Entity,
 }
 
+/// A dropped hazard that is used up (rc_items): it caught its last car (GDD §6.2: an Oil Slick
+/// after 3 cars, a Spring Pad after 3 launches), triggers nothing more and fades out over the
+/// rest of its `ItemTimer`. Drivers no longer steer around it.
+#[derive(Component, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Spent;
+
 /// The car an item entity is bound to (rc_items): a Spark Rocket's lock, a Leech Coil's tether
 /// target, the Goo Bomb's carrier. `None` = unbound (no lock, tether still searching).
 #[derive(Component, Debug, Clone, Copy, Default, PartialEq, Eq)]

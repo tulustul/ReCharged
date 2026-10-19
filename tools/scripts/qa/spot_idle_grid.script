@@ -1,0 +1,42 @@
+# T22a: the T21 idle-start spot check (spot_idle_start.script) on the new grid (GDD §3.2, §8.1).
+# Quick Race on Toy Town, steering assist on (pre-seeded settings.ron). The player does nothing at
+# GO: it starts last now, so nobody can queue behind it (look-back at 2 s). From 3 s it drives
+# throttle-only for 4 s — the assist puts it on the racing line — then brakes to a stop there, a
+# stalled car on the line. The leaders lap it after ~25 s: they must steer round it, not queue.
+wait ui
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.3 nav keyboardA confirm          # Toy Town (focused): select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.3 nav keyboardA confirm          # race
+wait countdown
+0.5 shot g_00_countdown
+wait racing
+@60 shot g_01_1s
+@120 hold keyboardA lookBack 1
+@150 shot g_02_2s_back
+@160 hold keyboardA lookBack 0
+@180 hold keyboardA throttle 1
+@420 hold keyboardA throttle 0
+@421 hold keyboardA brake 1
+@460 hold keyboardA brake 0
+@540 shot g_03_9s_stopped
+@1500 hold keyboardA lookBack 1
+@1560 shot g_04_26s_back
+@1620 shot g_05_27s_back
+@1680 shot g_06_28s_back
+@1740 shot g_07_29s_back
+@1800 shot g_08_30s_back
+@1860 shot g_09_31s_back
+@1920 shot g_10_32s_back
+@1980 shot g_11_33s_back
+@2040 shot g_12_34s_back
+@2100 hold keyboardA lookBack 0
+@2110 shot g_13_35s
+@2400 shot g_14_40s
+1.0 exit

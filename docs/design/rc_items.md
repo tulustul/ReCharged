@@ -65,7 +65,10 @@ builds poll `items.ron` once a second and hot-reload it (a bad edit keeps the ol
 - **Dropped hazards** lie on the ground found by a ray below the drop point (nothing below — over
   a gap — nothing is dropped), rotated to its normal. A car triggers one by *entering*: its origin
   over the disc and within −1…+1.5 u of the surface; it re-arms when the car leaves the disc (cars
-  jumping over do not trigger it; a launched car landing back on the pad does not either).
+  jumping over do not trigger it; a launched car landing back on the pad does not either). Once
+  it has caught its last car (`cars`: 3, GDD §6.2 — landed hits; a shield's block does not count)
+  it is `Spent` (rc_core) and its timer drops to 1.5 s: it triggers nothing more, rc_vfx shrinks
+  it away over those 1.5 s (a puddle dries up, a pad shrinks) and rc_ai stops steering round it.
 - **Storm Strike** hits the unfinished cars ahead in `Standings`, leader first, the first bolt one
   interval after the use (the `Used` event is the warning).
 - **Odds**: band from `Standings`; a racer not in it (no ranking yet) draws from Middle. The roll is
@@ -95,8 +98,8 @@ Impulses are Δv of the 2.6-mass reference car (× `REFERENCE_CAR_MASS`); rc_veh
 | Shock Orb | 24 u/s, radius 3 u, 10 s / 3 hits, 0.7 u high, edge margin 0.5 u (off a barrier or the width's edge), launch ≤ 30°; knock up 6 / sideways 7 u/s, spin 1 | GDD §6.2 |
 | EMP Pulse | wind-up 0.4 s, 12 u, power 0 for 2 s, −50 % charge | GDD §6.2 |
 | Goo Bomb | fuse 6 s, no pass-back 0.5 s, 7 u; tumble up 7 / push 5 u/s, spin 1.5; passes on a bump or a near miss ≤ 0.6 u; carrier top speed ×1.1 (code consts, `ponytail:`) | GDD §6.2; apex ≈ 1 u, under the 1.2 u barriers (up 9 threw cars over them); bumps only and no chase speed: two thirds of the bombs went off on their users |
-| Oil Slick | radius 2.5 u, 15 s, grip 0.2 for 1.2 s, yaw spin 2.5 (≈ 2 rad/s) | GDD §6.2; 15 s (was 25): a slick caught ≈ 3 cars (QA) |
-| Spring Pad | radius 1.6 u, 15 s, up 8 / forward 2 u/s, random spin ≤ 0.3 per axis | GDD §6.2; up 8 = 0.64 s air: up 12 (0.96 s) launched cars over the barriers, the largest source of to-track respawns in item races |
+| Oil Slick | radius 2.5 u, 15 s, used up after 3 cars, grip 0.2 for 1.2 s, yaw spin 2.5 (≈ 2 rad/s) | GDD §6.2; 15 s (was 25): a slick caught ≈ 3 cars (QA); used up after 3 (T22): one dropped from the front caught up to 8 of a bunched field (T21 R1) |
+| Spring Pad | radius 1.6 u, 15 s, used up after 3 launches, up 8 / forward 2 u/s, random spin ≤ 0.3 per axis | GDD §6.2; up 8 = 0.64 s air: up 12 (0.96 s) launched cars over the barriers, the largest source of to-track respawns in item races |
 | Shield Bubble | 10 s, bump push 6 u/s (+1.5 up) | GDD §6.2 |
 | Storm Strike | every 0.25 s, power 0 for 1.5 s, hop 4 u/s | GDD §6.2 |
 
@@ -111,7 +114,8 @@ Impulses are Δv of the 2.6-mass reference car (× `REFERENCE_CAR_MASS`); rc_veh
   behind the wall); a rocket that lost its lock re-locks onto a car that comes into its cone
   (`LockOn` again); shield blocks and pops; two EMPs in one tick both blocked, EMP power loss +
   drain, 0.4 s wind-up, no EMP hit through a wall; goo passes on a bump and explodes (carrier and
-  passer hit, exactly 6 s); oil slip + spin, owner spared; spring launch; leech moves 30 % and
+  passer hit, exactly 6 s); oil slip + spin, owner spared; spring launch; a slick and a pad are
+  used up after three cars (the fourth is spared; `Spent`, gone 1.5 s later); leech moves 30 % and
   tows, breaks out of range; orb follows the track round turn 1 and bounces off the barrier (and
   the open edge); orb knocks sideways, never its owner; storm hits only cars ahead, 0.25 s apart,
   and spares a car under cover; seeded roulette
@@ -121,7 +125,8 @@ Impulses are Δv of the 2.6-mass reference car (× `REFERENCE_CAR_MASS`); rc_veh
   start, and a shield never meets them.
 - In the game: `RUST_LOG=info,rc_items=debug cargo run -p recharged -- --user-data-dir
   target/agent-data/T12 --quick-race test_oval --exit-after 45` logs the cube count, every item
-  granted (with its odds band), used and every hit. Item visuals are rc_vfx's (T14).
+  granted (with its odds band), used (with the race time: `used OilSlick at 3.4 s`), every hit
+  and every used-up hazard. Item visuals are rc_vfx's (T14).
 
 ## Item race numbers (QA setup, T19a)
 Six headless toy_town races (`--headless-race --quick-race toy_town --ai 7 --seed 1…6`, logs
@@ -137,6 +142,21 @@ through `tools/scripts/qa/item_stats.py`): used → hits (self-hits), and to-tra
 Goo Bomb passes (log lines `items: goo passed …` / `goo exploded on …`, same six races): before
 the near-miss pass and the chase speed 11 bombs, 4 passes, 7 went off on their never-passed user
 (64 %); with them 9 bombs, 12 passes, 2 on the user (22 %).
+
+T22 (used-up hazards, players behind the AI field): 72 headless 8-car item races
+(`--headless-race --quick-race <track> --ai 7 --unlock-all --seed 5…16`, the six shipped tracks;
+victims per drop counted as `tools/scripts/qa/hazard_start.py` does; the race time of a drop is
+the `used … at T s` line's, interpolated from the log clock for T21's build, which lacks it),
+T21's build → T22:
+
+| | Oil Slick victims / drop (drops) | dropped < 10 s after GO | max | Spring Pad victims / drop | < 10 s | max | used up | to-track respawns / racer-lap |
+|---|---|---|---|---|---|---|---|---|
+| T21 build | 2.89 (208) | 4.48 (46) | 9 | 1.90 (173) | 2.62 (26) | 7 | — | 0.090 |
+| T22 | 1.85 (263) | 2.68 (34) | 3 | 1.66 (258) | 1.98 (40) | 3 | 122 slicks, 98 pads | 0.105 |
+
+Respawns per landed hit are unchanged (0.057 → 0.058): T22 races run 9 % longer (the autopilot
+player starts behind the field and finishes later) with 22 % more items, so there are more drops
+and respawns per race.
 
 ## Known limitations
 - The orb passes through props. Line-of-sight rays go from centre to centre: a car whose centre is

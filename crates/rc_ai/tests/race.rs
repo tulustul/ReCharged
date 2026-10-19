@@ -3,9 +3,11 @@
 
 mod common;
 
+use bevy::prelude::{Entity, Transform};
 use common::*;
 use rc_core::prelude::*;
 use rc_testkit::rc_track::Track;
+use rc_testkit::{load_race, race_phase, step};
 
 /// GDD DoD-2: within 1.5× the expected time (laps × the track's reference lap) …
 const MAX_RATIO: f32 = 1.5;
@@ -89,6 +91,130 @@ fn a_seeded_race_is_deterministic() {
     let a = run(5);
     assert_eq!(a, run(5), "same seed, same race");
     assert_ne!(a.1, run(6).1, "another seed races differently");
+}
+
+/// A player who missed GO: nobody drives this car.
+fn parked_player() -> RacerSetup {
+    RacerSetup {
+        name: "Parked".into(),
+        car: CarId::new("hornet"),
+        controller: Controller::Human {
+            slot: PlayerSlot(0),
+            autopilot: false,
+        },
+        ..Default::default()
+    }
+}
+
+/// An AI has reached the parked car once it is this close behind it along the track (u).
+const REACH_U: f32 = 6.0;
+
+/// 7 Pro AI behind a car parked on the racing line `ahead` u past the pole slot (0 = on pole): for
+/// every AI, the seconds from reaching the parked car (GO for the cars that start that close) to
+/// getting past it (`None` = not within 20 s). `AI_TRACE_ALL=1` prints each AI's distance to the
+/// parked car, lateral, speed and recovery (`R`) every 0.2 s; `AI_TRACE=<index>` traces one car.
+fn parked_car_race(track: &str, seed: u64, ahead: f32) -> Vec<(String, Option<f32>)> {
+    let mut app = race_app();
+    let mut racers = vec![parked_player()];
+    racers.extend(ai_field(&app, 7, Difficulty::Pro, CarClass::Pro));
+    load_race(&mut app, config(track, racers, 1, seed)).expect("loads");
+    while race_phase(&app) != Some(RacePhase::Intro) {
+        step(&mut app, 1);
+    }
+    let line = app.world().resource::<Track>().clone();
+    let s = line.project(line.grid()[0].translation, None).s + ahead;
+    let frame = line.frame_at(s);
+    let on_line = frame.point(line.racing_line_offset_at(s), 0.15);
+    let cars: Vec<Entity> = {
+        let world = app.world_mut();
+        let mut q = world.query::<(Entity, &Racer)>();
+        let mut cars: Vec<(usize, Entity)> = q.iter(world).map(|(e, r)| (r.index, e)).collect();
+        cars.sort();
+        cars.into_iter().map(|(_, e)| e).collect()
+    };
+    app.world_mut().write_message(RespawnCar {
+        car: cars[0],
+        transform: Transform::from_translation(on_line).with_rotation(frame.rotation()),
+        kind: RespawnKind::ToTrack,
+    });
+    while race_phase(&app) != Some(RacePhase::Racing) {
+        step(&mut app, 1);
+    }
+    let trace = std::env::var("AI_TRACE_ALL").is_ok();
+    let traced: Option<usize> = std::env::var("AI_TRACE").ok().and_then(|v| v.parse().ok());
+    let mut reached: Vec<Option<f32>> = vec![None; cars.len()];
+    let mut passed: Vec<Option<f32>> = vec![None; cars.len()];
+    for tick in 0..secs_to_ticks(20.0) {
+        step(&mut app, 1);
+        if let Some(index) = traced {
+            trace_racer(&mut app, index, tick);
+        }
+        let t = ticks_to_secs(tick + 1);
+        let w = app.world();
+        let view = |e: Entity| *w.get::<rc_ai::TrackView>(e).expect("track view");
+        let parked = view(cars[0]).s;
+        if trace && tick.is_multiple_of(12) {
+            let row: Vec<String> = cars[1..]
+                .iter()
+                .map(|&e| {
+                    let (v, brain) = (view(e), w.get::<rc_ai::AiBrain>(e).expect("brain"));
+                    let driving = format!("{:?}", brain.recovery).contains("Driving");
+                    let rec = if driving { ' ' } else { 'R' };
+                    let d = line.delta_s(parked, v.s);
+                    format!("{d:6.1}/{:5.2}/{:4.1}{rec}", v.lateral, v.vel.length())
+                })
+                .collect();
+            println!("t {t:5.2} {}", row.join(" "));
+        }
+        for (i, &car) in cars.iter().enumerate().skip(1) {
+            let ahead = line.delta_s(parked, view(car).s);
+            if reached[i].is_none() && ahead > -REACH_U {
+                reached[i] = Some(if tick == 0 { 0.0 } else { t });
+            }
+            if passed[i].is_none() && ahead > 0.0 {
+                passed[i] = Some(t);
+            }
+        }
+        if passed[1..].iter().all(Option::is_some) {
+            break;
+        }
+    }
+    let name = |e: Entity| app.world().get::<Racer>(e).map(|r| r.name.clone());
+    (1..cars.len())
+        .map(|i| {
+            let secs = passed[i].zip(reached[i]).map(|(p, r)| p - r);
+            (name(cars[i]).unwrap_or_default(), secs)
+        })
+        .collect()
+}
+
+/// GDD §8.1 (R2): nobody queues behind a stopped car — a player who missed GO, parked on the
+/// racing line on pole, is passed by each of the 7 AI behind within about 3 s of reaching it.
+#[test]
+fn every_ai_passes_a_car_parked_on_pole_within_3_s() {
+    for track in ["toy_town", "test_oval"] {
+        let times = parked_car_race(track, 31, 0.0);
+        for (name, secs) in &times {
+            assert!(
+                secs.is_some_and(|s| s <= 3.0),
+                "{track}: {name} took {secs:?} s to get past the parked car: {times:?}"
+            );
+        }
+    }
+}
+
+/// [`parked_car_race`] with `AI_TRACK`, `AI_SEED` and `AI_PARK_AHEAD` (u past the pole slot),
+/// printing each AI's time: `cargo test -p rc_ai --test race -- --ignored --nocapture
+/// parked_probe` (`AI_TRACE_ALL=1` for the trace).
+#[test]
+#[ignore = "tuning probe"]
+fn parked_probe() {
+    let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.to_owned());
+    let track = env("AI_TRACK", "toy_town");
+    let seed: u64 = env("AI_SEED", "31").parse().expect("AI_SEED");
+    let ahead: f32 = env("AI_PARK_AHEAD", "0").parse().expect("AI_PARK_AHEAD");
+    let times = parked_car_race(&track, seed, ahead);
+    println!("{track} seed {seed} ahead {ahead}: {times:?}");
 }
 
 /// Every layout of every catalog track with a data file (forward, reverse, mirrored), 8 Elite AI

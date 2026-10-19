@@ -416,6 +416,52 @@ fn spring_pad_launches_cars() {
     assert!(y > ROAD_Y + 0.8, "in the air: {y}");
 }
 
+/// Puts `car` at `at`, standing.
+fn teleport(app: &mut App, car: Entity, at: Vec3) {
+    app.world_mut()
+        .get_mut::<Transform>(car)
+        .expect("car")
+        .translation = at;
+    set_velocity(app, car, Vec3::ZERO);
+}
+
+/// GDD §6.2: an Oil Slick is used up once it has caught 3 cars, a Spring Pad after 3 launches;
+/// then it catches nobody and fades out instead of popping.
+#[test]
+fn dropped_hazards_are_used_up_after_three_cars_and_fade_out() {
+    for kind in [ItemKind::OilSlick, ItemKind::SpringPad] {
+        let mut app = race(1);
+        let dropper = spawn_car(&mut app, straight(0.0), 0.0);
+        let cars: Vec<Entity> = (0..4)
+            .map(|k| spawn_car(&mut app, straight(-12.0 - 3.0 * k as f32), 0.0))
+            .collect();
+        step(&mut app, 10);
+        fire(&mut app, dropper, kind, false);
+        let hazard = all::<Hazard>(&mut app)[0];
+        let at = pose(&app, hazard).translation;
+        for (k, &car) in cars.iter().enumerate() {
+            teleport(&mut app, car, at);
+            step(&mut app, 2);
+            teleport(&mut app, car, straight(-30.0 - 3.0 * k as f32));
+            step(&mut app, 2);
+        }
+        let caught: Vec<usize> = cars.iter().map(|&c| hits_on(&app, c, kind).len()).collect();
+        assert_eq!(caught, [1, 1, 1, 0], "{kind:?}: used up after three cars");
+        assert!(app.world().get::<Spent>(hazard).is_some(), "{kind:?} spent");
+        let left = app
+            .world()
+            .get::<ItemTimer>(hazard)
+            .expect("still fading")
+            .0;
+        assert!(
+            left > 1.0 && left <= 1.5,
+            "{kind:?} fades out over 1.5 s: {left}"
+        );
+        step_seconds(&mut app, 1.6);
+        assert!(app.world().get_entity(hazard).is_err(), "{kind:?} gone");
+    }
+}
+
 #[test]
 fn leech_coil_moves_charge_and_tows() {
     let mut app = race(1);

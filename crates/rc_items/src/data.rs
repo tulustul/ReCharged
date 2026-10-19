@@ -158,6 +158,8 @@ pub struct OilTuning {
     pub radius: f32,
     /// Lifetime (s).
     pub life_secs: f32,
+    /// Used up once it has caught this many cars.
+    pub cars: u32,
     /// Grip multiplier.
     pub grip: f32,
     /// Grip loss duration (s).
@@ -174,6 +176,8 @@ pub struct SpringTuning {
     pub radius: f32,
     /// Lifetime (s).
     pub life_secs: f32,
+    /// Used up after this many launches.
+    pub cars: u32,
     /// Upward Δv (u/s).
     pub up: f32,
     /// Δv along the car's heading (u/s).
@@ -320,8 +324,14 @@ impl ItemTuning {
                 "`turbo_cell.top_speed` must be within 1–{TOP_SPEED_CAP}"
             ));
         }
-        if self.shock_orb.hits == 0 {
-            out.push("`shock_orb.hits` must be ≥ 1".into());
+        for (name, n) in [
+            ("shock_orb.hits", self.shock_orb.hits),
+            ("oil_slick.cars", self.oil_slick.cars),
+            ("spring_pad.cars", self.spring_pad.cars),
+        ] {
+            if n == 0 {
+                out.push(format!("`{name}` must be ≥ 1"));
+            }
         }
         out
     }

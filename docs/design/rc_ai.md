@@ -10,7 +10,7 @@ pure pursuit & pedals, `traffic.rs` lanes, `scene.rs` what drivers see, `charge.
 ## Pipeline (FixedUpdate)
 | Set | Systems (chained) |
 |---|---|
-| `SimSet::Drivers` | `observe_racers` (track coordinates of every racer: `TrackView`) → `ensure_brains` (an `AiBrain` + `CatchUp` for every new `AiDriver`; re-plans on a tuning hot reload) → `update_catch_up` → `drive_ai` (`CarControl` of every `AiDriver`, autopilot humans included) |
+| `SimSet::Drivers` | `observe_racers` (track coordinates of every racer and how long it has crawled since GO: `TrackView`) → `ensure_brains` (an `AiBrain` + `CatchUp` for every new `AiDriver`; re-plans on a tuning hot reload) → `update_catch_up` → `drive_ai` (`CarControl` of every `AiDriver`, autopilot humans included) |
 | `SimSet::Assist` | `steering_assist`: `steer`, and lowers `throttle` / raises `brake` (auto-brake), `LocalPlayer` without `AiDriver`, `Settings.accessibility.steering_assist` on, Racing only |
 
 `AiTuning` loads on `OnEnter(Loading)` (`LoadingDone("ai")`, or `LoadingFailed` naming file and
@@ -49,9 +49,28 @@ offset and perfect start (`AiLineOffset`, `AiPerfectStart`), mistakes and drift 
   clamped to the **narrowest** legal width within 16 u ahead (`half width − edge_margin_u`) — cars
   queue before the dollhouse instead of arriving three abreast.
 - **Traffic** (`traffic.rs`): a slower car on the planned lateral within 16 u is passed on the side
-  the car already is on, else the other side, else followed. Cars alongside (±3 u along the track)
-  bound the lateral range (never squeeze into a car). Never drive into a slower car that overlaps
-  the *current* lateral: close to 3 u + 0.25 s × v behind it. Lane changes move at 4 u/s.
+  the car already is on, else the other side, else followed (the follow brake uses that car's own
+  speed and distance). Cars alongside (±3 u along the track, beside the car — one nose to tail is
+  ahead or behind, not alongside) bound the lateral range (never squeeze into a car). Never drive
+  into a slower moving car that overlaps the *current* lateral: close to 3 u + 0.25 s × v behind
+  it; within the ±3 u alongside window only when the bodies would touch (two cars side by side
+  held each other up). Well off its line with a free lane of its own, a car does not follow a car
+  that only blocks the planned line: it holds its lane. Lane changes move at 4 u/s.
+- **Stopped cars** (GDD §8.1, T22 R2): a racer slower than 2 u/s along the track for 0.5 s of the
+  race (counted from GO), and not driven by the AI, is stopped — a player who missed GO or
+  stopped. AI cars never count: their crawl is a queue and a crash recovers by itself within
+  seconds (dodging recovering AI cars at speed raised item-race respawns by half on wrench_works).
+  A stopped car is seen 2 s ahead and steered around like a hazard — at once, on the free side,
+  else squeezed past on the roomier side, never followed; cars still behind it do not close a side
+  (they are queued or passing too), and around it a car follows only a car whose body is in its
+  way (two cars beside the stopped one must not wait for each other). It brakes as late as the
+  brakes allow (28 u/s²): to stop 7 u behind the stopped car while the way round is closed (room
+  to pull out at full lock), to 2.5 u when its heading already carries it clear, creeping on at
+  2 u/s while it turns out from a standstill; once beside it, it drives on. A slow dodge aims 2 u
+  ahead (full lock); boxed in closer than 6 u, slower than 1 u/s, with the way round open and room
+  behind, a car backs off 0.6 s (once until it makes progress again; not a stuck try). Before, the
+  follow brake held a car at the parked car's speed — 0 — while the cars beside vetoed every side,
+  so the field drained one car at a time (T21: 5 of 7 rivals held 3–8 s, the last ≈ 20 s).
 - **Hazards and props**: rc_items' Oil Slick / Spring Pad discs and Shock Orbs (reach from
   `ItemRadius`, + 0.6 u) are obstacles, seen 0.8 s ahead at the car's speed (at least the 16 u
   traffic look-ahead: at 30 u/s 16 u left a dodge 0.5 s and cars ran over a slick 3–4 times per
@@ -221,7 +240,7 @@ seven tracks; toy_town and backyard_bash re-measured after their round-2 data ch
 | aisle_rush | Elite+ | 30.9 | 30.25 | 29.82 | 1.021 | 1.057 | 0 | 0 |
 
 ## How to verify
-- `cargo test -p rc_ai` — unit (51): data file, validation messages and debug hot reload; speed
+- `cargo test -p rc_ai` — unit (54): data file, validation messages and debug hot reload; speed
   plan (curvature, corner speed, braking pass, airborne, brake point, star caps & acceleration);
   pure pursuit geometry, speed-sensitive steering, pedals; lane choice (clear road, faster car,
   sides, edge, blocked, hazards, alongside, rear-end); recovery state machine (stuck → reverse →
@@ -229,7 +248,10 @@ seven tracks; toy_town and backyard_bash re-measured after their round-2 data ch
   hoarding, reaction delay, cancelled use, Goo Bomb only with a bump in reach; catch-up target;
   assist blend, auto-brake pedals and the hands-off window; perfect-start statistics; drift zones across the start line;
   prop footprints (walls as circle rows) and no prop obstacle on toy_town's racing line; a hazard
-  beyond a car decides the passing side; a powerless car is not stuck; shortcuts (traversal time;
+  beyond a car decides the passing side; a stopped car is steered around, never followed (a car
+  behind it does not close a side, one beside it does: squeeze), braked for as late as the brakes
+  allow and never pushed, and a car side by side holds nobody up; a car boxed in behind a stopped
+  car backs off once, then the stuck detectors take over; a powerless car is not stuck; shortcuts (traversal time;
   test_oval's and toy_town's not planned, a synthetic bulge's chord planned and followed, a narrow
   one never; the chance table; one decision per approach, kept through the cut, dropped after it
   or when pushed off its corridor).
@@ -242,12 +264,14 @@ seven tracks; toy_town and backyard_bash re-measured after their round-2 data ch
   steers, and changes nothing when off; catch-up slows rivals ahead
   and is 0 in Time Trial; a car put nose-first against a wall gets back into the race; rockets are
   fired only at cars in sight (not through a wall); a car that missed a gate holds reset and is put
-  back before it.
+  back before it; every one of 7 Pro AI passes a car parked on the racing line on pole within 3 s
+  of reaching it, on toy_town and test_oval (`tests/race.rs`).
 - `cargo test -p rc_ai --test race -- --ignored --nocapture every_layout` (QA, ≈ 2–4 min): every
   catalog track with a data file × forward/reverse/mirror, 8 Elite AI in Elite cars, 3 laps,
-  DoD-2 limits. Snapshot 2026-10-19 (T19a): all 28 variants of the 7 tracks pass (no DNF, worst
-  racer 1.43× on test_oval reverse mirror, at most 6 to-track respawns per 24 racer-laps, on
-  maple_street reverse mirror; before T19a QA saw wrench_works fail).
+  DoD-2 limits. Snapshot 2026-10-19 (T22): all 28 variants of the 7 tracks pass (no DNF, worst
+  racer 1.20× on backyard_bash reverse mirror, at most 2 to-track respawns per car and 6 per 24
+  racer-laps, on maple_street; T19a: worst 1.43× on test_oval reverse mirror; before T19a QA saw
+  wrench_works fail).
 - `cargo test -p rc_ai --test race -- --ignored --nocapture lap_table` prints the table above;
   `probe` runs one race with `AI_TRACK`, `AI_DIFF`, `AI_CLASS`, `AI_N`, `AI_LAPS`, `AI_SEED`,
   `AI_REV=1`, `AI_MIRROR=1`, `AI_ITEMS=1`, `AI_TT=1` (the calibration Time Trial instead),
@@ -256,7 +280,15 @@ seven tracks; toy_town and backyard_bash re-measured after their round-2 data ch
   impacts, missed gates and respawn causes); `tt_table` runs `recharged --calibrate-medals`'s Time
   Trials (`AI_TRACKS`, `AI_SEEDS`) and flags runs > 3 s over the layout's median.
   `tests/behaviour.rs assist_probe` drives a throttle-only assisted player (`AI_TRACK`, `AI_LAPS`,
-  `AI_REV`, `AI_MIRROR`, `AI_CAR`, `AI_TRACE`).
+  `AI_REV`, `AI_MIRROR`, `AI_CAR`, `AI_TRACE`). `parked_probe` runs the parked-car race
+  (`AI_TRACK`, `AI_SEED`, `AI_PARK_AHEAD` = u past the pole slot, `AI_TRACE_ALL=1` for every AI's
+  distance, lateral, speed and recovery every 0.2 s, `AI_TRACE=<racer>`) and prints each AI's
+  seconds from reaching the parked car to getting past it. Measured (T22, 6 seeds per row, worst
+  AI): parked on the racing line on pole — toy_town ≤ 2.3 s, test_oval ≤ 1.5 s, backyard_bash
+  ≤ 2.6 s, sofa_circuit ≤ 1.1 s in 3 seeds and 4.4–8.2 s in 3; parked 30 u past the pole (the
+  field arrives at speed) — toy_town ≤ 1.4 s, sofa_circuit ≤ 2.7 s, backyard_bash ≤ 2.1 s,
+  test_oval ≤ 3.4 s but one 6.3 s. Before (T21 AI): the car right behind took 8.8–9.2 s on
+  toy_town and test_oval; with the car on the grid slot itself several never got past in 20 s.
 - In the game: `cargo run -p recharged -- --user-data-dir target/agent-data/T11 --quick-race
   toy_town --ai 7 --autopilot --exit-after 90`.
 
@@ -279,5 +311,9 @@ seven tracks; toy_town and backyard_bash re-measured after their round-2 data ch
   after a hop on a kerbed corner or a bump. toy_town has none since its raised turns' ends are half
   banked (8 seeds × 4 layouts all within 71.5–75.4 s; before: medians up to 81.1 s, 4 outliers).
 - Traffic costs Elite fields ≈ 1.5–2 s per toy_town lap against a solo car (conservative headway).
+- Stopped cars (R2): two cars in line behind a stopped car, one on each side of it, can hold each
+  other for 4–8 s (the lane choice flips between them) — measured only with the stopped car on
+  pole, which the T22 grid rules out in the game (the players start behind the AI field). A
+  stopped AI car is followed, not dodged (its own recovery frees it within seconds).
 - The countdown press is counted in ticks against `COUNTDOWN_TICKS`; extra fixed ticks in a frame
   at GO shift it by a tick or two (still inside the window).

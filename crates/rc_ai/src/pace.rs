@@ -1,6 +1,7 @@
 //! Pace (pure-ish helpers of the driver): the speed plan → throttle and brake, difficulty
 //! mistakes, the cornering adaptation from measured slides.
 
+use bevy::prelude::Vec3;
 use rc_core::prelude::*;
 
 use crate::brain::{AiBrain, Mistake, TrackView};
@@ -8,9 +9,9 @@ use crate::charge;
 use crate::data::DifficultyProfile;
 use crate::driver::{AiCarItem, Path};
 use crate::profile::brake_point_speed;
-use crate::scene::{CAR_HALF_WIDTH_U, Scene, jump_takeoff_ahead, near_jump, nearest_car_ahead};
+use crate::scene::{CAR_HALF_WIDTH_U, OVERLAP_U, Scene, jump_takeoff_ahead, near_jump};
 use crate::steering::pedals;
-use crate::traffic::{Obstacle, rear_end_limit};
+use crate::traffic::{Obstacle, StopShort, rear_end_limit, stop_short_limit};
 
 /// Mistakes are rolled every this many ticks.
 const MISTAKE_PERIOD_TICKS: u64 = 30;
@@ -32,6 +33,12 @@ const ADAPT_MIN: f32 = 0.8;
 const FOLLOW_GAP_U: f32 = 3.0;
 const FOLLOW_HEADWAY_SECS: f32 = 0.25;
 const FOLLOW_CLOSE_RATE: f32 = 1.0;
+/// Behind a stopped car it is steered around, a car waits this far back (u, centre to centre)
+/// while the way round is closed — room to pull out at full lock once it opens — comes no closer
+/// than this, and turns out from a standstill at this speed (u/s).
+const WAIT_GAP_U: f32 = 7.0;
+const CONTACT_GAP_U: f32 = 2.5;
+const CREEP_UPS: f32 = 2.0;
 /// An inside lane never plans below this share of the racing line's cornering (sqrt taken).
 const MIN_LANE_SHARE: f32 = 0.5;
 /// Horizon of the straight-road scan for boosts and Turbo Cells (s at the current speed).
@@ -43,8 +50,6 @@ const MIN_SCAN_UPS: f32 = 5.0;
 /// from 0.8× of it, a slower car drops into the gap.
 pub(crate) const JUMP_RUNUP_U: f32 = 45.0;
 pub(crate) const JUMP_TAKEOFF_SHARE: f32 = 0.9;
-/// Lateral room kept between the bodies of cars that overlap (u, as the driver's alongside gap).
-const OVERLAP_CLEARANCE_U: f32 = 0.4;
 /// A Goo Bomb carrier chasing a car to bump drives this much over its plan (closing 10 u on a
 /// car at 25 u/s takes ≈ 4 s of the 6 s fuse).
 const GOO_CHASE_SCALE: f32 = 1.1;
@@ -111,19 +116,32 @@ pub(crate) fn speed_plan(
     // a jump's run-up, where too little speed drops the car into the gap.
     if !seeking && !near_jump(w.track, view.s, 0.0) {
         let gap = FOLLOW_GAP_U + FOLLOW_HEADWAY_SECS * speed.max(0.0);
-        if let (Some(follow), Some(ahead)) = (path.lane.follow_speed, nearest_car_ahead(obstacles))
-        {
-            brake_to = brake_to.min(follow + (ahead - gap) * FOLLOW_CLOSE_RATE);
+        if let Some(car) = path.lane.follow {
+            brake_to = brake_to.min(car.speed + (car.ahead - gap) * FOLLOW_CLOSE_RATE);
         }
-        let overlap = 2.0 * CAR_HALF_WIDTH_U + OVERLAP_CLEARANCE_U;
+        let touch = 2.0 * CAR_HALF_WIDTH_U;
         if let Some(limit) = rear_end_limit(
             view.lateral,
             speed,
             obstacles,
-            overlap,
+            (OVERLAP_U, touch),
             gap,
             FOLLOW_CLOSE_RATE,
         ) {
+            brake_to = brake_to.min(limit);
+        }
+        let frame = w.track.frame_at(view.s);
+        let heading = car.transform.rotation * Vec3::NEG_Z;
+        let slope = heading.dot(frame.right) / heading.dot(frame.forward).max(0.2);
+        let k = StopShort {
+            touch,
+            wait: WAIT_GAP_U,
+            contact: CONTACT_GAP_U,
+            creep: CREEP_UPS,
+            decel: d.brake_decel,
+        };
+        let aim = path.lane.lateral;
+        if let Some(limit) = stop_short_limit(view.lateral, slope, aim, obstacles, &k) {
             brake_to = brake_to.min(limit);
         }
     }

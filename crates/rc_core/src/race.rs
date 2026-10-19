@@ -112,7 +112,8 @@ pub struct GhostData {
 
 /// Setup of the current session. Written only by rc_game: before `Loading` (replaced for a next
 /// race) and between attempts during `Setup` (new Time Trial ghost, collected Golden Battery,
-/// dropped player → autopilot). Everyone else reads it, once per attempt.
+/// dropped player → autopilot, Versus players re-sorted by the session points). Everyone else
+/// reads it, once per attempt.
 #[derive(Resource, Debug, Clone, Default, PartialEq)]
 pub struct RaceConfig {
     /// Mode.
@@ -121,7 +122,7 @@ pub struct RaceConfig {
     pub variant: TrackVariant,
     /// Laps.
     pub laps: u8,
-    /// Racers in grid order.
+    /// Racers in grid order (GDD §3.2: the rivals in front, the local players behind them).
     pub racers: Vec<RacerSetup>,
     /// Items enabled.
     pub items: bool,

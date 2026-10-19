@@ -16,6 +16,11 @@ use crate::traffic::Obstacle;
 
 /// Half the width of a car (u).
 pub(crate) const CAR_HALF_WIDTH_U: f32 = 0.6;
+/// Cars whose centres are closer than this across the track (u) overlap: a body width plus the
+/// room kept between bodies (as the driver's alongside gap).
+pub(crate) const OVERLAP_U: f32 = 2.0 * CAR_HALF_WIDTH_U + 0.4;
+/// Drive power below this share (EMP, Storm Strike, stall) = the car cannot move by itself.
+pub(crate) const POWERLESS_MUL: f32 = 0.5;
 /// A car's centre above its origin (u) and where rc_items launches a rocket, ahead of (or behind)
 /// that centre (u): the line-of-sight tests use the item's own geometry.
 const CAR_CENTRE_U: f32 = 0.4;
@@ -26,6 +31,8 @@ const FALLBACK_HAZARD_RADIUS_U: f32 = 2.5;
 /// least as far as the traffic look-ahead: at 30 u/s the 16 u look-ahead left a dodge 0.5 s,
 /// and cars ran over a slick 3–4 times per drop.
 const HAZARD_LOOK_AHEAD_SECS: f32 = 0.8;
+/// A stopped car is seen this long ahead at the car's speed (s; at least the traffic look-ahead).
+const STOPPED_LOOK_AHEAD_SECS: f32 = 2.0;
 /// A Goo Bomb carrier hunts the nearest unshielded car it can reach: from alongside to this far
 /// ahead along the track and this far to either side (u). Farther cars ahead are only seeked
 /// when none is in reach (the carrier rarely caught them and blew itself up).
@@ -63,6 +70,11 @@ pub(crate) struct Other {
     pub speed: f32,
     pub ghosted: bool,
     pub shielded: bool,
+    /// Standing still or crawling ([`TrackView::stopped`]) and not driven by the AI — a player who
+    /// stopped: steered around, never followed. An AI car never counts (its crawl is a queue, a
+    /// crash recovers by itself within seconds; dodging recovering AI cars at speed raised
+    /// item-race respawns by half).
+    pub stopped: bool,
 }
 
 /// A hazard to steer around, in track coordinates.
@@ -169,6 +181,8 @@ pub(crate) struct SceneBuffers {
     pub locked: Vec<Entity>,
     /// Cars carrying a Goo Bomb.
     pub goo: Vec<Entity>,
+    /// The AI-driven cars: never stopped (a crawl is a queue, a crash recovers by itself).
+    pub ai: Vec<Entity>,
     pub obstacles: Vec<Obstacle>,
     pub alongside: Vec<f32>,
     /// Static prop obstacles of the current track and its geometry hash.
@@ -214,6 +228,7 @@ impl SceneBuffers {
                 speed: view.vel.dot(track.frame_at(view.s).forward),
                 ghosted: effects.ghosted(),
                 shielded: effects.shielded(),
+                stopped: view.stopped() && !self.ai.contains(&entity),
             }));
         self.hazards.clear();
         self.hazards.extend_from_slice(&self.props);
@@ -290,6 +305,14 @@ impl Scene<'_> {
             .filter(move |o| o.entity != me && !o.ghosted)
     }
 
+    /// No car within `room` u behind `me` overlapping its lateral: it can back up.
+    pub fn room_behind(&self, me: Entity, view: &TrackView, room: f32) -> bool {
+        !self.rivals(me).any(|o| {
+            let behind = self.track.delta_s(o.s, view.s);
+            behind > 0.0 && behind < room && (o.lateral - view.lateral).abs() < OVERLAP_U
+        })
+    }
+
     /// Cars and hazards ahead of `me` into `out` (`seek` = a car to bump, not avoid), the laterals
     /// of cars alongside into `alongside`.
     pub fn obstacles(
@@ -302,7 +325,11 @@ impl Scene<'_> {
     ) {
         let t = &self.tuning.traffic;
         let ahead = |s: f32| self.track.delta_s(view.s, s);
-        // Followers keep no extra berth from a Goo Bomb carrier: the carrier needs a bump.
+        let item_reach = t
+            .look_ahead_u
+            .max(HAZARD_LOOK_AHEAD_SECS * view.vel.length());
+        // Followers keep no extra berth from a Goo Bomb carrier: the carrier needs a bump. A
+        // stopped car is seen early, so the field files into the free lane in good time.
         let cars = self
             .rivals(me)
             .filter(|o| Some(o.entity) != seek)
@@ -312,11 +339,17 @@ impl Scene<'_> {
                 half_width: CAR_HALF_WIDTH_U + t.side_gap_u,
                 speed: o.speed,
                 car: true,
+                stopped: o.stopped,
             })
-            .filter(|o| o.ahead > 0.0 && o.ahead < t.look_ahead_u);
-        let item_reach = t
-            .look_ahead_u
-            .max(HAZARD_LOOK_AHEAD_SECS * view.vel.length());
+            .filter(|o| {
+                let reach = match o.stopped {
+                    true => t
+                        .look_ahead_u
+                        .max(STOPPED_LOOK_AHEAD_SECS * view.vel.length()),
+                    false => t.look_ahead_u,
+                };
+                o.ahead > 0.0 && o.ahead < reach
+            });
         let hazards = self
             .hazards
             .iter()
@@ -327,6 +360,7 @@ impl Scene<'_> {
                     half_width: h.radius + t.hazard_clearance_u,
                     speed: 0.0,
                     car: false,
+                    stopped: false,
                 };
                 (o, if h.item { item_reach } else { t.look_ahead_u })
             })
@@ -334,10 +368,14 @@ impl Scene<'_> {
             .map(|(o, _)| o);
         out.clear();
         out.extend(cars.chain(hazards));
+        // A car nose to tail with this one (bodies overlapping across the track) is ahead or
+        // behind, not alongside: it must not pin the lateral range (a car queued behind a stopped
+        // one could not pull out).
+        let beside = |o: &Other| (o.lateral - view.lateral).abs() >= 2.0 * CAR_HALF_WIDTH_U;
         alongside.clear();
         alongside.extend(
             self.rivals(me)
-                .filter(|o| Some(o.entity) != seek && ahead(o.s).abs() < ALONGSIDE_U)
+                .filter(|o| Some(o.entity) != seek && ahead(o.s).abs() < ALONGSIDE_U && beside(o))
                 .map(|o| o.lateral),
         );
     }
@@ -474,15 +512,6 @@ pub(crate) fn narrowest_ahead(track: &Track, s: f32, distance: f32, edge: f32) -
         x += NARROWING_STEP_U;
     }
     (half - edge).max(0.0)
-}
-
-/// Distance to the nearest car among `obstacles` (u).
-pub(crate) fn nearest_car_ahead(obstacles: &[Obstacle]) -> Option<f32> {
-    obstacles
-        .iter()
-        .filter(|o| o.car)
-        .map(|o| o.ahead)
-        .min_by(f32::total_cmp)
 }
 
 #[cfg(test)]

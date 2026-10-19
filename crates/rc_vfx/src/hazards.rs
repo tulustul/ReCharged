@@ -346,7 +346,7 @@ fn spring_pads(
     mut fx: ResMut<Fx>,
     mut hits: MessageReader<HitEvent>,
     poses: Poses,
-    hazards: Query<(&Hazard, Option<&ItemRadius>)>,
+    hazards: Query<(&Hazard, Option<&ItemRadius>, Option<&ItemTimer>)>,
     mut roots: Query<(&Follows, &mut PadFx, &mut Transform), (With<FxVisual>, Without<Part>)>,
     mut parts: Query<&mut Transform, (With<Part>, With<FxVisual>)>,
 ) {
@@ -358,10 +358,14 @@ fn spring_pads(
         .map(|h| h.victim)
         .collect();
     for (follows, mut pad, mut transform) in &mut roots {
-        let (Ok((_, radius)), Some(pose)) = (hazards.get(follows.0), poses.of(follows.0)) else {
+        let (Ok((_, radius, timer)), Some(pose)) = (hazards.get(follows.0), poses.of(follows.0))
+        else {
             continue;
         };
-        *transform = pose;
+        // Like a puddle drying up: shrinks away over the last OIL_DRY_S of its timer (a used-up
+        // pad gets exactly that long) instead of popping.
+        let fade = timer.map_or(1.0, |t| (t.0 / OIL_DRY_S).clamp(0.0, 1.0));
+        *transform = pose.with_scale(Vec3::splat(fade.sqrt().max(0.01)));
         let r = radius.map_or(1.6, |r| r.0);
         let near = launched.iter().any(|&car| {
             poses

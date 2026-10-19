@@ -1,6 +1,7 @@
 //! Hazards (GDD §6.2). Oil Slick and Spring Pad are dropped behind the car onto the ground below
 //! (nothing below = nothing dropped) and live 15 s; a car *entering* one (centre over the disc,
-//! near its surface; leaving the disc re-arms it) slips (`Grip` 0.2 + spin) or is launched.
+//! near its surface; leaving the disc re-arms it) slips (`Grip` 0.2 + spin) or is launched. One
+//! that has caught its last car (3, `items.ron`) is `Spent`: it fades out and triggers nothing.
 //! The Goo Bomb sticks to its user: a bump (rapier `CollisionEvent::Started` between two racers),
 //! or a near miss (the chassis within 0.6 u), passes it on — never to a shielded or ghosted car,
 //! never back to the giver within 0.5 s; its carrier drives at 1.1× top speed to catch someone.
@@ -24,6 +25,9 @@ const ZONE_BELOW_U: f32 = 1.0;
 const ZONE_ABOVE_U: f32 = 1.5;
 /// Dropped hazards are looked for this far above and below the drop point (u).
 const DROP_PROBE_U: f32 = 3.0;
+/// A used-up hazard fades out over this long (s): rc_vfx dries an oil puddle up over the last
+/// 1.5 s of its timer, so it shrinks away instead of popping.
+const SPENT_FADE_SECS: f32 = 1.5;
 /// The Goo Bomb sits this far above its carrier's origin (u).
 const GOO_HEIGHT_U: f32 = 0.9;
 /// Upward Δv of a Shield Bubble push (u/s).
@@ -37,10 +41,12 @@ const GOO_PASS_GAP_U: f32 = 0.6;
 const GOO_CARRIER_TOP_SPEED: f32 = 1.1;
 const GOO_SPEED_REFRESH_S: f32 = 0.1;
 
-/// The cars currently over a dropped hazard's trigger disc (its `ItemRadius`).
+/// The cars currently over a dropped hazard's trigger disc (its `ItemRadius`), and how many it
+/// has caught.
 #[derive(Component, Debug, Clone, Default, PartialEq)]
 pub(crate) struct Zone {
     pub inside: Vec<Entity>,
+    pub caught: u32,
 }
 
 /// A Goo Bomb's passing state.
@@ -198,7 +204,9 @@ fn zone_blow(
     }
 }
 
-/// Dropped hazards: lifetime, entering cars (owner immunity), re-arming.
+/// Dropped hazards: lifetime, entering cars (owner immunity), re-arming, used up after their
+/// last catch.
+#[allow(clippy::type_complexity)]
 pub(crate) fn zones(
     mut commands: Commands,
     tuning: Res<ItemTuning>,
@@ -212,17 +220,25 @@ pub(crate) fn zones(
         &ItemRadius,
         &mut ItemTimer,
         &Transform,
+        Has<Spent>,
     )>,
     cars: Query<(Entity, &Racer, &Transform)>,
     mut hits: Hits,
 ) {
     let seed = config.map_or(0, |c| c.seed);
     let immunity = u64::from(secs_to_ticks(tuning.owner_immunity_secs));
-    for (entity, hazard, born, mut zone, radius, mut timer, at) in &mut zones {
+    for (entity, hazard, born, mut zone, radius, mut timer, at, spent) in &mut zones {
         if !run_down(&mut timer.0) {
             commands.entity(entity).despawn();
             continue;
         }
+        if spent {
+            continue;
+        }
+        let limit = match hazard.kind {
+            HazardKind::OilSlick => tuning.oil_slick.cars,
+            _ => tuning.spring_pad.cars,
+        };
         for (car, racer, t) in &cars {
             let local = at.rotation.inverse() * (t.translation - at.translation);
             let over = Vec2::new(local.x, local.z).length() <= radius.0;
@@ -251,7 +267,15 @@ pub(crate) fn zones(
                 clock.0,
                 racer.index,
             );
-            hits.land(car, hazard.owner, by, entity, blow);
+            if hits.land(car, hazard.owner, by, entity, blow) {
+                zone.caught += 1;
+                if zone.caught >= limit {
+                    debug!("items: {by:?} {entity} used up after {} cars", zone.caught);
+                    timer.0 = timer.0.min(SPENT_FADE_SECS);
+                    commands.entity(entity).insert(Spent);
+                    break;
+                }
+            }
         }
     }
 }

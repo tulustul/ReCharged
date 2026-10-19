@@ -50,7 +50,7 @@ fn race_buttons_start_restart_and_quit_without_reloading() {
     });
     let config = app.world().resource::<RaceConfig>().clone();
     assert_eq!(
-        (config.racers.len(), config.racers[0].car.as_str()),
+        (config.racers.len(), config.racers[2].car.as_str()),
         (3, "zip")
     );
     // rc_race (not in this app) would run the intro and countdown; stand in for it.

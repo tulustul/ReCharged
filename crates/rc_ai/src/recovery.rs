@@ -9,6 +9,10 @@ const TAP_SECS: f32 = 0.15;
 const GRACE_SECS: f32 = 1.0;
 /// Below this speed (u/s) a car on its roof counts as resting there.
 const FLIPPED_MAX_UPS: f32 = 2.0;
+/// Boxed in right behind a stopped car with the way round open, the car backs off this long (s)
+/// to get room to pull out — once until it makes progress again (wedged at a wall it would back
+/// off forever); not a stuck try (the next one still reverses before it resets).
+const BACK_OFF_SECS: f32 = 0.6;
 /// Less progress than this (u) over the long window (s) means the car is trapped (under a ramp,
 /// wedged between props): hold reset whatever the reverse tries say.
 const TRAPPED_PROGRESS_U: f32 = 12.0;
@@ -29,6 +33,8 @@ pub struct Sense {
     pub flipped: bool,
     /// No drive power (EMP, Storm Strike, a stalled start): it cannot move, so it is not stuck.
     pub powerless: bool,
+    /// Too close behind a stopped car to pull out round it, with room behind: back off first.
+    pub boxed: bool,
 }
 
 /// What recovery wants the car to do.
@@ -46,6 +52,8 @@ pub enum Action {
 enum State {
     Driving,
     Reversing(f32),
+    /// Reversing to make room behind a stopped car (not a stuck try).
+    BackingOff(f32),
     Resetting(f32),
 }
 
@@ -60,6 +68,8 @@ pub struct Recovery {
     window_progress: f32,
     grace: f32,
     tries: u32,
+    /// Backed off from a stopped car since the last progress window with progress.
+    backed_off: bool,
     long_window: f32,
     long_progress: f32,
 }
@@ -75,6 +85,7 @@ impl Default for Recovery {
             window_progress: 0.0,
             grace: GRACE_SECS,
             tries: 0,
+            backed_off: false,
             long_window: 0.0,
             long_progress: 0.0,
         }
@@ -113,6 +124,13 @@ impl Recovery {
                 };
                 return Action::Reverse;
             }
+            State::BackingOff(left) => {
+                self.state = match left - dt {
+                    l if l > 0.0 => State::BackingOff(l),
+                    _ => self.back_to_driving(),
+                };
+                return Action::Reverse;
+            }
             State::Resetting(left) => {
                 self.state = match left - dt {
                     l if l > 0.0 => State::Resetting(l),
@@ -121,6 +139,11 @@ impl Recovery {
                 return Action::HoldReset;
             }
             State::Driving => {}
+        }
+        if sense.boxed && !sense.powerless && !self.backed_off {
+            self.backed_off = true;
+            self.state = State::BackingOff(BACK_OFF_SECS);
+            return Action::Reverse;
         }
         self.grace = (self.grace - dt).max(0.0);
         self.window += dt;
@@ -131,6 +154,7 @@ impl Recovery {
         if self.window >= t.progress_secs {
             if self.window_progress >= t.progress_u {
                 self.tries = 0;
+                self.backed_off = false;
             }
             self.window = 0.0;
             self.window_progress = 0.0;
@@ -209,6 +233,7 @@ mod tests {
             off_course: false,
             flipped: false,
             powerless: false,
+            boxed: false,
         }
     }
 
@@ -283,6 +308,41 @@ mod tests {
             (first as f32 * DT - 0.8).abs() < 0.05,
             "judged from the moment the power returned: {}",
             first as f32 * DT
+        );
+    }
+
+    #[test]
+    fn a_car_boxed_in_behind_a_stopped_car_backs_off_at_once_once() {
+        let mut r = Recovery::default();
+        let boxed = Sense {
+            boxed: true,
+            ..stuck()
+        };
+        assert!(
+            run(&mut r, boxed, 0.5)
+                .iter()
+                .all(|a| *a == Action::Reverse),
+            "no grace"
+        );
+        assert_eq!(r.tries, 0, "making room is not a stuck try");
+        let after = run(&mut r, driving(), 1.0);
+        assert_eq!(after[..5], [Action::Reverse; 5], "the back-off runs out");
+        assert_eq!(after.last(), Some(&Action::Drive));
+        // Boxed again without progress (wedged at a wall): no endless backing off — the stuck
+        // detectors take over (reverse, then reset).
+        let mut r = Recovery::default();
+        let actions = run(&mut r, boxed, 8.0);
+        let backing = actions
+            .iter()
+            .take_while(|a| **a == Action::Reverse)
+            .count();
+        assert!(
+            (36..=37).contains(&backing),
+            "one 0.6 s back-off: {backing} ticks"
+        );
+        assert!(
+            actions.contains(&Action::HoldReset),
+            "then reverse and reset"
         );
     }
 

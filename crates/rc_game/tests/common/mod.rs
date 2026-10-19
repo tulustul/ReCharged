@@ -44,7 +44,8 @@ pub struct Geometry(pub u64);
 #[derive(Resource)]
 pub struct FinishAfter(pub Option<u32>);
 
-/// Grid indices in finishing order (empty = grid order).
+/// The finishing order as indices into the field listed players first (by slot), then the rivals
+/// in grid order (empty = that order): tests describe results whatever the grid order.
 #[derive(Resource, Default)]
 pub struct FinishOrder(pub Vec<usize>);
 
@@ -215,8 +216,8 @@ fn placeholder_phases(
     }
 }
 
-/// rc_race stand-in: everyone finishes at once in `FinishOrder`; results and phase as rc_race
-/// writes them.
+/// rc_race stand-in: everyone finishes at once in `FinishOrder` (players first by default);
+/// results and phase as rc_race writes them.
 fn placeholder_race(
     phase: Option<Res<State<RacePhase>>>,
     (mut clock, finish, order, geometry): (
@@ -239,9 +240,14 @@ fn placeholder_race(
     if clock.0 != after {
         return;
     }
+    let mut field: Vec<usize> = (0..config.racers.len()).collect();
+    field.sort_by_key(|&i| match config.racers[i].controller {
+        Controller::Human { slot, .. } => (0, slot.0),
+        Controller::Ai { .. } => (1, 0),
+    });
     let order: Vec<usize> = match order.0.is_empty() {
-        true => (0..config.racers.len()).collect(),
-        false => order.0.clone(),
+        true => field,
+        false => order.0.iter().map(|&k| field[k]).collect(),
     };
     let entries = order
         .iter()

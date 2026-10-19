@@ -1,0 +1,16 @@
+# T22a: 2P Versus with AI (GDD §3.2): the players start behind the rivals in slot order; from the
+# second race (Rematch) in reverse order of the session points — the leader starts last.
+wait countdown
+0.8 shot vs_00_race1_countdown
+wait racing
+@60 shot vs_01_race1_1s
+wait finished
+3.5 shot vs_02_results
+0.3 nav keyboardA confirm          # Continue → scoreboard
+2.0 shot vs_03_scoreboard
+0.3 nav keyboardA confirm          # Rematch
+wait countdown
+0.8 shot vs_04_race2_countdown
+wait racing
+@60 shot vs_05_race2_1s
+1.0 exit

@@ -87,7 +87,7 @@ and drawn at `ItemRadius` wherever a reach matters — **what you see is what tr
 | EMP | wind-up shell swelling around the user + converging sparks; pulse: two rings racing to the pulse radius, an expanding rim-only shell, radial arcs |
 | Goo Bomb | glossy slime blob on its carrier, red light blinking 1 s → 0.12 s as the fuse runs out, drips; last 2 s: red ring of the blast radius on the ground; blast: slime splatter across the radius |
 | Oil Slick | dark puddle with thin-film sheen (generated texture) at its radius; spreads in 0.4 s, shrinks over its last 1.5 s |
-| Spring Pad | rubber base, chrome coils, yellow plate, glowing ring at its radius; bounces (damped spring) + sparks when it launches someone |
+| Spring Pad | rubber base, chrome coils, yellow plate, glowing ring at its radius; bounces (damped spring) + sparks when it launches someone; shrinks away over its last 1.5 s like a drying puddle (a used-up pad gets exactly that long) |
 | Shield Bubble | fresnel energy shell (`bubble.wesl`) around the car; flashes on blocked hits, blinks in the last 2 s, bursts into shards when it ends |
 | Storm Strike | `HitEvent { by: StormStrike }`: jagged bolt (midpoint displacement) from 26 u above, branches, glow, flash, sparks |
 | Hits | orb / leech / EMP zaps, oil splashes, blue deflection sparks on blocked hits |

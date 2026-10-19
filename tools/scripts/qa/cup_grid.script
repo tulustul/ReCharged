@@ -1,0 +1,8 @@
+# T22a: the Cup grid (GDD §3.2): the player starts behind the seven rivals.
+wait countdown
+0.8 shot cup_00_countdown
+wait racing
+@60 shot cup_01_1s
+@180 shot cup_02_3s
+@420 shot cup_03_7s
+1.0 exit

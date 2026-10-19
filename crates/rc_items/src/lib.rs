@@ -10,7 +10,8 @@
 //!   paths), rapier scene queries (walls, sight, ground) and `CollisionEvent`s (bumps),
 //!   `ApplyEffect` (from items and race), `UserPaths`.
 //! - **Outputs:** `Pickup` / `Projectile` / `Hazard` entities with `ItemTarget` / `ItemTimer` /
-//!   `ItemRadius` (attempt-scoped, `Interpolated` + `Teleported` at spawn), `ItemSlot`,
+//!   `ItemRadius` (attempt-scoped, `Interpolated` + `Teleported` at spawn; a used-up dropped
+//!   hazard gets `Spent` and fades out), `ItemSlot`,
 //!   `StatusEffects`, `ItemEvent`, `HitEvent`, `Explosion`, `ApplyImpulse` (Δv ×
 //!   `REFERENCE_CAR_MASS`; rc_vehicle scales by weight), `ApplyEffect` (own effects, consumed
 //!   here), `DrainCharge`, `GrantCharge`, `LoadingDone("items")` / `LoadingFailed`.

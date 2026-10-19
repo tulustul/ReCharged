@@ -133,17 +133,19 @@ pub(crate) fn roulette(
 /// `CarControl::use_item` with a ready item: the slot empties, `ItemEvent::Used` and
 /// [`UseItem`] go out (racers who finished keep theirs).
 pub(crate) fn use_items(
+    status: Option<Res<RaceStatus>>,
     mut racers: Query<(Entity, &CarControl, &RaceProgress, &mut ItemSlot)>,
     mut events: MessageWriter<ItemEvent>,
     mut uses: MessageWriter<UseItem>,
 ) {
+    let race_secs = status.map_or(0.0, |s| ticks_to_secs(s.race_ticks));
     for (racer, control, progress, mut slot) in &mut racers {
         let Some(kind) = slot.item else { continue };
         if !control.use_item || progress.finished || slot.roulette > 0.0 {
             continue;
         }
         slot.item = None;
-        debug!("items: {racer} used {kind:?}");
+        debug!("items: {racer} used {kind:?} at {race_secs:.1} s");
         events.write(ItemEvent {
             racer,
             kind: ItemEventKind::Used(kind),

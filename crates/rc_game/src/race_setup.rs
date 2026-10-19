@@ -1,9 +1,11 @@
 //! `RaceRequest` → `RaceConfig` per mode (pure), and validation against the profile's unlocks.
 //!
-//! Grid: local players first (slot colours; "Player" alone, P1–P4 otherwise), then rivals in a
-//! seeded order (`RngStream::RaceSetup`). Rivals drive the cup's class in cups and the class of
-//! the best human car elsewhere (Secret counts as Elite, GDD §8.3); cars shared by several racers
-//! get distinct base paints.
+//! Grid (GDD §3.2): rivals in a seeded order (`RngStream::RaceSetup`) fill the front, the local
+//! players start behind them in slot order (slot colours; "Player" alone, P1–P4 otherwise) — a
+//! Versus session re-sorts its players by the session points at every attempt
+//! (`series::versus_grid`). Rivals drive the cup's class in cups and the class of the best human
+//! car elsewhere (Secret counts as Elite, GDD §8.3); cars shared by several racers get distinct
+//! base paints.
 
 use rc_core::prelude::*;
 
@@ -198,6 +200,8 @@ pub(crate) fn build_race_config(
             },
         });
     }
+    // The rivals fill the front of the grid, the players start behind them.
+    racers.rotate_left(humans.len());
 
     let weather = match cup_race {
         Some((_, race)) => race.weather,
@@ -334,14 +338,14 @@ mod tests {
         let config = build(&request, &all).expect("valid");
         assert_eq!(config.racers.len(), MAX_RACERS);
         assert!(matches!(
-            config.racers[0].controller,
+            config.racers[MAX_RACERS - 1].controller,
             Controller::Human {
                 slot: PlayerSlot(0),
                 autopilot: false
             }
         ));
         let c = catalog();
-        for racer in &config.racers[1..] {
+        for racer in &config.racers[..MAX_RACERS - 1] {
             assert_eq!(
                 c.car(&racer.car).map(|car| car.class),
                 Some(CarClass::Pro),
@@ -370,7 +374,7 @@ mod tests {
         };
         let names = |seed| -> Vec<String> {
             let config = build(&request(seed), &fresh()).expect("valid");
-            config.racers[1..].iter().map(|r| r.name.clone()).collect()
+            config.racers[..3].iter().map(|r| r.name.clone()).collect()
         };
         assert_eq!(names(1), names(1), "deterministic");
         assert_eq!(names(1).len(), 3);
@@ -378,6 +382,28 @@ mod tests {
             (2..40).any(|s| names(s) != names(1)),
             "the seed changes the field"
         );
+    }
+
+    #[test]
+    fn rivals_fill_the_front_of_the_grid_and_the_players_start_behind_in_slot_order() {
+        let request = RaceRequest {
+            players: 3,
+            ai: Some(3),
+            seed: Some(4),
+            ..RaceRequest::quick("toy_town")
+        };
+        let config = build(&request, &fresh()).expect("valid");
+        let grid: Vec<Option<u8>> = config
+            .racers
+            .iter()
+            .map(|r| match r.controller {
+                Controller::Human { slot, .. } => Some(slot.0),
+                Controller::Ai { .. } => None,
+            })
+            .collect();
+        assert_eq!(grid, [None, None, None, Some(0), Some(1), Some(2)]);
+        let names: Vec<&str> = config.racers[3..].iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, ["P1", "P2", "P3"]);
     }
 
     #[test]
@@ -441,7 +467,7 @@ mod tests {
         );
         assert_eq!((config.racers.len(), config.laps), (MAX_RACERS, 3));
         let c = catalog();
-        for racer in &config.racers[1..] {
+        for racer in &config.racers[..MAX_RACERS - 1] {
             assert_eq!(c.car(&racer.car).map(|x| x.class), Some(CarClass::Elite));
             assert!(matches!(
                 racer.controller,
@@ -488,26 +514,21 @@ mod tests {
         validate(&request, &c, &profile).expect("valid");
         let config = build_race_config(&request, &ctx).expect("valid");
         assert_eq!(config.racers.len(), MAX_RACERS);
-        assert_eq!(
-            (
-                config.racers[1].name.as_str(),
-                config.racers[1].car.as_str()
-            ),
-            ("P3", "dumpster")
-        );
-        assert_eq!(config.racers[1].color, SLOT_COLORS[2]);
+        let (p1, p3) = (&config.racers[6], &config.racers[7]);
+        assert_eq!((p3.name.as_str(), p3.car.as_str()), ("P3", "dumpster"));
+        assert_eq!(p3.color, SLOT_COLORS[2]);
         assert!(matches!(
-            config.racers[1].controller,
+            p3.controller,
             Controller::Human {
                 autopilot: true,
                 ..
             }
         ));
         assert!(matches!(
-            config.racers[0].controller,
+            p1.controller,
             Controller::Human {
+                slot: PlayerSlot(0),
                 autopilot: false,
-                ..
             }
         ));
         assert_eq!(
@@ -561,14 +582,14 @@ mod tests {
         };
         let config = build_race_config(&RaceRequest::quick("toy_town"), &ctx).expect("valid");
         assert!(matches!(
-            config.racers[1].controller,
+            config.racers[0].controller,
             Controller::Ai {
                 difficulty: Difficulty::Pro,
                 ..
             }
         ));
         assert!(matches!(
-            config.racers[0].controller,
+            config.racers[MAX_RACERS - 1].controller,
             Controller::Human {
                 autopilot: true,
                 ..

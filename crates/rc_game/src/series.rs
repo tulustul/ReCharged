@@ -1,12 +1,19 @@
-//! Points series (pure): cup runs and the Versus scoreboard (GDD §3.1, §3.3).
+//! Points series (pure): cup runs and the Versus scoreboard (GDD §3.1, §3.3), and the Versus
+//! grid order they set (GDD §3.2).
 //!
 //! A [`Series`] stores each finished race's positions. Recording a race replaces any earlier
 //! result of the same race, and a restart removes it, so restarting reverts that race's points.
+
+use std::cmp::Reverse;
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
 use crate::profile::Trophy;
+
+pub(crate) fn build(app: &mut App) {
+    app.add_systems(OnEnter(RacePhase::Setup), versus_grid);
+}
 
 /// Championship points by finishing position (8 racers, GDD §3.1).
 pub const POINTS: [u32; MAX_RACERS] = [10, 8, 6, 5, 4, 3, 2, 1];
@@ -184,6 +191,44 @@ impl VersusSession {
     }
 }
 
+/// Lines up the local players — the end of the grid, behind the rivals — in reverse order of the
+/// standings of `series` (GDD §3.2): the leader starts last; players without a result yet start
+/// first, in slot order. The first race of a session keeps the slot order.
+pub(crate) fn order_players(racers: &mut [RacerSetup], series: &Series) {
+    let standings = series.standings();
+    let place = |r: &RacerSetup| {
+        let key = RacerKey::of(&r.controller);
+        let place = standings.iter().position(|s| s.key == key);
+        let slot = match r.controller {
+            Controller::Human { slot, .. } => slot.0,
+            Controller::Ai { .. } => u8::MAX,
+        };
+        (Reverse(place.unwrap_or(usize::MAX)), slot)
+    };
+    let human = |r: &RacerSetup| matches!(r.controller, Controller::Human { .. });
+    let first = racers.iter().position(human).unwrap_or(racers.len());
+    racers[first..].sort_by_key(place);
+}
+
+/// `OnEnter(RacePhase::Setup)`: the grid of a Versus attempt follows the session points. Every
+/// attempt passes here, so a rematch re-sorts the players and a restart keeps the race's order
+/// (its result was reverted).
+fn versus_grid(session: Option<Res<VersusSession>>, config: Option<ResMut<RaceConfig>>) {
+    let (Some(session), Some(mut config)) = (session, config) else {
+        return;
+    };
+    if config.mode != GameMode::Versus {
+        return;
+    }
+    let mut racers = config.racers.clone();
+    order_players(&mut racers, &session.series);
+    if racers != config.racers {
+        let names: Vec<&str> = racers.iter().map(|r| r.name.as_str()).collect();
+        info!("Versus grid by the session points: {names:?}");
+        config.racers = racers;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,6 +306,61 @@ mod tests {
         s.record(vec![(P1, 3)]);
         assert_eq!(s.points(&P1), 16, "a race is scored once");
         assert_eq!(s.race_points(1, &P1), 6);
+    }
+
+    fn racer(name: &str, controller: Controller) -> RacerSetup {
+        RacerSetup {
+            name: name.into(),
+            controller,
+            ..Default::default()
+        }
+    }
+
+    fn human(slot: u8) -> RacerSetup {
+        let controller = Controller::Human {
+            slot: PlayerSlot(slot),
+            autopilot: false,
+        };
+        racer(&format!("P{}", slot + 1), controller)
+    }
+
+    fn names(racers: &[RacerSetup]) -> Vec<&str> {
+        racers.iter().map(|r| r.name.as_str()).collect()
+    }
+
+    #[test]
+    fn versus_players_start_behind_the_rivals_in_reverse_order_of_the_points() {
+        let ai = |id: &str| {
+            let rival = Controller::Ai {
+                rival: id.into(),
+                difficulty: Difficulty::Pro,
+            };
+            racer(id, rival)
+        };
+        let grid = vec![ai("dash"), ai("nova"), human(0), human(1), human(2)];
+        let mut s = Series::default();
+        let mut racers = grid.clone();
+        order_players(&mut racers, &s);
+        assert_eq!(racers, grid, "first race: slot order behind the rivals");
+
+        // P2 won, P3 second, P1 last; then P1 wins the next race: P2 18, P1 13, P3 11.
+        let p = |slot| RacerKey::Player(PlayerSlot(slot));
+        s.record(vec![(p(1), 1), (p(2), 2), (p(0), 5)]);
+        order_players(&mut racers, &s);
+        assert_eq!(
+            names(&racers),
+            ["dash", "nova", "P1", "P3", "P2"],
+            "the leader starts last"
+        );
+        s.race = 1;
+        s.record(vec![(p(0), 1), (p(1), 2), (p(2), 4)]);
+        order_players(&mut racers, &s);
+        assert_eq!(names(&racers), ["dash", "nova", "P3", "P1", "P2"]);
+
+        // A player without a result yet (joined later) starts first among the players.
+        let mut racers = vec![ai("dash"), human(0), human(1), human(2), human(3)];
+        order_players(&mut racers, &s);
+        assert_eq!(names(&racers), ["dash", "P4", "P3", "P1", "P2"]);
     }
 
     #[test]

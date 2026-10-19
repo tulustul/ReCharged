@@ -1,16 +1,17 @@
 //! # rc_ai — AI drivers (L2)
 //!
 //! - **Responsibilities:** `CarControl` of `AiDriver` racers — pure pursuit on a personal offset
-//!   of the racing line, a per-car speed plan × difficulty, overtaking lanes, hazard and static
-//!   prop avoidance, drift for charge and boost on straights, item use with reaction delays,
-//!   perfect-start timing, stuck recovery, difficulty mistakes, shortcuts that are faster — the
-//!   autopilot (an `AiDriver` on a `LocalPlayer` racer), `CatchUp`, and the steering assist
-//!   (`SimSet::Assist`: `steer`, plus a gentle auto-brake that only lowers `throttle` / raises
-//!   `brake`, for assisted local players).
+//!   of the racing line, a per-car speed plan × difficulty, overtaking lanes, hazard, static prop
+//!   and stopped-car avoidance, drift for charge and boost on straights, item use with reaction
+//!   delays, perfect-start timing, stuck recovery, difficulty mistakes, shortcuts that are
+//!   faster — the autopilot (an `AiDriver` on a `LocalPlayer` racer), `CatchUp`, and the steering
+//!   assist (`SimSet::Assist`: `steer`, plus a gentle auto-brake that only lowers `throttle` /
+//!   raises `brake`, for assisted local players).
 //! - **Inputs:** `Track` (rc_track: racing line, frames, projection, jumps, walls), racer
 //!   `Transform`s, `VehicleTelemetry`, `Charge`, `StatusEffects`, `ItemSlot`, `RaceProgress`,
 //!   `Standings`, rc_items' `Hazard` / `Projectile` entities (`ItemTarget` = rocket lock or Goo
-//!   carrier, `ItemRadius` = reach), the rapier world (line of sight for rockets and the Leech
+//!   carrier, `ItemRadius` = reach; `Spent` hazards are ignored), `RacePhase`, the rapier world
+//!   (line of sight for rockets and the Leech
 //!   Coil), `CarRespawned`, `RaceConfig` (seed, catch-up, mode), `Catalog` (car stars, rival
 //!   personalities), `WeatherState`, `Settings` (assist), `assets/data/ai.ron` ([`AiTuning`]).
 //! - **Outputs:** `CarControl` of AI racers (and `steer` / the auto-brake of assisted humans),

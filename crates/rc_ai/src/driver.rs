@@ -15,7 +15,8 @@ use crate::items::{ItemView, Temper};
 use crate::pace;
 use crate::recovery::{Action, Sense};
 use crate::scene::{
-    CAR_HALF_WIDTH_U, Scene, SceneBuffers, behind_wall, narrowest_ahead, near_jump,
+    CAR_HALF_WIDTH_U, OVERLAP_U, POWERLESS_MUL, Scene, SceneBuffers, behind_wall, narrowest_ahead,
+    near_jump,
 };
 use crate::shortcut::take_chance;
 use crate::steering::{lookahead, pursuit_curvature, steer_for_curvature};
@@ -40,8 +41,6 @@ const JUMP_LANE_U: f32 = 0.8;
 const JUMP_DODGE_U: f32 = 3.0;
 /// `up_dot` below this = on the side or roof (GDD §5.4).
 const FLIPPED_UP_DOT: f32 = 0.3;
-/// Drive power below this share (EMP, Storm Strike, stall) = the car cannot move by itself.
-const POWERLESS_MUL: f32 = 0.5;
 /// The next gate still to validate this far behind the car (u) = it was missed (passed outside
 /// the gate after a slide or a shove): the car holds reset and rc_race puts it back before the
 /// gate — a respawn instead of a whole extra lap.
@@ -57,6 +56,14 @@ const SLIDE_REFERENCE_RAD: f32 = 0.14;
 const ALONGSIDE_CLEARANCE_U: f32 = 0.4;
 /// RNG key offset of the per-lap shortcut decision.
 const SHORTCUT_KEY: u64 = 6;
+/// A stopped car overlapping the car's lateral less than this far ahead (u, centre to centre),
+/// the car slower than this (u/s) and the way round open: too close to pull out at full lock (it
+/// waits 7 u back, rc_ai's pace) — the car backs off first, when no car is this close behind it.
+const BOXED_U: f32 = 6.0;
+const BOXED_UPS: f32 = 1.0;
+const BACK_OFF_ROOM_U: f32 = 3.0;
+/// Shortest pure-pursuit look-ahead of a dodge (u): at low speed it asks for full lock.
+const DODGE_LOOKAHEAD_MIN_U: f32 = 2.0;
 
 /// Ticks since the attempt began (keys the AI's RNG draws). Reset in `OnEnter(RacePhase::Setup)`.
 #[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -105,7 +112,7 @@ pub(crate) fn drive_ai(
     standings: Option<Res<Standings>>,
     mut cars: Query<AiCar>,
     racers: Query<(Entity, &TrackView, &StatusEffects), With<Racer>>,
-    hazards: Query<HazardItem>,
+    hazards: Query<HazardItem, Without<Spent>>,
     projectiles: Query<ProjectileItem>,
     rapier: ReadRapierContext,
     mut buffers: Local<SceneBuffers>,
@@ -117,6 +124,8 @@ pub(crate) fn drive_ai(
     let phase = phase.map_or(RacePhase::Setup, |p| *p.get());
     let ctx = rapier.single().ok();
     let buffers = &mut *buffers;
+    buffers.ai.clear();
+    buffers.ai.extend(cars.iter().map(|c| c.entity));
     buffers.fill(&track, racers.iter(), hazards.iter(), projectiles.iter());
     let scene = Scene {
         track: &track,
@@ -235,6 +244,15 @@ fn drive(
                 && view.height < -UNDER_RIBBON_U),
         flipped: tel.up_dot < FLIPPED_UP_DOT,
         powerless: car.effects.power_mul() < POWERLESS_MUL,
+        boxed: speed.abs() < BOXED_UPS
+            && obstacles.iter().any(|o| {
+                let touch = 2.0 * CAR_HALF_WIDTH_U;
+                o.stopped
+                    && o.ahead < BOXED_U
+                    && (o.lateral - view.lateral).abs() < touch
+                    && (path.lane.lateral - o.lateral).abs() >= touch
+            })
+            && w.room_behind(car.entity, &view, BACK_OFF_ROOM_U),
     };
     match brain.recovery.step(&tuning.recovery, sense, SIM_DT) {
         Action::Drive => {}
@@ -362,7 +380,7 @@ fn plan_path(
     let lane = match seek {
         Some((_, lateral)) => LaneChoice {
             lateral: lateral.clamp(lo, hi),
-            follow_speed: None,
+            follow: None,
             dodge: false,
         },
         // The side to pass on follows last tick's target, not the car's own lateral: a car
@@ -376,8 +394,25 @@ fn plan_path(
             obstacles,
         ),
     };
+    // Around a stopped car, a car that cannot be passed is followed only when its body is in the
+    // way of the planned lateral (one merely inside the passing berth is driven past, closer than
+    // a clean overtake): two cars beside the stopped one must not wait for each other.
+    let lane = match lane.follow {
+        Some(car)
+            if (here - car.lateral).abs() >= OVERLAP_U && obstacles.iter().any(|o| o.stopped) =>
+        {
+            LaneChoice {
+                follow: None,
+                ..lane
+            }
+        }
+        _ => lane,
+    };
     // Well off its line (a slide, a shove, the open lawn), the car's own path back may cross a
-    // prop or hazard the line does not: clear those first.
+    // prop or hazard the line does not: clear those first, within the legal range or toward it
+    // (an unbounded side round a stopped car could lie off the track). And a car that blocks only
+    // the planned line is not followed from a free lane of the car's own (beside a queue): it
+    // holds that lane.
     let lane = match (view.lateral - here).abs() > OFF_LINE_U {
         true => {
             let own = choose_lane(
@@ -385,12 +420,17 @@ fn plan_path(
                 view.lateral,
                 CAR_HALF_WIDTH_U,
                 speed,
-                (-f32::MAX, f32::MAX),
+                (lo.min(view.lateral), hi.max(view.lateral)),
                 obstacles,
             );
+            let clear = own.follow.is_none() && !own.dodge && own.lateral == view.lateral;
             match own.dodge {
                 true => LaneChoice {
                     lateral: own.lateral.clamp(lo.min(own.lateral), hi.max(own.lateral)),
+                    ..own
+                },
+                false if clear && lane.follow.is_some() => LaneChoice {
+                    lateral: view.lateral.clamp(lo, hi),
                     ..own
                 },
                 false => lane,
@@ -399,12 +439,12 @@ fn plan_path(
         false => lane,
     };
     let d = &tuning.driving;
-    let ld = lookahead(
-        speed,
-        d.lookahead_secs,
-        d.lookahead_min_u,
-        d.lookahead_max_u,
-    );
+    // A slow dodge aims closer, at full lock: pulling out from right behind a stopped car.
+    let min = match lane.dodge {
+        true => DODGE_LOOKAHEAD_MIN_U.min(d.lookahead_min_u),
+        false => d.lookahead_min_u,
+    };
+    let ld = lookahead(speed, d.lookahead_secs, min, d.lookahead_max_u);
     let max_lane = match (near_jump(w.track, view.s, ld), lane.dodge) {
         (true, true) => JUMP_DODGE_U,
         (true, false) => JUMP_LANE_U,
