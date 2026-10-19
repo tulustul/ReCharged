@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`); v2.2 post-QA tuning: Toy Town and Wrench Works default to 4 laps (§7.1) |
+| Status | **v2.1 — APPROVED** (reviews 1 & 2 in `docs/reviews/`); v2.2 post-QA tuning: Toy Town and Wrench Works default to 4 laps (§7.1); Oil Slick / Spring Pad last 15 s, softer pad launch (§6.2); steering assist brakes before corners (§15) |
 | Owner | Game designer / orchestrator |
 | Engine | Bevy 0.20, bevy-react 0.8.1 (UI), bevy_rapier3d 0.37 (physics), bevy_kira_audio 0.27 (audio) |
 | Companion docs | `docs/ARCHITECTURE.md` (technical design), `docs/PRACTICES.md` (engineering rules) |
@@ -265,8 +265,8 @@ Holding **Look back** while using an item fires it **backward** where noted.
 | **Shock Orb** | fire forward | Slow (24 u/s) plasma ball that **follows the track**, bouncing off walls; knocks any car within 3 u sideways + up. Lives 10 s or 3 hits; never hits its owner. | Steer around it |
 | **EMP Pulse** | instant | 0.4 s wind-up glow, then a 12 u radius pulse: other cars `PowerLoss(0)` for 2.0 s (steering works) and lose 50 % charge. | Keep distance, shield |
 | **Goo Bomb** | instant | Sticks to your car with a 6 s fuse and beeping. **Bump another car to pass it** (0.5 s no-pass-back). Explodes: tumble everyone within 7 u, the carrier included. | Pass it on! |
-| **Oil Slick** | drop behind | 2.5 u puddle for 25 s; driving through: `Grip(0.2)` for 1.2 s + spin torque | Steer around |
-| **Spring Pad** | drop behind | 1.6 u springy pad for 25 s; a car crossing it is launched (up 12 u/s, forward 4 u/s, small random spin). Skilled players can turn the air into charge. | Steer around, shield |
+| **Oil Slick** | drop behind | 2.5 u puddle for 15 s; driving through: `Grip(0.2)` for 1.2 s + spin torque | Steer around |
+| **Spring Pad** | drop behind | 1.6 u springy pad for 15 s; a car crossing it is launched (up 8 u/s, forward 2 u/s, small random spin). Skilled players can turn the air into charge. | Steer around, shield |
 | **Shield Bubble** | instant | 10 s bubble (§5.5); bumping with it pushes others harder | — |
 | **Storm Strike** | instant | *Rare, positions 6–8 only.* Lightning hits every car ahead, one by one 0.25 s apart: `PowerLoss(0)` 1.5 s + small hop. | Shield |
 
