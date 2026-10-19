@@ -36,4 +36,4 @@ take B2, B4, B5, B8, B10–B13, B15–B17, B19, B23–B25, B27.
 | B28 | Night lamps: a car entering a shadow-casting lamp's range compiles 3 shadow pipelines mid-race (warm-up cars sit far from lamps) | rc_render warm-up | T19b |
 | B29 | Split-screen start compiles the overlay's sprite/blit pipelines at GO (frames < 30 ms) | rc_render warm-up | T19b |
 | B30 | Rain splashes extrapolate the plane under the car: far ones float/sink a little where the slope changes | rc_vfx | T19b |
-| B31 | Loading → InRace is 4.6–4.8 s in a dev build after the warm-up (budget ≤ 3 s, ARCHITECTURE §11) — measure the release build; trim if over | rc_render / rc_vfx warm-up | T19b |
+| B31 | Loading → InRace is 4.6–4.8 s in a dev build after the warm-up (budget ≤ 3 s, ARCHITECTURE §9) — measure the release build; trim if over | rc_render / rc_vfx warm-up | T19b |
