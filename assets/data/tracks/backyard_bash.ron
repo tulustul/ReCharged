@@ -79,24 +79,26 @@
         (pos: (-35.36, 0, 46.93)), // 61
         (pos: (-30, 0, 48), surface: Dirt), // 62: south dirt path (heading east)
         (pos: (-15, 0.03, 48), wall_right: false), // 63: veg-patch kerb ends
-        (pos: (-9.59, 0.03, 48), width: 9), // 64: sandbox run-up
-        (pos: (-8.39, 0.03, 48)), // 65: kicker foot (reverse: landing slope foot)
-        (pos: (-3.1, 1.18, 48)), // 66: sandbox jump lip (both directions)
-        (pos: (3.1, 1.18, 48)), // 67: sandbox jump landing (reverse: lip)
-        (pos: (8.39, 0.03, 48)), // 68: landing kicker foot
-        (pos: (9.59, 0.03, 48), width: 10), // 69: dirt path (puddles)
-        (pos: (17.59, 0.03, 48)), // 70
-        (pos: (32, 0.03, 48)), // 71: SE corner entry
-        (pos: (36.59, 0.03, 47.09)), // 72
-        (pos: (40.49, 0.03, 44.49)), // 73
-        (pos: (43.09, 0.03, 40.59)), // 74
-        (pos: (44, 0.03, 36), surface: Grass), // 75: east lawn (heading north)
-        (pos: (44, 0, 22)), // 76: start straight (the loop closes to point 0)
+        (pos: (-10.84, 0.03, 48), width: 9), // 64: sandbox run-up
+        (pos: (-9.64, 0.03, 48)), // 65: kicker foot (reverse: landing slope foot)
+        (pos: (-7.14, 0.28, 48)), // 66: kicker toe (lead-in board, half the slope)
+        (pos: (-3.1, 1.18, 48)), // 67: sandbox jump lip (both directions)
+        (pos: (3.1, 1.18, 48)), // 68: sandbox jump landing (reverse: lip)
+        (pos: (7.14, 0.28, 48)), // 69: landing kicker toe
+        (pos: (9.64, 0.03, 48)), // 70: landing kicker foot
+        (pos: (10.84, 0.03, 48), width: 10), // 71: dirt path (puddles)
+        (pos: (18.84, 0.03, 48)), // 72
+        (pos: (32, 0.03, 48)), // 73: SE corner entry
+        (pos: (36.59, 0.03, 47.09)), // 74
+        (pos: (40.49, 0.03, 44.49)), // 75
+        (pos: (43.09, 0.03, 40.59)), // 76
+        (pos: (44, 0.03, 36), surface: Grass), // 77: east lawn (heading north)
+        (pos: (44, 0, 22)), // 78: start straight (the loop closes to point 0)
     ],
     gaps: [
         (from: 13, to: 14, dir: Fwd), // drop off the deck onto the patio
         (from: 3, to: 4, dir: Rev), // reverse: drop off the deck onto the lawn
-        (from: 66, to: 67, dir: Both), // over the sandbox (kickers both sides)
+        (from: 67, to: 68, dir: Both), // over the sandbox (kickers both sides)
     ],
     ground: [
         (surface: Grass, height: 0, points: [(-56, -64), (56, -64), (56, 64), (-56, 64)]), // the lawn
@@ -127,8 +129,8 @@
         (kind: "garden_fairy_lights", pos: (24, 2, -29.2), yaw: 0), // along the deck edge
         (kind: "garden_bench", pos: (-24.49, 0, -18), yaw: 90), // the track passes under the seat
         (kind: "garden_sandbox", pos: (0, 0, 48), yaw: 90), // long side across the track
-        (kind: "garden_kicker", pos: (-5.75, 0, 48), yaw: -90), // west kicker (rises east)
-        (kind: "garden_kicker", pos: (5.75, 0, 48), yaw: 90), // east kicker (rises west)
+        (kind: "garden_kicker", pos: (-6.37, 0, 48), yaw: -90), // west kicker (rises east)
+        (kind: "garden_kicker", pos: (6.37, 0, 48), yaw: 90), // east kicker (rises west)
         (kind: "garden_hose_reel", pos: (1.87, 0, -10.65), yaw: 30), // centre of the spiral
         (kind: "garden_pot_cluster", pos: (-2.74, 0.05, -45.03), yaw: 15), // chicane marker
         (kind: "garden_pot_cluster", pos: (-20.12, 0.05, -52.88), yaw: -150), // chicane marker

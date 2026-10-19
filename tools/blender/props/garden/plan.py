@@ -37,7 +37,13 @@ BENCH_AT, BENCH_W, BENCH_D = 6.5, 7.0, 3.0        # bench along the outbound lan
 STICK_LEN = 13.0                                  # outbound lane before the spiral
 EDGING = 1.2                                      # garden_edging block length
 SANDBOX_X = 0.0                                   # sandbox centre on the south side
-SANDBOX_D, KICK_RUN, KICK_TOP = 6.2, 5.29, 1.18   # sandbox depth along the track, kicker run, lip
+SANDBOX_D, KICK_TOP = 6.2, 1.18                   # sandbox depth along the track, kicker lip
+KICK_SLOPE = 1.18 / 5.29                          # kicker board slope (12.6°)
+# A lead-in board at half the slope eases cars onto the kicker: straight onto the 12.6° board at
+# 30 u/s the suspension bottomed out and the rebound tipped cars nose-down at the lip (T19a).
+TOE_RUN = 2.5
+TOE_TOP = TOE_RUN * KICK_SLOPE / 2
+KICK_RUN = (KICK_TOP - TOE_TOP) / KICK_SLOPE      # the board from the toe to the lip
 LOOP = [(0.4, 15.0), (0.3, 12.5), (0.3, 10.0)]   # spiral: share of the turn, radius
 VEER_R = 12.0
 WALL_T = 0.6                                      # rc_track barrier thickness
@@ -238,15 +244,17 @@ def build():
     i['sw_in'] = p.straight_to('z', SOUTH_Z - SW_R, note='SW corner entry')
     p.arc(SW_R, 90, note='south dirt path (heading east)')
     p.set(surface='Dirt')
-    x_foot = SANDBOX_X - SANDBOX_D / 2 - KICK_RUN
+    x_foot = SANDBOX_X - SANDBOX_D / 2 - KICK_RUN - TOE_RUN
     p.straight_to('x', KERB_END_X, y1=DIRT, note='veg-patch kerb ends')
     p.set(wall_right=False)
     p.straight_to('x', x_foot - 1.2, note='sandbox run-up')
     p.set(width=9)
     p.straight(1.2, note='kicker foot (reverse: landing slope foot)')
+    p.straight(TOE_RUN, y1=TOE_TOP, note='kicker toe (lead-in board, half the slope)')
     i['sand_lip'] = p.straight(KICK_RUN, y1=KICK_TOP, note='sandbox jump lip (both directions)')
     i['sand_landing'] = p.straight(SANDBOX_D, note='sandbox jump landing (reverse: lip)')
-    p.straight(KICK_RUN, y1=DIRT, note='landing kicker foot')
+    p.straight(KICK_RUN, y1=TOE_TOP, note='landing kicker toe')
+    p.straight(TOE_RUN, y1=DIRT, note='landing kicker foot')
     p.straight(1.2, note='dirt path (puddles)')
     p.set(width=10)
     i['se_in'] = p.straight_to('x', EAST_X - CORNER_R, at=(8,), note='SE corner entry')
@@ -356,7 +364,7 @@ def props(p, i):
     add('garden_bench', bx, 0, bz, bh + 180, note='the track passes under the seat')
     # sandbox jump: kickers lean on the rims
     add('garden_sandbox', SANDBOX_X, 0, SOUTH_Z, 90, note='long side across the track')
-    run = SANDBOX_D / 2 + KICK_RUN / 2
+    run = SANDBOX_D / 2 + (TOE_RUN + KICK_RUN) / 2
     add('garden_kicker', SANDBOX_X - run, 0, SOUTH_Z, -90, note='west kicker (rises east)')
     add('garden_kicker', SANDBOX_X + run, 0, SOUTH_Z, 90, note='east kicker (rises west)')
     # hose reel in the middle of the spiral's island

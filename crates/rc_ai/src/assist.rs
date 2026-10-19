@@ -1,10 +1,12 @@
 //! Steering assist (GDD §15, `SimSet::Assist`): for local players without the AI and with
 //! `Settings.accessibility.steering_assist` on, blends `CarControl::steer` toward the steer that
 //! follows the racing line; after a respawn or when the car points away from the track (a crash,
-//! a spin), a stronger pull turns it back for a moment. Hands off the steering, it also brakes
-//! gently before corners taken too fast (auto-brake: the throttle lifts, the brake goes to at most
-//! [`MAX_AUTO_BRAKE`]), so a throttle-only player gets round. It only ever lowers the speed, and
-//! the player's own brake or steering takes over.
+//! a spin), a stronger pull turns it back for a moment. For throttle-only play (no steering or
+//! braking for [`HANDS_OFF_SECS`]) it also drives the pedals: a gentle auto-brake before corners
+//! (the throttle lifts, the brake goes to at most [`MAX_AUTO_BRAKE`]) and a pace below the
+//! medals ([`HANDS_OFF_PACE`] of the corner plan and of the car's top speed), so the car gets
+//! round reliably but a player who steers and brakes is faster. It only ever lowers the speed;
+//! any steering or braking hands the pedals back.
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
@@ -42,8 +44,15 @@ const AUTO_BRAKE_DECEL: f32 = 14.0;
 /// Share of the car's cornering grip the plan uses (the AI's: Rookie 0.82 … Elite 0.96); the
 /// assisted line is followed less tightly than the AI's.
 const PLAN_CORNER_GRIP: f32 = 0.85;
-/// Braking above this pedal level, the player keeps the pedals.
+/// Steering beyond this or braking beyond that is the player's own driving.
+const PLAYER_STEER: f32 = 0.1;
 const PLAYER_BRAKE: f32 = 0.05;
+/// After steering or braking the pedals are the player's until both have been left alone this
+/// long (s).
+pub const HANDS_OFF_SECS: f32 = 2.0;
+/// Throttle-only play drives at this share of the corner plan and of the car's top speed: at
+/// full pace it earned Silver medals; GDD medals start at 1.15× the Elite reference (Bronze).
+pub const HANDS_OFF_PACE: f32 = 0.73;
 
 /// Assist state of a local player's car.
 #[derive(Component, Debug, Clone, Default, PartialEq)]
@@ -52,11 +61,17 @@ pub struct AssistState {
     pub recovering: f32,
     /// The auto-brake's speed plan (built on the first assisted tick of the race).
     pub plan: Option<SpeedProfile>,
+    /// Seconds since the player last steered or braked.
+    pub hands_off: f32,
 }
 
-/// Decorates local players' racers with an [`AssistState`].
+/// Decorates local players' racers with an [`AssistState`] (hands off from the start: throttle-only
+/// play gets the pedal help from GO).
 pub(crate) fn add_assist_state(add: On<Add<LocalPlayer>>, mut commands: Commands) {
-    commands.entity(add.entity).insert(AssistState::default());
+    commands.entity(add.entity).insert(AssistState {
+        hands_off: HANDS_OFF_SECS,
+        ..default()
+    });
 }
 
 /// The player's `human` steer blended toward `assist` with `strength` (0–1, the share once the
@@ -69,17 +84,23 @@ pub fn blend(human: f32, assist: f32, strength: f32) -> f32 {
     (human + w * (assist - human)).clamp(-1.0, 1.0)
 }
 
-/// The player's `throttle` and `brake` with the auto-brake, `over` u/s above the plan, the player
-/// steering `steer`: hands off, the throttle lifts and the brake comes on gently; the player's
-/// own brake, or steering, takes over. Neither pedal ever pushes the car faster.
-pub fn auto_pedals(throttle: f32, brake: f32, steer: f32, over: f32) -> (f32, f32) {
-    let ease = 1.0 - (steer.abs() / HANDS_ON_INPUT).min(1.0);
-    if brake > PLAYER_BRAKE || over <= 0.0 || ease <= 0.0 {
+/// The throttle and brake of throttle-only play `over` u/s above the plan: the throttle lifts,
+/// then the brake comes on gently. Neither pedal ever pushes the car faster.
+pub fn auto_pedals(throttle: f32, brake: f32, over: f32) -> (f32, f32) {
+    if over <= 0.0 {
         return (throttle, brake);
     }
-    let lift = (over / LIFT_RAMP_UPS).min(1.0) * ease;
-    let auto = MAX_AUTO_BRAKE * ((over - LIFT_RAMP_UPS) / BRAKE_RAMP_UPS).clamp(0.0, 1.0) * ease;
+    let lift = (over / LIFT_RAMP_UPS).min(1.0);
+    let auto = MAX_AUTO_BRAKE * ((over - LIFT_RAMP_UPS) / BRAKE_RAMP_UPS).clamp(0.0, 1.0);
     (throttle * (1.0 - lift), brake.max(auto))
+}
+
+/// Seconds without steering or braking after this tick's input (`steer`, `brake`).
+pub fn hands_off(before: f32, steer: f32, brake: f32) -> f32 {
+    match steer.abs() > PLAYER_STEER || brake > PLAYER_BRAKE {
+        true => 0.0,
+        false => before + SIM_DT,
+    }
 }
 
 type AssistItem<'a> = (
@@ -144,26 +165,34 @@ pub(crate) fn steering_assist(
             false => a.strength,
         };
         let steer = blend(control.steer, assist, strength);
-        // Auto-brake: the speed the car can still brake from (gently) into the corners ahead.
-        let plan = state.plan.get_or_insert_with(|| {
-            SpeedProfile::build(&track, &caps, PLAN_CORNER_GRIP, AUTO_BRAKE_DECEL)
-        });
-        let lead = view.s + speed * PEDAL_LEAD_SECS;
-        let corner = |x: f32| {
-            let props = plan.surface_at(lead + x).props();
-            plan.corner_at(lead + x) * (props.with_weather(wet, snow).grip / props.grip).sqrt()
+        state.hands_off = hands_off(state.hands_off, control.steer, control.brake);
+        let (throttle, brake) = match state.hands_off >= HANDS_OFF_SECS {
+            false => (control.throttle, control.brake),
+            true => {
+                // Throttle-only: the speed the car can still brake from (gently) into the corners
+                // ahead, at the hands-off pace.
+                let plan = state.plan.get_or_insert_with(|| {
+                    SpeedProfile::build(&track, &caps, PLAN_CORNER_GRIP, AUTO_BRAKE_DECEL)
+                });
+                let lead = view.s + speed * PEDAL_LEAD_SECS;
+                let corner = |x: f32| {
+                    let props = plan.surface_at(lead + x).props();
+                    let weather = (props.with_weather(wet, snow).grip / props.grip).sqrt();
+                    HANDS_OFF_PACE * plan.corner_at(lead + x) * weather
+                };
+                let mut brake_to =
+                    brake_point_speed(speed, AUTO_BRAKE_DECEL, plan.spacing(), corner);
+                if !tel.boosting {
+                    let here = plan.surface_at(view.s).props().with_weather(wet, snow);
+                    brake_to = brake_to.min(HANDS_OFF_PACE * caps.top_speed * here.top_speed);
+                }
+                if let Some(takeoff) = jump_takeoff_ahead(&track, view.s, JUMP_RUNUP_U) {
+                    // A jump's run-up: too little speed drops the car into the gap.
+                    brake_to = brake_to.max(JUMP_TAKEOFF_SHARE * takeoff);
+                }
+                auto_pedals(control.throttle, control.brake, speed - brake_to)
+            }
         };
-        let mut brake_to = brake_point_speed(speed, AUTO_BRAKE_DECEL, plan.spacing(), corner);
-        if let Some(takeoff) = jump_takeoff_ahead(&track, view.s, JUMP_RUNUP_U) {
-            // A jump's run-up: too little speed drops the car into the gap.
-            brake_to = brake_to.max(JUMP_TAKEOFF_SHARE * takeoff);
-        }
-        let (throttle, brake) = auto_pedals(
-            control.throttle,
-            control.brake,
-            control.steer,
-            speed - brake_to,
-        );
         if (steer, throttle, brake) != (control.steer, control.throttle, control.brake) {
             control.steer = steer;
             control.throttle = throttle;
@@ -195,36 +224,35 @@ mod tests {
     }
 
     #[test]
-    fn the_auto_brake_only_slows_and_yields_to_the_player() {
+    fn the_auto_brake_only_slows() {
         assert_eq!(
-            auto_pedals(1.0, 0.0, 0.0, -3.0),
+            auto_pedals(1.0, 0.0, -3.0),
             (1.0, 0.0),
             "under the plan: untouched"
         );
-        let (t, b) = auto_pedals(1.0, 0.0, 0.0, 0.5);
+        let (t, b) = auto_pedals(1.0, 0.0, 0.5);
         assert!(
             t > 0.0 && t < 1.0 && b == 0.0,
             "just over: the throttle lifts"
         );
         assert_eq!(
-            auto_pedals(1.0, 0.0, 0.0, 10.0),
+            auto_pedals(1.0, 0.0, 10.0),
             (0.0, MAX_AUTO_BRAKE),
             "gentle brake"
         );
-        assert_eq!(
-            auto_pedals(1.0, 0.8, 0.0, 10.0),
-            (1.0, 0.8),
-            "the player's brake wins"
-        );
-        assert_eq!(
-            auto_pedals(1.0, 0.0, 0.5, 10.0),
-            (1.0, 0.0),
-            "steering hands it back"
-        );
-        let (t, b) = auto_pedals(1.0, 0.0, 0.1, 10.0);
+    }
+
+    #[test]
+    fn steering_or_braking_hands_the_pedals_back_for_a_while() {
+        let mut off = 0.0;
+        for _ in 0..secs_to_ticks(HANDS_OFF_SECS) {
+            off = hands_off(off, 0.05, 0.0); // a resting stick
+        }
         assert!(
-            t > 0.0 && b > 0.0 && b < MAX_AUTO_BRAKE,
-            "light steering: partly"
+            off >= HANDS_OFF_SECS - 1e-3,
+            "throttle only: the assist drives the pedals"
         );
+        assert_eq!(hands_off(off, 0.3, 0.0), 0.0, "steering takes them back");
+        assert_eq!(hands_off(off, 0.0, 0.5), 0.0, "and so does braking");
     }
 }

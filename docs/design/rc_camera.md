@@ -70,7 +70,10 @@ Camera { order: 10, clear_color: ClearColorConfig::Custom(Color::NONE),
   of a car stopped against a ramp, a deck face or a wall (B23) — the boom swings up over the car in
   its vertical plane (by 0.6, then 1.2 rad, never steeper than ≈ 85°: straight down flips the view)
   to the first direction with 1.2 u of room (else the roomiest tried) and looks down at the car.
-  The swing snaps, like the pull-in (`ponytail:`).
+  The swing snaps, like the pull-in (`ponytail:`). Checked in a window (Backyard Bash, car parked
+  nose-first against the deck face beside the ramp, look back held; `--input-script` with
+  race-tick timing): with the swing disabled the look-back view is the deck's boards filling the
+  screen, with it the camera looks down at the car from above the deck edge.
 - Shake: trauma from `CarImpact` (×0.6 strength), `CarLanded` (≥ 0.3 s air, ×0.35), `Explosion`
   (0.9 at the centre, 0 at 3 × radius). Angle = trauma² × (2°, 2°, 1.2°), decays 1.6/s. Off with
   `camera_shake`.

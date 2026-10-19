@@ -149,18 +149,30 @@ it ends and the reason still holds (`use_item` for one tick, `look_back` for bac
   0.9 × (1 − |player| / 0.25)) × (1 − 0.6 |player|): hands off it steers the line almost fully (a
   throttle-only player understeered off every corner at 0.4), and hands control back as the input
   grows; 0.8 for 1.5 s after a respawn or while pointing > 46° away from the track.
-  **Auto-brake** (Q7): a speed plan per assisted car (built on its first assisted tick: the car's
-  stars, 0.85 of its cornering grip, braking at 14 u/s² — the 0.4 brake of a 40 u/s² car, less a
-  margin) gives the brake-point speed ahead (weather included; on a jump run-up never below 0.9×
-  the takeoff speed). Over it, hands off, the throttle lifts over 1 u/s and the brake ramps to at
-  most 0.4 over the next 2 u/s. The player's brake (> 0.05) keeps both pedals; steering input
-  fades it out (none at |steer| ≥ 0.25); speed only ever goes down. Measured (`assist_probe`,
-  throttle only = auto-accelerate, 1 lap of sofa_circuit and backyard_bash forward and reverse,
-  Hornet and Phantom also mirrored): Sparky, Zip, Dumpster, Torque, Hornet, Volt GT 0 respawns, no
-  "Hold Reset", 0.94–1.10× the reference lap (Hornet before T19a: 53.4 s and 4 respawns on
-  sofa_circuit, 57.6 s and 4 on backyard_bash; with the hands-off steering alone 31.5 s and 2, 20.4
-  s and 0); the Hornet also on all 7 tracks over 3 laps (0 respawns, ≤ 1.06×); the Phantom 15 of 16
-  clean (backyard forward: flipped on the sandbox kicker, 1 respawn, 1.11×).
+  **Throttle-only pedals** (Q7, T19a round 2): after 2 s without steering (|steer| > 0.1) or
+  braking (> 0.05) — from GO for a player who never touches them — the assist also drives the
+  pedals; any steering or braking hands them back for the next 2 s, so a player who steers and
+  brakes is never slowed. A speed plan per assisted car (built on its first assisted tick: the
+  car's stars, 0.85 of its cornering grip, braking at 14 u/s² — the 0.4 brake of a 40 u/s² car,
+  less a margin) gives the brake-point speed ahead at **0.73× pace** (weather included; on a jump
+  run-up never below 0.9× the takeoff speed), capped at 0.73× the car's top speed on the surface
+  (not while boosting). Over it the throttle lifts over 1 u/s and the brake ramps to at most 0.4
+  over the next 2 u/s; speed only ever goes down. At full pace throttle-only play earned Silver
+  medals; GDD medals start at 1.15× the Elite reference (Bronze). Measured (`assist_probe`,
+  throttle only = auto-accelerate, 3 laps, against `medals.ron`):
+
+  | Layout | Reference (s) | Hornet | Phantom |
+  |---|---|---|---|
+  | sofa_circuit | 53.78 | 69.06 s (1.28×) | 67.69 s (1.26×) |
+  | sofa_circuit rev | 54.32 | 69.22 s (1.27×) | 67.76 s (1.25×) |
+  | backyard_bash | 59.87 | 74.36 s (1.24×) | 72.49 s (1.21×) |
+  | backyard_bash rev | 61.03 | 74.80 s (1.23×) | 74.04 s (1.21×) |
+  | toy_town | 72.37 | 93.55 s (1.29×) | 91.37 s (1.26×) |
+  | toy_town rev | 72.28 | 93.15 s (1.29×) | 91.15 s (1.26×) |
+
+  0 respawns and no "Hold Reset" in every run; also 0 respawns for the Hornet on the other four
+  tracks both ways and for Sparky, Zip, Dumpster, Torque and Volt GT on these three (at 0.74×).
+  Before (full pace, round 1): sofa_circuit 3 laps 55.94 s in a Hornet (1.04×, Silver).
 
 ## Data (`assets/data/ai.ron`, every struct `deny_unknown_fields`, ranges validated)
 `difficulty.{rookie,pro,elite,elite_plus}` (speed_scale, corner_grip, mistakes_per_min,
@@ -175,7 +187,7 @@ The shortcut chances are a code table (`ponytail:` in `shortcut.rs`).
 3 laps from the grid (countdown start included), 3 seeds per row, items off. *Expected* = 3 ×
 the track's reference lap (rc_track's reference car on its speed profile, flying). Respawns
 are to-track respawns summed over the 3 races (72 racer-laps). Snapshot 2026-10-19 (T19a), all
-seven tracks.
+seven tracks; toy_town and backyard_bash re-measured after their round-2 data changes.
 
 | Track | Difficulty | Reference lap (s) | Flying lap, median (s) | Best lap (s) | Race ÷ expected, mean | worst | Respawns | DNF |
 |---|---|---|---|---|---|---|---|---|
@@ -183,18 +195,18 @@ seven tracks.
 | test_oval | Pro | 11.0 | 11.20 | 10.72 | 1.080 | 1.132 | 0 | 0 |
 | test_oval | Elite | 11.0 | 10.50 | 10.10 | 1.016 | 1.068 | 0 | 0 |
 | test_oval | Elite+ | 11.0 | 10.35 | 9.95 | 1.002 | 1.110 | 0 | 0 |
-| toy_town | Rookie | 24.5 | 29.80 | 28.20 | 1.255 | 1.313 | 0 | 0 |
-| toy_town | Pro | 24.5 | 27.35 | 26.33 | 1.158 | 1.193 | 0 | 0 |
-| toy_town | Elite | 24.5 | 26.05 | 24.53 | 1.109 | 1.181 | 1 | 0 |
-| toy_town | Elite+ | 24.5 | 26.05 | 24.02 | 1.114 | 1.279 | 1 | 0 |
+| toy_town | Rookie | 24.8 | 29.12 | 27.77 | 1.215 | 1.255 | 0 | 0 |
+| toy_town | Pro | 24.8 | 26.58 | 25.72 | 1.108 | 1.146 | 0 | 0 |
+| toy_town | Elite | 24.8 | 25.13 | 24.15 | 1.050 | 1.089 | 0 | 0 |
+| toy_town | Elite+ | 24.8 | 24.72 | 23.57 | 1.054 | 1.148 | 2 | 0 |
 | sofa_circuit | Rookie | 20.1 | 22.20 | 20.42 | 1.143 | 1.205 | 0 | 0 |
 | sofa_circuit | Pro | 20.1 | 19.78 | 19.05 | 1.045 | 1.108 | 0 | 0 |
 | sofa_circuit | Elite | 20.1 | 19.10 | 17.98 | 0.996 | 1.052 | 0 | 0 |
 | sofa_circuit | Elite+ | 20.1 | 18.80 | 18.32 | 0.991 | 1.050 | 0 | 0 |
-| backyard_bash | Rookie | 21.3 | 24.43 | 23.12 | 1.187 | 1.240 | 0 | 0 |
-| backyard_bash | Pro | 21.3 | 22.12 | 21.17 | 1.082 | 1.134 | 0 | 0 |
-| backyard_bash | Elite | 21.3 | 20.90 | 20.05 | 1.023 | 1.069 | 0 | 0 |
-| backyard_bash | Elite+ | 21.3 | 20.50 | 19.82 | 1.010 | 1.060 | 0 | 0 |
+| backyard_bash | Rookie | 21.3 | 24.15 | 23.05 | 1.186 | 1.240 | 0 | 0 |
+| backyard_bash | Pro | 21.3 | 22.02 | 21.07 | 1.079 | 1.130 | 0 | 0 |
+| backyard_bash | Elite | 21.3 | 20.58 | 19.90 | 1.030 | 1.095 | 0 | 0 |
+| backyard_bash | Elite+ | 21.3 | 20.72 | 19.70 | 1.006 | 1.071 | 0 | 0 |
 | maple_street | Rookie | 34.7 | 39.32 | 37.28 | 1.156 | 1.222 | 0 | 0 |
 | maple_street | Pro | 34.7 | 36.35 | 34.38 | 1.072 | 1.121 | 1 | 0 |
 | maple_street | Elite | 34.7 | 34.32 | 32.75 | 1.027 | 1.100 | 1 | 0 |
@@ -209,13 +221,13 @@ seven tracks.
 | aisle_rush | Elite+ | 30.9 | 30.25 | 29.82 | 1.021 | 1.057 | 0 | 0 |
 
 ## How to verify
-- `cargo test -p rc_ai` — unit (50): data file, validation messages and debug hot reload; speed
+- `cargo test -p rc_ai` — unit (51): data file, validation messages and debug hot reload; speed
   plan (curvature, corner speed, braking pass, airborne, brake point, star caps & acceleration);
   pure pursuit geometry, speed-sensitive steering, pedals; lane choice (clear road, faster car,
   sides, edge, blocked, hazards, alongside, rear-end); recovery state machine (stuck → reverse →
   reset, tries forgiven, flip tap, off course, trapped); item decision table, aggression and
   hoarding, reaction delay, cancelled use, Goo Bomb only with a bump in reach; catch-up target;
-  assist blend and auto-brake pedals; perfect-start statistics; drift zones across the start line;
+  assist blend, auto-brake pedals and the hands-off window; perfect-start statistics; drift zones across the start line;
   prop footprints (walls as circle rows) and no prop obstacle on toy_town's racing line; a hazard
   beyond a car decides the passing side; a powerless car is not stuck; shortcuts (traversal time;
   test_oval's and toy_town's not planned, a synthetic bulge's chord planned and followed, a narrow
@@ -226,7 +238,8 @@ seven tracks.
   toy_town likewise; a seeded race (items on) replays bit for bit; perfect starts at Elite+
   without stalls; items are used and an item race finishes; the autopilot finishes a lap and ends
   the race; the assist steers toward the line and keeps the pedals on a straight, lifts and brakes
-  gently (≤ 0.4) into test_oval's turn 1, and changes nothing when off; catch-up slows rivals ahead
+  gently (≤ 0.4) into test_oval's turn 1 for throttle-only play, leaves the pedals to a player who
+  steers, and changes nothing when off; catch-up slows rivals ahead
   and is 0 in Time Trial; a car put nose-first against a wall gets back into the race; rockets are
   fired only at cars in sight (not through a wall); a car that missed a gate holds reset and is put
   back before it.
@@ -260,15 +273,11 @@ seven tracks.
   racer-lap (B17, T19a; before: 0.229 and 0.260 over 3 seeds — Spring Pads throwing cars over
   barriers, dodges hiding pads behind cars and flipping sides, EMP-stopped cars counted as stuck,
   Goo tumbles over barriers); worst racers up to 1.5× the expected time.
-- Toy Town reverse, T1 (the last corner): the raised 20° turn is entered over a climb and a bank
-  onset that unload the car at ≈ 30 u/s; on a lap-1 entry the autopilot can spin there (Time Trial
-  median 81.1 s against 78.0 s before the bank-drift rule: 2–3 of 3 seeds lose ≈ 3–4 s on lap 1). A
-  crest-aware speed plan (unloaded wheels cannot brake or turn) or a smoother transition in the
-  track data would fix it.
-- Elite autopilot Time Trials (28 layouts × 3 seeds): 4 (`tt_table`) to 6 (`--calibrate-medals`,
-  whose app differs slightly) runs more than 3 s over their layout's median, worst + 8 s (before
-  T19a: 3, worst + 20 s on wrench_works) — slides into a barrier after a hop on a raised or kerbed
-  corner.
+- Elite autopilot Time Trials (`--calibrate-medals`, 28 layouts × 3 seeds): 6 runs more than 3 s
+  over their layout's median, worst + 8 s (sofa_circuit, backyard_bash, wrench_works and
+  maple_street mirrored or reversed layouts; before T19a 3, worst + 20 s) — slides into a barrier
+  after a hop on a kerbed corner or a bump. toy_town has none since its raised turns' ends are half
+  banked (8 seeds × 4 layouts all within 71.5–75.4 s; before: medians up to 81.1 s, 4 outliers).
 - Traffic costs Elite fields ≈ 1.5–2 s per toy_town lap against a solo car (conservative headway).
 - The countdown press is counted in ticks against `COUNTDOWN_TICKS`; extra fixed ticks in a frame
   at GO shift it by a tick or two (still inside the window).

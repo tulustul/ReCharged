@@ -38,7 +38,7 @@ mod traffic;
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
-pub use assist::{AssistState, MAX_AUTO_BRAKE};
+pub use assist::{AssistState, HANDS_OFF_SECS, MAX_AUTO_BRAKE};
 pub use brain::{AiBrain, TrackView};
 pub use data::{AI_FILE, AiTuning, LOADING_KEY};
 pub use driver::AiClock;

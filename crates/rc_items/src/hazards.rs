@@ -1,10 +1,11 @@
 //! Hazards (GDD §6.2). Oil Slick and Spring Pad are dropped behind the car onto the ground below
-//! (nothing below = nothing dropped) and live 25 s; a car *entering* one (centre over the disc,
+//! (nothing below = nothing dropped) and live 15 s; a car *entering* one (centre over the disc,
 //! near its surface; leaving the disc re-arms it) slips (`Grip` 0.2 + spin) or is launched.
-//! The Goo Bomb sticks to its user: a bump (rapier `CollisionEvent::Started` between two racers)
-//! passes it on — never to a shielded car, never back to the giver within 0.5 s — and after the
-//! 6 s fuse it tumbles everyone within 7 u that the blast can see (not through walls), the
-//! carrier included. A shielded car bumping another pushes it away (Shield Bubble).
+//! The Goo Bomb sticks to its user: a bump (rapier `CollisionEvent::Started` between two racers),
+//! or a near miss (the chassis within 0.6 u), passes it on — never to a shielded or ghosted car,
+//! never back to the giver within 0.5 s; its carrier drives at 1.1× top speed to catch someone.
+//! After the 6 s fuse it tumbles everyone within 7 u that the blast can see (not through walls),
+//! the carrier included. A shielded car bumping another pushes it away (Shield Bubble).
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
@@ -27,6 +28,14 @@ const DROP_PROBE_U: f32 = 3.0;
 const GOO_HEIGHT_U: f32 = 0.9;
 /// Upward Δv of a Shield Bubble push (u/s).
 const SHIELD_PUSH_UP_UPS: f32 = 1.5;
+/// A Goo Bomb also passes to a car whose chassis comes this close to the carrier's (u), and its
+/// carrier drives at this top-speed multiplier (refreshed every tick for this long, s): with
+/// physical bumps only, two thirds of the bombs went off on their users (T19a).
+// ponytail: code constants keep `items.ron` readable by older builds; move them into
+// `goo_bomb` there with the next format change.
+const GOO_PASS_GAP_U: f32 = 0.6;
+const GOO_CARRIER_TOP_SPEED: f32 = 1.1;
+const GOO_SPEED_REFRESH_S: f32 = 0.1;
 
 /// The cars currently over a dropped hazard's trigger disc (its `ItemRadius`).
 #[derive(Component, Debug, Clone, Default, PartialEq)]
@@ -35,10 +44,13 @@ pub(crate) struct Zone {
 }
 
 /// A Goo Bomb's passing state.
-#[derive(Component, Debug, Clone, Copy, PartialEq)]
+#[derive(Component, Debug, Clone, Default, PartialEq)]
 pub(crate) struct Goo {
     /// Who passed it to the current carrier, and when (clock tick).
     pub giver: Option<(Entity, u64)>,
+    /// The cars within the near-miss gap of the carrier last tick: only a car coming close
+    /// takes it (like a bump), not one already alongside.
+    pub close: Vec<Entity>,
 }
 
 /// The carrier of a Goo Bomb may pass it to `other` at tick `now`.
@@ -126,7 +138,7 @@ pub(crate) fn attach_goo(
                     owner: u.racer,
                 },
                 ItemTarget(Some(u.racer)),
-                Goo { giver: None },
+                Goo::default(),
                 ItemTimer(tuning.goo_bomb.fuse_secs),
                 ItemRadius(tuning.goo_bomb.radius),
                 riding(t),
@@ -273,8 +285,9 @@ pub(crate) fn goo_bombs(
         &mut Transform,
     )>,
     cars: Query<(Entity, &Transform), (With<Racer>, Without<Goo>)>,
+    bodies: Query<&Collider, With<Racer>>,
     (mut hits, mut explosions): (Hits, MessageWriter<Explosion>),
-    mut contacts: Local<Vec<(Entity, Entity)>>,
+    (mut contacts, mut near): (Local<Vec<(Entity, Entity)>>, Local<Vec<Entity>>),
 ) {
     let g = &tuning.goo_bomb;
     let ctx = rapier.single().ok();
@@ -283,30 +296,47 @@ pub(crate) fn goo_bombs(
     let no_back = u64::from(secs_to_ticks(g.no_pass_back_secs));
     for (entity, mut hazard, mut carrier, mut fuse, mut goo, mut t) in &mut bombs {
         let Some(holder) = carrier.0 else { continue };
-        let pass = contacts.iter().find_map(|&(a, b)| {
-            let other = if a == holder {
-                b
-            } else if b == holder {
-                a
-            } else {
-                return None;
-            };
-            may_pass(&goo, other, hits.shielded(other), clock.0, no_back).then_some(other)
-        });
+        near.clear();
+        if let (Some(ctx), Ok((_, ht)), Ok(body)) = (&ctx, cars.get(holder), bodies.get(holder)) {
+            near_cars(ctx, holder, ht, body, GOO_PASS_GAP_U, &mut near);
+        }
+        let bumped = contacts
+            .iter()
+            .filter_map(|&(a, b)| match (a == holder, b == holder) {
+                (true, _) => Some(b),
+                (_, true) => Some(a),
+                _ => None,
+            });
+        let closing = near.iter().copied().filter(|c| !goo.close.contains(c));
+        let pass = bumped
+            .chain(closing)
+            .find(|&other| may_pass(&goo, other, hits.shielded(other), clock.0, no_back));
+        goo.close.clone_from(&near);
         if let Some(other) = pass {
+            debug!("items: goo passed {holder} -> {other}");
             goo.giver = Some((holder, clock.0));
             hazard.owner = holder;
             carrier.0 = Some(other);
         }
-        let Some(Ok((_, ct))) = carrier.0.map(|c| cars.get(c)) else {
+        let Some(Ok((carrying, ct))) = carrier.0.map(|c| cars.get(c)) else {
             commands.entity(entity).despawn();
             continue;
         };
         *t = riding(ct);
+        let chase = Effect::TopSpeed {
+            mul: GOO_CARRIER_TOP_SPEED,
+            secs: GOO_SPEED_REFRESH_S,
+        };
+        hits.effect(carrying, chase, entity);
         if run_down(&mut fuse.0) {
             continue;
         }
         let at = t.translation;
+        debug!(
+            "items: goo exploded on {:?} (passed: {})",
+            carrier.0,
+            goo.giver.is_some()
+        );
         explosions.write(Explosion {
             position: at,
             radius: g.radius,
@@ -320,6 +350,58 @@ pub(crate) fn goo_bombs(
             }
         }
         commands.entity(entity).despawn();
+    }
+}
+
+/// The racers whose chassis come within `gap` of `car`'s (its `body` grown by `gap`, posed at
+/// `t`); ghosted cars (no car contacts) never count.
+fn near_cars(
+    ctx: &RapierContext,
+    car: Entity,
+    t: &Transform,
+    body: &Collider,
+    gap: f32,
+    out: &mut Vec<Entity>,
+) {
+    let Some(grown) = grown(body.as_unscaled_typed_shape(), gap) else {
+        return;
+    };
+    let cars = Group::from_bits_truncate(layers::CAR);
+    let filter = QueryFilter::new()
+        .exclude_sensors()
+        .exclude_collider(car)
+        .groups(CollisionGroups::new(cars, cars));
+    ctx.intersect_shape(t.translation, t.rotation, &grown, filter, |e, _| {
+        out.push(e);
+        true
+    });
+    out.sort(); // deterministic choice among several
+}
+
+/// `shape` (a chassis: boxes, rounded or not, possibly in a compound) grown by `by`.
+fn grown(shape: ColliderView, by: f32) -> Option<Collider> {
+    match shape {
+        ColliderView::Cuboid(c) => {
+            let h = c.half_extents();
+            Some(Collider::round_cuboid(h.x, h.y, h.z, by))
+        }
+        ColliderView::RoundCuboid(c) => {
+            let h = c.inner_shape().half_extents();
+            Some(Collider::round_cuboid(
+                h.x,
+                h.y,
+                h.z,
+                c.border_radius() + by,
+            ))
+        }
+        ColliderView::Compound(c) => {
+            let parts: Vec<_> = c
+                .shapes()
+                .filter_map(|(at, rot, part)| Some((at, rot, grown(part, by)?)))
+                .collect();
+            (!parts.is_empty()).then(|| Collider::compound(parts))
+        }
+        _ => None,
     }
 }
 
@@ -362,7 +444,7 @@ mod tests {
             Entity::from_raw_u32(2).expect("e"),
             Entity::from_raw_u32(3).expect("e"),
         );
-        let fresh = Goo { giver: None };
+        let fresh = Goo::default();
         assert!(may_pass(&fresh, b, false, 10, 30));
         assert!(
             !may_pass(&fresh, b, true, 10, 30),
@@ -370,6 +452,7 @@ mod tests {
         );
         let passed = Goo {
             giver: Some((a, 100)),
+            ..Goo::default()
         }; // a gave it to the carrier at tick 100
         assert!(
             !may_pass(&passed, a, false, 129, 30),

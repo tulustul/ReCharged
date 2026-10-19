@@ -44,8 +44,10 @@ Forward (counter-clockwise from above), with reverse in brackets:
 5. West lawn (border bed on the right), SW corner (R 14) — the bed's brick wall runs on round
    the corner's outside and along the dirt path's south edge (kerb to the vegetable patch).
 6. **Sandbox jump** on the dirt path: plywood kickers lean on both rims of the 2.4 × 1.4 m sandbox
-   (12.6°, lip 1.18 u), gap over the sand (dir Both: the same props make the jump both ways,
-   0.62 s air); short jumps land in the sand.
+   (12.6°, lip 1.18 u), each with a 2.5 u lead-in board at half the slope in front (T19a: straight
+   onto the 12.6° sheet at 30 u/s the suspension bottomed out, the rear rebounded and cars left
+   the lip nose-down — an assisted Phantom flipped there); gap over the sand (dir Both: the same
+   props make the jump both ways, 0.62 s air); short jumps land in the sand.
 7. **Puddles** (three, wet-mud rims) on the dirt path → SE corner past the shed → start.
 
 **Golden Battery** (forward only): above the sandbox, 3.8 u south of the line at 1.9 u — take the
@@ -67,7 +69,7 @@ rewards a late apex and a steady drift (battery charge); keep the throttle on ov
 | **bbq** (hero) | 1 860 | kettle barbecue (on the deck, inside the turn) |
 | deck (structure) | 4 148 | 42 × 36 u boards, fascia, skirting, posts, steps |
 | deck_ramp | 624 | decking ramp 10 u wide, 2.0 over 7.5 u (Wood wedge) |
-| kicker | 476 | plywood sheet on brick stacks (Wood wedge) |
+| kicker | 520 | plywood sheet on brick stacks + lead-in board (two Wood wedges, 6.54 u run) |
 | edging | 198 | brick-red block = barrier block size, closes open bed ends |
 | round_bed | 4 778 | stone ring bed with a Japanese maple (central lawn) |
 | veg_bed | 2 200 | timber bed, lettuces, bean-cane wigwam |

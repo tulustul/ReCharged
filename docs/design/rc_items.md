@@ -55,9 +55,13 @@ builds poll `items.ron` once a second and hot-reload it (a bad edit keeps the ol
 - **Leech Coil** "ahead" = ahead in `Standings`. The transfer moves `share × charge at attach`
   evenly over 3 s (180 equal `DrainCharge`/`GrantCharge` pairs, capped by what the target has);
   the tow is a `TopSpeed 1.08` refreshed every tick for 0.1 s. A target raising a shield breaks it.
-- **Goo Bomb** passes on rapier `CollisionEvent::Started` between two racers (a car's collider is
-  its racer entity): real bumps only, once per contact; ghosted cars cannot take it (no contacts).
-  `Hazard.owner` becomes the passer (the explosion's attacker).
+- **Goo Bomb** passes on a bump — rapier `CollisionEvent::Started` between two racers (a car's
+  collider is its racer entity) — or a near miss: a car whose chassis comes within 0.6 u of the
+  carrier's (a shape query with the carrier's collider grown by 0.6 u, car layer only), once per
+  approach (a car already that close takes it only after leaving and coming back; with the 0.5 s
+  no-pass-back rule two cars stuck together do not ping-pong it). Ghosted cars cannot take it
+  (no car contacts). The carrier gets `TopSpeed 1.1`, refreshed every tick for 0.1 s, to catch
+  someone. `Hazard.owner` becomes the passer (the explosion's attacker).
 - **Dropped hazards** lie on the ground found by a ray below the drop point (nothing below — over
   a gap — nothing is dropped), rotated to its normal. A car triggers one by *entering*: its origin
   over the disc and within −1…+1.5 u of the surface; it re-arms when the car leaves the disc (cars
@@ -90,7 +94,7 @@ Impulses are Δv of the 2.6-mass reference car (× `REFERENCE_CAR_MASS`); rc_veh
 | Leech Coil | ahead 40 u, near 20 u, wait 3 s, tether 3 s, share 30 %, tow ×1.08, breaks > 45 u | GDD §6.2 (10 %/s) |
 | Shock Orb | 24 u/s, radius 3 u, 10 s / 3 hits, 0.7 u high, edge margin 0.5 u (off a barrier or the width's edge), launch ≤ 30°; knock up 6 / sideways 7 u/s, spin 1 | GDD §6.2 |
 | EMP Pulse | wind-up 0.4 s, 12 u, power 0 for 2 s, −50 % charge | GDD §6.2 |
-| Goo Bomb | fuse 6 s, no pass-back 0.5 s, 7 u; tumble up 7 / push 5 u/s, spin 1.5 | GDD §6.2; apex ≈ 1 u, under the 1.2 u barriers (up 9 threw cars over them) |
+| Goo Bomb | fuse 6 s, no pass-back 0.5 s, 7 u; tumble up 7 / push 5 u/s, spin 1.5; passes on a bump or a near miss ≤ 0.6 u; carrier top speed ×1.1 (code consts, `ponytail:`) | GDD §6.2; apex ≈ 1 u, under the 1.2 u barriers (up 9 threw cars over them); bumps only and no chase speed: two thirds of the bombs went off on their users |
 | Oil Slick | radius 2.5 u, 15 s, grip 0.2 for 1.2 s, yaw spin 2.5 (≈ 2 rad/s) | GDD §6.2; 15 s (was 25): a slick caught ≈ 3 cars (QA) |
 | Spring Pad | radius 1.6 u, 15 s, up 8 / forward 2 u/s, random spin ≤ 0.3 per axis | GDD §6.2; up 8 = 0.64 s air: up 12 (0.96 s) launched cars over the barriers, the largest source of to-track respawns in item races |
 | Shield Bubble | 10 s, bump push 6 u/s (+1.5 up) | GDD §6.2 |
@@ -128,12 +132,15 @@ through `tools/scripts/qa/item_stats.py`): used → hits (self-hits), and to-tra
 | QA, before T19a | 15 used, 16 self | 18 → 62 | 12 → 33 | 7 → 40 | 54 → 27 | — |
 | T19a, before the Q6 tuning | 18 → 22 (18 self) | 21 → 58 | 22 → 61 | 10 → 45 | 43 → 26 | 36 |
 | T19a final | 12 → 20 (10 self) | 18 → 38 | 15 → 24 | 7 → 30 | 60 → 38 | 26 |
+| T19a round 2 (smoothed toy_town) | 9 → 15 (6 self) | 18 → 49 | 11 → 24 | 14 → 66 | 60 → 42 | 25 |
+
+Goo Bomb passes (log lines `items: goo passed …` / `goo exploded on …`, same six races): before
+the near-miss pass and the chase speed 11 bombs, 4 passes, 7 went off on their never-passed user
+(64 %); with them 9 bombs, 12 passes, 2 on the user (22 %).
 
 ## Known limitations
 - The orb passes through props. Line-of-sight rays go from centre to centre: a car whose centre is
   hidden behind a low wall is spared even when its roof shows.
 - Hit tests use the car centre (origin + 0.4 u along its up) as a point, not its box.
-- Goo Bombs still mostly go off on their carrier: the AI hunts a bump only within 15 u ahead, and
-  fields spread out over a lap.
 - Before rc_race's `Standings` exist every racer rolls from the Middle row, the Leech Coil only uses
   its 20 u any-direction rule and Storm Strike hits nobody.

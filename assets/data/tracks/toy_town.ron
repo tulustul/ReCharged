@@ -10,9 +10,11 @@
 // through two knockable block gates (Golden Battery on the play table, up the toy-track ramp,
 // forward only) → exit straight → raised final hairpin.
 // Banked turns are lifted (20° → y 1.8, 15° → y 1.35) so their inner lip stays above the mat;
-// heights change on the straights. Turns have a point every 30°. Pillars under every raised
-// stretch are generated (tools/blender/props/toy/supports.py); out-of-reach decor (bunting,
-// aisle signs) lives in assets/data/decor/toy_town.ron.
+// heights change on the straights. Turns have a point every 30°; the raised turns' end points
+// are half banked, so the roll builds over two segments (a full roll over one threw cars off
+// the ground at 30 u/s: autopilot spins, T19a). Pillars under every raised stretch are
+// generated (tools/blender/props/toy/supports.py); out-of-reach decor (bunting, aisle signs)
+// lives in assets/data/decor/toy_town.ron.
 (
     style: ToyTrack,
     start: 0,
@@ -23,14 +25,15 @@
         // Start straight, heading west (−X).
         (pos: (14, 0.3, 50), width: 10, surface: ToyTrack, wall_left: true, wall_right: true, offroad_margin: 6), // 0: start / finish
         (pos: (-12, 0.4, 50)), // 1
-        (pos: (-38, 1.1, 50)), // 2: rising into the raised banked T1
-        // T1: radius 19, banked 20°, raised 1.8 so the inner lip stays above the mat.
+        // T1: radius 19, banked 20°, raised 1.8 so the inner lip stays above the mat; half
+        // banked at its ends, even climbs (≈ 4–6 %) on both sides.
+        (pos: (-38, 1.3, 50), bank_deg: 10), // 2: rising into the raised banked T1
         (pos: (-47.5, 1.8, 47.454), bank_deg: 20), // 3
         (pos: (-54.454, 1.8, 40.5), bank_deg: 20), // 4
-        (pos: (-57, 1.2, 31)), // 5
+        (pos: (-57, 1.3, 31), bank_deg: 10), // 5
         // West straight, heading north: the dollhouse tunnel narrows the track to 7 u (its own
         // walls replace the barriers there).
-        (pos: (-57, 0.45, 21), width: 10), // 6
+        (pos: (-57, 0.6, 21), width: 10), // 6
         (pos: (-57, 0.3, 13), width: 7, wall_left: false, wall_right: false), // 7: dollhouse
         (pos: (-57, 0.3, 1), width: 7), // 8
         (pos: (-57, 0.3, -7), width: 10, wall_left: true, wall_right: true), // 9
@@ -58,18 +61,18 @@
         (pos: (2, 6.8, -42)), // 28: Fwd jump lip
         (pos: (14, 3.3, -42)), // 29: Fwd jump landing
         (pos: (34, 1.8, -42)), // 30: the landing runs out level with the raised T3
-        (pos: (42, 1.8, -42)), // 31
-        // T3 (NE): radius 16, banked 20°, raised 1.8.
+        // T3 (NE): radius 16, banked 20°, raised 1.8; half banked at its ends like T1.
+        (pos: (42, 1.8, -42), bank_deg: 10), // 31
         (pos: (50, 1.8, -39.856), bank_deg: 20), // 32
         (pos: (55.856, 1.8, -34), bank_deg: 20), // 33
-        (pos: (58, 1.8, -26)), // 34
-        (pos: (58, 1.5, -20)), // 35
-        // T5 into the infield: radius 14, banked 15°, raised 1.35.
+        (pos: (58, 1.8, -26), bank_deg: 10), // 34
+        // T5 into the infield: radius 14, banked 15°, raised 1.35; half banked at its ends.
+        (pos: (58, 1.5, -20), bank_deg: 7.5), // 35
         (pos: (56.124, 1.35, -13), bank_deg: 15), // 36
         (pos: (51, 1.35, -7.876), bank_deg: 15), // 37
         // Infield straight, heading west, with the reverse jump: in reverse the ramp (8°) climbs
         // east to the lip at x = 15 and flies 8 u to the landing at x = 23.
-        (pos: (44, 0.8, -6)), // 38
+        (pos: (44, 0.8, -6), bank_deg: 7.5), // 38
         (pos: (36, 0.3, -6)), // 39
         (pos: (23, 1.3, -6)), // 40: Rev jump landing
         (pos: (15, 2.3, -6)), // 41: Rev jump lip
@@ -88,14 +91,14 @@
         (pos: (1, 0.3, 34), wall_left: true, offroad_margin: 6), // 50
         (pos: (18, 0.3, 34)), // 51
         (pos: (35, 0.6, 34)), // 52
-        (pos: (52, 1.25, 34)), // 53
-        // Final hairpin: radius 8, banked 15°, raised 1.35.
+        // Final hairpin: radius 8, banked 15°, raised 1.35; half banked at its ends.
+        (pos: (52, 1.25, 34), bank_deg: 7.5), // 53
         (pos: (56, 1.35, 35.072), bank_deg: 15), // 54
         (pos: (58.928, 1.35, 38), bank_deg: 15), // 55
         (pos: (60, 1.35, 42), bank_deg: 15), // 56
         (pos: (58.928, 1.35, 46), bank_deg: 15), // 57
         (pos: (56, 1.35, 48.928), bank_deg: 15), // 58
-        (pos: (52, 1.25, 50)), // 59
+        (pos: (52, 1.25, 50), bank_deg: 7.5), // 59
         (pos: (38, 0.4, 50)), // 60
         (pos: (26, 0.3, 50)), // 61: the grid stays level
     ],
@@ -317,12 +320,12 @@
         // Pillars under every raised stretch of the ribbon (helix, elevated straight, landing,
         // banked edges, the infield hump). Generated: python3 tools/blender/props/toy/supports.py
         // supports:begin
-        (kind: "toy_track_support", pos: (-38.87, 0.84, 56.59), yaw: -7.5),
-        (kind: "toy_track_support", pos: (-37.13, 0.84, 43.41), yaw: 172.5),
-        (kind: "toy_track_support", pos: (-50.56, 3.33, 52.90), yaw: -29.3),
-        (kind: "toy_track_support", pos: (-59.90, 3.33, 43.56), yaw: -60.7),
-        (kind: "toy_track_support", pos: (-63.59, 0.94, 31.87), yaw: -82.5),
-        (kind: "toy_track_support", pos: (-50.41, 0.94, 30.13), yaw: 97.5),
+        (kind: "toy_track_support", pos: (-20.94, 0.62, 56.83), yaw: 1.8),
+        (kind: "toy_track_support", pos: (-30.27, 1.39, 56.97), yaw: 0.3),
+        (kind: "toy_track_support", pos: (-38.81, 1.95, 56.50), yaw: -7.1),
+        (kind: "toy_track_support", pos: (-50.58, 3.33, 52.89), yaw: -29.5),
+        (kind: "toy_track_support", pos: (-59.90, 3.33, 43.57), yaw: -60.6),
+        (kind: "toy_track_support", pos: (-63.50, 1.95, 31.78), yaw: -83.1),
         (kind: "toy_track_support", pos: (-60.46, 0.98, -36.78), yaw: -119.7),
         (kind: "toy_track_support", pos: (-51.81, 1.93, -45.32), yaw: -149.4),
         (kind: "toy_track_support", pos: (-40.06, 2.33, -48.50), yaw: -179.4),
@@ -357,16 +360,14 @@
         (kind: "toy_track_support", pos: (24.56, 2.18, -35.35), yaw: -0.0, dir: Fwd),
         (kind: "toy_track_support", pos: (34.00, 1.54, -48.65), yaw: -180.0),
         (kind: "toy_track_support", pos: (34.00, 1.54, -35.35), yaw: 0.0),
-        (kind: "toy_track_support", pos: (42.87, 1.54, -48.59), yaw: 172.5),
-        (kind: "toy_track_support", pos: (41.13, 1.54, -35.41), yaw: -7.5),
+        (kind: "toy_track_support", pos: (42.86, 2.45, -48.49), yaw: 172.5),
         (kind: "toy_track_support", pos: (53.13, 3.33, -45.27), yaw: 150.0),
         (kind: "toy_track_support", pos: (61.27, 3.33, -37.12), yaw: 120.0),
-        (kind: "toy_track_support", pos: (64.59, 1.54, -26.87), yaw: 97.5),
-        (kind: "toy_track_support", pos: (51.41, 1.54, -25.13), yaw: -82.5),
-        (kind: "toy_track_support", pos: (64.59, 1.24, -19.13), yaw: 82.5),
-        (kind: "toy_track_support", pos: (51.41, 1.24, -20.87), yaw: -97.5),
+        (kind: "toy_track_support", pos: (64.50, 2.45, -26.83), yaw: 97.2),
+        (kind: "toy_track_support", pos: (64.53, 1.92, -19.11), yaw: 82.2),
         (kind: "toy_track_support", pos: (61.68, 2.44, -9.77), yaw: 59.8),
         (kind: "toy_track_support", pos: (54.15, 2.44, -2.28), yaw: 29.4),
+        (kind: "toy_track_support", pos: (44.80, 1.22, 0.54), yaw: 7.0),
         (kind: "toy_track_support", pos: (23.00, 1.04, 0.65), yaw: -0.0, dir: Fwd),
         (kind: "toy_track_support", pos: (23.00, 1.04, -12.65), yaw: 180.0, dir: Fwd),
         (kind: "toy_track_support", pos: (15.00, 2.04, 0.65), yaw: 0.0),
@@ -378,19 +379,15 @@
         (kind: "toy_track_support", pos: (-31.42, 2.44, 14.00), yaw: -90.0),
         (kind: "toy_track_support", pos: (-27.88, 2.44, 27.21), yaw: -60.0),
         (kind: "toy_track_support", pos: (-18.13, 2.44, 36.93), yaw: -29.2),
-        (kind: "toy_track_support", pos: (44.11, 0.68, 27.17), yaw: -178.9),
-        (kind: "toy_track_support", pos: (44.38, 0.68, 40.47), yaw: 1.1),
-        (kind: "toy_track_support", pos: (52.87, 0.99, 27.41), yaw: 172.5),
-        (kind: "toy_track_support", pos: (51.13, 0.99, 40.59), yaw: -7.5),
+        (kind: "toy_track_support", pos: (44.10, 1.02, 27.18), yaw: -178.7),
+        (kind: "toy_track_support", pos: (52.83, 1.67, 27.46), yaw: 172.7),
         (kind: "toy_track_support", pos: (59.20, 2.44, 29.50), yaw: 150.2),
         (kind: "toy_track_support", pos: (64.49, 2.44, 34.79), yaw: 120.0),
         (kind: "toy_track_support", pos: (66.42, 2.44, 42.00), yaw: 90.0),
         (kind: "toy_track_support", pos: (64.49, 2.44, 49.21), yaw: 60.0),
         (kind: "toy_track_support", pos: (59.19, 2.44, 54.50), yaw: 29.8),
-        (kind: "toy_track_support", pos: (52.87, 0.99, 56.59), yaw: 7.5),
-        (kind: "toy_track_support", pos: (51.13, 0.99, 43.41), yaw: -172.5),
-        (kind: "toy_track_support", pos: (45.33, 0.57, 56.81), yaw: -1.2),
-        (kind: "toy_track_support", pos: (45.61, 0.57, 43.51), yaw: 178.8),
+        (kind: "toy_track_support", pos: (52.82, 1.67, 56.54), yaw: 7.2),
+        (kind: "toy_track_support", pos: (45.30, 0.91, 56.79), yaw: -1.5),
         (kind: "toy_track_support", pos: (2.00, 6.54, -48.65), yaw: 180.0, dir: Rev),
         (kind: "toy_track_support", pos: (2.00, 6.54, -35.35), yaw: -0.0, dir: Rev),
         (kind: "toy_track_support", pos: (24.23, 1.97, -48.65), yaw: 180.0, dir: Rev),

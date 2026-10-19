@@ -148,9 +148,9 @@ fn steering_assist_steers_toward_the_line_and_keeps_the_pedals_on_a_straight() {
     assert_eq!(steer, 0.0, "assist off: the player's steer is kept");
 }
 
-/// Full throttle, no steering, for 6 s on test_oval (into turn 1): the lowest throttle and the
-/// strongest brake the car got.
-fn assisted_pedals(assist: bool) -> (f32, f32) {
+/// Full throttle for 6 s on test_oval (into turn 1), no steering or (`steering`) small corrections
+/// every other tick: the lowest throttle and the strongest brake the car got.
+fn assisted_pedals(assist: bool, steering: bool) -> (f32, f32) {
     let mut app = race_app();
     let mut settings = Settings::default();
     settings.accessibility.steering_assist = assist;
@@ -159,9 +159,10 @@ fn assisted_pedals(assist: bool) -> (f32, f32) {
     run_to_go(&mut app, &mut Vec::new());
     let car = find(&mut app, 0);
     let (mut throttle, mut brake) = (1.0f32, 0.0f32);
-    for _ in 0..secs_to_ticks(6.0) {
+    for tick in 0..secs_to_ticks(6.0) {
         *app.world_mut().get_mut::<CarControl>(car).expect("racer") = CarControl {
             throttle: 1.0,
+            steer: if steering && tick % 2 == 0 { 0.15 } else { 0.0 },
             ..default()
         };
         step(&mut app, 1);
@@ -173,14 +174,22 @@ fn assisted_pedals(assist: bool) -> (f32, f32) {
 
 #[test]
 fn the_assist_brakes_gently_before_a_corner_taken_too_fast() {
-    let (throttle, brake) = assisted_pedals(true);
-    assert_eq!(throttle, 0.0, "the throttle lifts before turn 1");
+    let (throttle, brake) = assisted_pedals(true, false);
+    assert_eq!(
+        throttle, 0.0,
+        "throttle only: the throttle lifts before turn 1"
+    );
     assert!(
         brake > 0.0 && brake <= rc_ai::MAX_AUTO_BRAKE,
         "a gentle auto-brake: {brake}"
     );
     assert_eq!(
-        assisted_pedals(false),
+        assisted_pedals(true, true),
+        (1.0, 0.0),
+        "a player who steers keeps the pedals"
+    );
+    assert_eq!(
+        assisted_pedals(false, false),
         (1.0, 0.0),
         "assist off: the pedals are the player's"
     );
@@ -362,6 +371,11 @@ fn assist_probe() {
     load_race(&mut app, cfg).expect("loads");
     run_to_go(&mut app, &mut Vec::new());
     let car = find(&mut app, 0);
+    // run_to_go's ticks after GO feed the assist its own steer back as input: a throttle-only
+    // player has not touched the stick (rc_input writes every tick in the game).
+    if let Some(mut st) = app.world_mut().get_mut::<rc_ai::AssistState>(car) {
+        st.hands_off = rc_ai::HANDS_OFF_SECS;
+    }
     let mut respawns = MessageCursor::<CarRespawned>::default();
     let mut events = MessageCursor::<RaceEvent>::default();
     let mut impacts = MessageCursor::<CarImpact>::default();

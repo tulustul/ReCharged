@@ -69,7 +69,9 @@ Lint-free in all four variants. Changes from the T02 placeholder layout:
 - **Raised banked turns.** Banked turns pivot on the centreline, so at y 0.3 their inner half
   (lips and barrier) sank under the play-mat. T1/T3 (20°) are now at y 1.8, T5, the U-turn and
   the hairpin (15°) at 1.35, the helix's first point banks 6° instead of 12°; the climbs happen on
-  the straights (≤ 8.5°). Two knee points keep the start straight and the grid level.
+  the straights (≤ 8.5°). Two knee points keep the start straight and the grid level. The end
+  points of every raised turn are half banked (T19a), so the roll builds over two segments — the
+  AI no longer spins at the bank onset (reverse T1). The U-turn's ends sit at mat level, unbanked.
 - **Dressing.** Castle in the helix, start gate, play table + ramp instead of the toy box,
   pillars under every raised stretch, shelves on every wall, cubbies under the windows, displays.
 

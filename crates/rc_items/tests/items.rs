@@ -308,6 +308,33 @@ fn goo_passes_on_contact_and_explodes_after_the_fuse() {
 }
 
 #[test]
+fn goo_passes_on_a_near_miss_and_speeds_its_carrier() {
+    // Side by side, chassis 1.1 u wide: 1.5 u apart leaves a 0.4 u gap, 2.1 u a 1.0 u gap.
+    let near = |apart: f32| {
+        let mut app = race(1);
+        let a = spawn_car(&mut app, straight(0.0), 0.0);
+        let b = spawn_car(&mut app, Vec3::new(apart, ROAD_Y, 0.0), 0.0);
+        step(&mut app, 10);
+        fire(&mut app, a, ItemKind::GooBomb, false);
+        step(&mut app, 3);
+        let goo = all::<Hazard>(&mut app)[0];
+        let carrier = app.world().get::<ItemTarget>(goo).and_then(|t| t.0);
+        let fast = |car| effects(&app, car).top_speed_mul() > 1.05;
+        (carrier == Some(b), fast(a), fast(b))
+    };
+    assert_eq!(
+        near(1.5),
+        (true, false, true),
+        "passed without a bump; the new carrier is fast"
+    );
+    assert_eq!(
+        near(2.1),
+        (false, true, false),
+        "too far: kept, and its carrier is fast"
+    );
+}
+
+#[test]
 fn goo_explodes_on_time() {
     let mut app = race(1);
     let a = spawn_car(&mut app, straight(0.0), 0.0);
