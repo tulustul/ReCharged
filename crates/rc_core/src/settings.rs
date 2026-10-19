@@ -83,6 +83,8 @@ pub struct GameplaySettings {
     pub hud_scale: f32,
     /// Show the minimap.
     pub minimap: bool,
+    /// Show the FPS meter (top-right corner, menus and races).
+    pub fps_meter: bool,
     /// 2P split orientation.
     pub split: SplitOrientation,
     /// AI catch-up.
@@ -101,6 +103,7 @@ impl Default for GameplaySettings {
             camera_shake: true,
             hud_scale: 1.0,
             minimap: true,
+            fps_meter: false,
             split: SplitOrientation::Horizontal,
             ai_catch_up: true,
             ai_difficulty: Difficulty::Pro,

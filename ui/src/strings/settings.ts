@@ -27,6 +27,7 @@ export const settingsText = {
     cameraShake: ["Camera shake", "Shake on impacts and landings."],
     hudScale: ["HUD scale", "Size of the race HUD."],
     minimap: ["Minimap", "Show the track map in the HUD."],
+    fpsMeter: ["FPS meter", "Show frames per second in the top-right corner."],
     split: ["2-player split", "Top/bottom or side-by-side screens for two players."],
     aiCatchUp: ["AI catch-up", "Rivals behind speed up a little; rivals far ahead slow down."],
     aiDifficulty: ["AI difficulty", "Default difficulty for Quick Race and Versus."],

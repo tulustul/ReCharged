@@ -7,7 +7,7 @@ sends intents. Everything crosses typed channels generated into `ui/src/bevy.ts`
 ## Structure
 | Where | What |
 |---|---|
-| `crates/rc_ui/src/` | one module per namespace: `app` (state, info, quit), `ui` (ready/error, `ui.screen` (the shown screen: logged, waited on by `--input-script`), `ui.sound` cues with a 40 ms retrigger guard, `ui.stinger`, `ui.nav`, `toast` = rc_game notices held until `ui.ready`; hides the OS cursor after keyboard/pad input until the mouse moves), `input` (devices, bindings, rebind), `menu` (catalog view, `menu.backdrop` → `MenuBackdrop`), `profile` (profile/records/NEW badges), `settings` (mirror of `Settings` without bindings), `lobby`, `race` (commands, `race.snapshot`, `loading.progress`), `results` (`race.results` = `RaceResults` + `RaceOutcome`, `cup.standings`, `versus.score`), `hud` (race HUD: `race.setup`, `race.hud`, `race.event`, `viewports`, `hud.bind/unbind` — `docs/design/hud.md`), `filters` (`chargeSwap` morph, embedded WESL), `debug` (`RECHARGED_UI_SCRIPT`) |
+| `crates/rc_ui/src/` | one module per namespace: `app` (state, info, quit), `ui` (ready/error, `ui.screen` (the shown screen: logged, waited on by `--input-script`), `ui.sound` cues with a 40 ms retrigger guard, `ui.stinger`, `ui.nav`, `ui.fps` (frame rate every 0.5 s while the FPS meter setting is on), `toast` = rc_game notices held until `ui.ready`; hides the OS cursor after keyboard/pad input until the mouse moves), `input` (devices, bindings, rebind), `menu` (catalog view, `menu.backdrop` → `MenuBackdrop`), `profile` (profile/records/NEW badges), `settings` (mirror of `Settings` without bindings), `lobby`, `race` (commands, `race.snapshot`, `loading.progress`), `results` (`race.results` = `RaceResults` + `RaceOutcome`, `cup.standings`, `versus.score`), `hud` (race HUD: `race.setup`, `race.hud`, `race.event`, `viewports`, `hud.bind/unbind` — `docs/design/hud.md`), `filters` (`chargeSwap` morph, embedded WESL), `debug` (`RECHARGED_UI_SCRIPT`) |
 | `ui/src/theme/` | `tokens.ts` (colours, slot colours, sizes, spacing, layers), `styles.ts` (text presets, glass), `motion.ts` (springs, timings) |
 | `ui/src/components/` | Button, Panel, Tabs, List/Carousel (`lists.tsx`), Grid/StatBar/LockOverlay/Spinner (`bits.tsx`), OptionRow/Toggle/Slider/Cycler (`controls.tsx`), Dialog, Toast, Glyph, Badge, Hints, Screen (frame), TrackArt, Backdrop, icons |
 | `ui/src/nav/` | `focus.ts` regions model, `stack.ts` nav layers, `router.ts` stack ops (pure, tested); `input.ts` (`useNav`, glyph device per slot), `useFocusNav.ts`, `routes.ts` (menu routes + morph transitions) |
@@ -129,7 +129,7 @@ NEW badges come from `Profile::new_unlocks`; focusing an item sends `profile.see
 5. A `go x` / `demo x` verb in `debug.ts` if it needs sample data, then screenshot it.
 
 ## Channels (final)
-- **Events**: `app.state`, `ui.nav`, `input.device`, `input.rebindResult`, `bindings.changed`,
+- **Events**: `app.state`, `ui.nav`, `ui.fps`, `input.device`, `input.rebindResult`, `bindings.changed`,
   `lobby.slots`, `loading.progress`, `toast`, `profile.changed`, `profile.unlocked`, `race.results`,
   `cup.standings`, `versus.score`, `race.setup`, `race.hud`, `race.event`, `viewports`, `debug.act`.
 - **Messages**: `ui.ready`, `ui.error`, `ui.screen`, `ui.sound`, `ui.stinger`, `menu.backdrop`, `race.start`,

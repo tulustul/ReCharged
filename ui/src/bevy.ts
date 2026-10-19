@@ -822,7 +822,12 @@ message: string,
  * Component stack, if React provided one.
  */
 stack?: string, };
-export type UiGameplay = { speedUnit: UiSpeedUnit, cameraMode: UiCameraMode, cameraShake: boolean, hudScale: number, minimap: boolean, split: UiSplit, aiCatchUp: boolean, aiDifficulty: UiDifficulty, hints: boolean, };
+export type UiFps = { 
+/**
+ * Frames per second over the last window, rounded.
+ */
+fps: number, };
+export type UiGameplay = { speedUnit: UiSpeedUnit, cameraMode: UiCameraMode, cameraShake: boolean, hudScale: number, minimap: boolean, fpsMeter: boolean, split: UiSplit, aiCatchUp: boolean, aiDifficulty: UiDifficulty, hints: boolean, };
 export type UiGraphics = { preset: UiQuality, displayMode: UiDisplayMode, windowSize: [number, number], vsync: boolean, fovDeg: number, shadows: UiShadows, antiAliasing: UiAntiAliasing, ambientOcclusion: boolean, bloom: boolean, motionBlur: boolean, particles: UiParticles, volumetricFog: boolean, };
 export type UiHint = "driftCharge" | "boostReady" | "itemReady" | "holdReset" | "wrongWay";
 export type UiHudSetup = { 
@@ -1926,6 +1931,7 @@ export interface ReactEvents {
   "race.setup": UiHudSetup;
   resize: Resize;
   toast: UiNotice;
+  "ui.fps": UiFps;
   "ui.nav": NavEvent;
   "versus.score": UiVersusScore;
   viewports: UiViewports;

@@ -1,6 +1,7 @@
 //! `ui.*` channels: readiness and render errors of the React app, the screen it shows
 //! (`ui.screen`, logged and waited on by `--input-script`), UI sound cues and music stingers, menu
-//! navigation (`ui.nav`) and toasts, plus the readiness watchdog.
+//! navigation (`ui.nav`), toasts and the FPS meter's frame rate (`ui.fps`), plus the readiness
+//! watchdog.
 
 use bevy::input::gamepad::Gamepad;
 use bevy::prelude::*;
@@ -17,6 +18,9 @@ pub const READY_TIMEOUT_SECS: f32 = 15.0;
 
 /// The same cue within this many seconds plays once (a fast pointer sweep over a list).
 const CUE_RETRIGGER_SECS: f64 = 0.04;
+
+/// The FPS meter averages the frames of this many seconds (and updates as often).
+const FPS_WINDOW_SECS: f64 = 0.5;
 
 /// React → Bevy message `ui.ready`: the React app mounted (again after a full hot reload).
 #[react_message(name = "ui.ready")]
@@ -157,6 +161,15 @@ pub enum UiNotice {
     },
 }
 
+/// Bevy → React event `ui.fps`: the frame rate, every [`FPS_WINDOW_SECS`] while the FPS meter
+/// setting is on.
+#[react_event(name = "ui.fps")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UiFps {
+    /// Frames per second over the last window, rounded.
+    pub fps: u16,
+}
+
 /// Health of the React UI; automation runs exit non-zero when it is not ready or has errors.
 #[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
 pub struct UiStatus {
@@ -182,7 +195,8 @@ pub(crate) fn register(app: &mut App) {
             },
         )
         .add_react_event::<NavEvent>()
-        .add_react_event::<UiNotice>();
+        .add_react_event::<UiNotice>()
+        .add_react_event::<UiFps>();
 }
 
 fn on_ready(_: On<UiReady>, status: Option<ResMut<UiStatus>>) {
@@ -302,6 +316,29 @@ pub(crate) fn forward_notices(
     }
     if !unlocked.is_empty() {
         events.send(&Unlocked { items: unlocked });
+    }
+}
+
+/// Counts frames and sends `ui.fps` at the end of each window while the FPS meter is on (frames
+/// are counted either way, so the first value after switching it on is a full window's).
+pub(crate) fn push_fps(
+    time: Res<Time<Real>>,
+    settings: Option<Res<Settings>>,
+    mut window: Local<(u32, f64)>,
+    events: ReactEvents,
+) {
+    window.0 += 1;
+    let now = time.elapsed_secs_f64();
+    let secs = now - window.1;
+    if secs < FPS_WINDOW_SECS {
+        return;
+    }
+    let fps = f64::from(window.0) / secs;
+    *window = (0, now);
+    if settings.is_some_and(|s| s.gameplay.fps_meter) {
+        events.send(&UiFps {
+            fps: fps.round() as u16,
+        });
     }
 }
 

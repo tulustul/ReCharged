@@ -587,7 +587,7 @@ All settings apply live and persist (written at most once per second).
 
 | Tab | Settings |
 |---|---|
-| Gameplay | speed units (km/h, mph); default camera mode; camera shake; HUD scale (75–125 %); minimap; 2P split orientation; AI catch-up; default AI difficulty; hints; reset progress |
+| Gameplay | speed units (km/h, mph); default camera mode; camera shake; HUD scale (75–125 %); minimap; FPS meter; 2P split orientation; AI catch-up; default AI difficulty; hints; reset progress |
 | Graphics | quality preset (Low / Medium / High / Ultra / Custom); display mode (windowed, borderless); window size (windowed); vsync; field of view (60–100° horizontal); shadows (off/low/high); anti-aliasing (off/FXAA/SMAA/TAA); ambient occlusion; bloom; motion blur; particle density (low/med/high); volumetric fog (Ultra only, never in split-screen) |
 | Audio | master, music, sound effects, engines, UI, ambience volumes; mute when unfocused |
 | Controls | binding lists per scheme (keyboard A, keyboard B, gamepad) with rebinding & reset; steering dead zone; steering sensitivity; vibration on/off & intensity |

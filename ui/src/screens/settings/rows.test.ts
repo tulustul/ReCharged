@@ -5,7 +5,7 @@ import type { UiBindings, UiSettings } from "../../bevy";
 import { PRESETS, rebindNotice, rowsOf, type RowDef } from "./rows.ts";
 
 const settings: UiSettings = {
-  gameplay: { speedUnit: "kmh", cameraMode: "chase", cameraShake: true, hudScale: 1, minimap: true, split: "horizontal", aiCatchUp: true, aiDifficulty: "pro", hints: true },
+  gameplay: { speedUnit: "kmh", cameraMode: "chase", cameraShake: true, hudScale: 1, minimap: true, fpsMeter: false, split: "horizontal", aiCatchUp: true, aiDifficulty: "pro", hints: true },
   graphics: {
     preset: "high",
     displayMode: "windowed",

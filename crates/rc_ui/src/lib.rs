@@ -104,6 +104,7 @@ impl Plugin for GameUiPlugin {
                     ui::forward_nav,
                     ui::cursor_visibility,
                     ui::forward_notices,
+                    ui::push_fps,
                     ui::watchdog,
                     input::forward_devices,
                     input::forward_rebinds,

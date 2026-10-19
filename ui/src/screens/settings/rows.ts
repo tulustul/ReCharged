@@ -89,6 +89,7 @@ export function rowsOf(tab: TabId, s: UiSettings): RowDef[] {
         { id: "cameraShake", kind: "toggle", get: (x) => x.gameplay.cameraShake, set: (x, v) => gameplay(x, { cameraShake: v }) },
         { id: "hudScale", kind: "slider", min: 0.75, max: 1.25, step: 0.05, format: percent, get: (x) => x.gameplay.hudScale, set: (x, v) => gameplay(x, { hudScale: v }) },
         { id: "minimap", kind: "toggle", get: (x) => x.gameplay.minimap, set: (x, v) => gameplay(x, { minimap: v }) },
+        { id: "fpsMeter", kind: "toggle", get: (x) => x.gameplay.fpsMeter, set: (x, v) => gameplay(x, { fpsMeter: v }) },
         cycle("split", choices(splitName), (x) => x.gameplay.split, (x, v) => gameplay(x, { split: v })),
         { id: "aiCatchUp", kind: "toggle", get: (x) => x.gameplay.aiCatchUp, set: (x, v) => gameplay(x, { aiCatchUp: v }) },
         cycle(
