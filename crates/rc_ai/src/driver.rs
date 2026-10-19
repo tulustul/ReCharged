@@ -160,7 +160,9 @@ pub(crate) struct Path {
     /// Planned lateral here (before the lane shift).
     pub(crate) planned: f32,
     pub(crate) lane: LaneChoice,
-    /// Half the legal width of the narrowest track ahead (u).
+    /// Half the legal width of the narrowest track ahead (u), inside the normal edge margin even
+    /// while drifting: the drift's line keeps `charge::DRIFT_EDGE_EXTRA_U` more, and room
+    /// measured to that bound ran out at every apex and ended the drift.
     pub(crate) narrowest: f32,
 }
 
@@ -477,7 +479,12 @@ fn plan_path(
         target: frame_t.point(lateral_t, 0.0),
         planned: here,
         lane,
-        narrowest,
+        narrowest: narrowest_ahead(
+            w.track,
+            view.s,
+            tuning.traffic.look_ahead_u,
+            d.edge_margin_u,
+        ),
     }
 }
 

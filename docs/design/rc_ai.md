@@ -115,11 +115,14 @@ offset and perfect start (`AiLineOffset`, `AiPerfectStart`), mistakes and drift 
   drifted with the difficulty's `drift` chance, from stable grip driving only (4 wheels down, slip <
   8°, within 1.5 u of its line, battery < 70 %). The drift ends when it does not charge after 0.7 s
   (`VehicleTelemetry::charge_rate`), the pursuit asks for > 0.35 counter-steer (too tight), the car
-  spins (> 40°), slows below the zone speed or gets within 0.5 u of the edge (its line keeps 1 u
-  more room: a car turned 30° reaches the barrier with its corner). After a drift the throttle is
-  eased (0.4) until the slide is caught. Measured (solo Hornet, toy_town): drifting costs ≈ 0.5 s
-  per lap (4WD cars scrub speed in a drift) that the charge partly earns back on the next straight;
-  before these entry/exit rules a wall-scraping helix drift cost 2–5 s per lap.
+  spins (> 40°), slows below the zone speed or gets within 0.5 u of its normal line's bound (the
+  drift's line keeps 1 u more room: a car turned 30° reaches the barrier with its corner; room
+  measured to that tighter bound ran out at every apex, and the median drift ended after 0.15 s,
+  before charging). Three in four drifts still end within 0.6 s (median 0.43 s, 8 AI on 5 tracks):
+  the car tightens past its drift line toward the apex. After a drift the throttle is eased (0.4)
+  until the slide is caught. Measured (solo Hornet, toy_town): drifting costs ≈ 0.5 s per lap (4WD
+  cars scrub speed in a drift) that the charge partly earns back on the next straight; before these
+  entry/exit rules a wall-scraping helix drift cost 2–5 s per lap.
 - **Boost**: from `BOOST_MIN_CHARGE` + (1 − eagerness) × 0.2 when the plan stays above the boosted
   top speed for `boost_straight_secs` × (1.5 − eagerness) (integrated with the car's Accel-star
   acceleration), all wheels down, not drifting, > 50 % top; held until braking is due.
@@ -261,17 +264,20 @@ seven tracks; toy_town and backyard_bash re-measured after their round-2 data ch
   without stalls; items are used and an item race finishes; the autopilot finishes a lap and ends
   the race; the assist steers toward the line and keeps the pedals on a straight, lifts and brakes
   gently (≤ 0.4) into test_oval's turn 1 for throttle-only play, leaves the pedals to a player who
-  steers, and changes nothing when off; catch-up slows rivals ahead
+  steers, and changes nothing when off; an Elite AI alone on test_oval earns charge from its
+  drifts; catch-up slows rivals ahead
   and is 0 in Time Trial; a car put nose-first against a wall gets back into the race; rockets are
   fired only at cars in sight (not through a wall); a car that missed a gate holds reset and is put
   back before it; every one of 7 Pro AI passes a car parked on the racing line on pole within 3 s
   of reaching it, on toy_town and test_oval (`tests/race.rs`).
 - `cargo test -p rc_ai --test race -- --ignored --nocapture every_layout` (QA, ≈ 2–4 min): every
-  catalog track with a data file × forward/reverse/mirror, 8 Elite AI in Elite cars, 3 laps,
-  DoD-2 limits. Snapshot 2026-10-19 (T22): all 28 variants of the 7 tracks pass (no DNF, worst
-  racer 1.20× on backyard_bash reverse mirror, at most 2 to-track respawns per car and 6 per 24
-  racer-laps, on maple_street; T19a: worst 1.43× on test_oval reverse mirror; before T19a QA saw
-  wrench_works fail).
+  catalog track with a data file × forward/reverse/mirror, 8 Elite AI in Elite cars, 3 laps, DoD-2
+  limits. Snapshot 2026-10-20 (drift edge-room fix): all 28 pass (no DNF, worst racer 1.24× on
+  test_oval forward, at most 2 to-track respawns per car and 3 per 24 racer-laps; 25 respawns in
+  all, 17 without the fix, and Elite fields 0.4 % slower on average: the AI's drifts now last).
+  2026-10-19 (T22): all 28 variants of the 7 tracks pass (no DNF, worst racer 1.20× on backyard_bash
+  reverse mirror, at most 2 to-track respawns per car and 6 per 24 racer-laps, on maple_street;
+  T19a: worst 1.43× on test_oval reverse mirror; before T19a QA saw wrench_works fail).
 - `cargo test -p rc_ai --test race -- --ignored --nocapture lap_table` prints the table above;
   `probe` runs one race with `AI_TRACK`, `AI_DIFF`, `AI_CLASS`, `AI_N`, `AI_LAPS`, `AI_SEED`,
   `AI_REV=1`, `AI_MIRROR=1`, `AI_ITEMS=1`, `AI_TT=1` (the calibration Time Trial instead),

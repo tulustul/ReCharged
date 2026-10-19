@@ -1,5 +1,5 @@
 //! Headless behaviours of the AI on the full sim stack: starts, items, autopilot, steering
-//! assist, catch-up, wall recovery.
+//! assist, catch-up, wall recovery, drift charge.
 
 mod common;
 
@@ -468,4 +468,23 @@ fn assist_probe() {
          respawns {count}, Hold Reset hints {stuck_hints}",
         p.finished
     );
+}
+
+/// An Elite AI alone on test_oval (no drafting; air time charges only off the ground) earns
+/// charge from its drifts: they outlast rc_vehicle's 0.4 s before a drift charges (measured
+/// 0.055 over 3 laps; 0 while the edge room was measured to the drift line's own bound).
+#[test]
+fn elite_drifts_charge_the_battery() {
+    let mut app = race_app();
+    let racers = ai_field(&app, 1, Difficulty::Elite, CarClass::Pro);
+    let cfg = config("test_oval", racers, 3, 7);
+    let mut charged = 0.0;
+    run_race_traced(&mut app, cfg, 60.0, |app, _| {
+        let world = app.world_mut();
+        let mut q = world.query::<&VehicleTelemetry>();
+        for t in q.iter(world).filter(|t| t.drifting) {
+            charged += t.charge_rate * SIM_DT;
+        }
+    });
+    assert!(charged > 0.02, "drift charge over 3 laps: {charged:.3}");
 }
