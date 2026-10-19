@@ -1,0 +1,30 @@
+# QA Q3: rebinding Use item (keyboard A) to C, which Camera uses. Expected: a clear outcome (swap,
+# or "Camera is now unbound"). Actual: Camera silently loses C (settings.ron: camera: []) while the
+# notice says "Also bound to Camera (Keyboard A)"; the notice survives Reset bindings.
+wait ui
+3.5 nav keyboardA confirm          # Title
+1.5 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up               # Settings
+0.3 nav keyboardA confirm
+2.0 nav keyboardA nextTab          # Graphics
+0.4 nav keyboardA nextTab          # Audio
+0.4 nav keyboardA nextTab          # Controls (scheme Keyboard A)
+0.6 nav keyboardA down             # Throttle
+0.3 nav keyboardA down             # Brake
+0.3 nav keyboardA down             # Steer left
+0.3 nav keyboardA down             # Steer right
+0.3 nav keyboardA down             # Drift
+0.3 nav keyboardA down             # Use item
+0.3 nav keyboardA confirm          # capture
+0.6 tap keyboardA camera           # C
+1.0 shot rb_01_after_rebind        # Camera row shows "—", notice "Also bound to Camera"
+0.3 nav keyboardA down             # Boost
+0.3 nav keyboardA down             # Look back
+0.3 nav keyboardA down             # Reset
+0.3 nav keyboardA down             # Camera
+0.3 nav keyboardA down             # Pause
+0.3 nav keyboardA down             # Reset bindings
+0.3 nav keyboardA confirm
+1.0 shot rb_02_after_reset         # bindings back; the stale notice is still shown
+1.5 exit

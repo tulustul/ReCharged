@@ -1,0 +1,200 @@
+# QA DoD-1, keyboard only: every main-menu screen, Settings (every tab, speed unit, a graphics
+# preset change, an audio volume change, a rebind with a conflict), Championship race 1 (pause →
+# Settings in the pause menu → graphics preset live → resume → finish → results → standings → quit
+# cup), Time Trial (finish → results → Retry with the ghost → pause → quit), the Quit dialog.
+# Quick Race and Versus are covered by tools/scripts/keyboard_only.script.
+#   rm -rf target/qa/data/kb_modes && cargo run -p recharged -- --user-data-dir target/qa/data/kb_modes \
+#     --window 1600x900 --input-script tools/scripts/qa/kb_modes.script --exit-after 900
+# Screenshots: <user-data-dir>/screenshots/kbm_*.png. Fresh profile, default settings.
+
+wait ui
+3.5 nav keyboardA confirm          # Title: any button
+1.5 shot kbm_01_main
+
+# Garage (5th entry)
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA confirm
+2.0 shot kbm_02_garage
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Torque: locked
+0.6 shot kbm_03_garage_locked
+0.3 nav keyboardB back             # Backspace (scheme B)
+
+# Records (6th entry), every tab
+1.5 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA confirm
+2.0 shot kbm_04_records_tracks
+0.3 nav keyboardA nextTab
+0.6 shot kbm_05_records_trophies
+0.3 nav keyboardA nextTab
+0.6 shot kbm_06_records_batteries
+0.3 nav keyboardA nextTab
+0.6 shot kbm_07_records_stats
+0.3 nav keyboardA back
+
+# How to play (7th entry), every tab
+1.5 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA confirm
+2.0 shot kbm_08_howto_controls
+0.3 nav keyboardA nextTab
+0.6 shot kbm_09_howto_charge
+0.3 nav keyboardA nextTab
+0.6 shot kbm_10_howto_items
+0.3 nav keyboardA nextTab
+0.6 shot kbm_11_howto_recovery
+0.3 nav keyboardA back
+
+# Credits (9th entry: up ×2 wraps through Quit)
+1.5 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA confirm
+4.0 shot kbm_12_credits
+0.3 nav keyboardA back
+
+# Settings (8th entry: up ×3)
+1.5 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA confirm
+2.0 nav keyboardA right            # Gameplay: speed unit → mph
+0.6 shot kbm_13_settings_gameplay
+0.3 nav keyboardA nextTab          # Graphics
+0.6 nav keyboardA left             # preset High → Medium
+0.3 nav keyboardA left             # → Low
+0.6 shot kbm_14_settings_graphics_low
+0.3 nav keyboardA nextTab          # Audio
+0.6 nav keyboardA down             # Music
+0.3 nav keyboardA left             # 70 → 65 %
+0.3 nav keyboardA left             # → 60 %
+0.6 shot kbm_15_settings_audio
+0.3 nav keyboardA nextTab          # Controls (scheme: Keyboard A)
+0.6 nav keyboardA down             # Throttle
+0.3 nav keyboardA down             # Brake
+0.3 nav keyboardA down             # Steer left
+0.3 nav keyboardA down             # Steer right
+0.3 nav keyboardA down             # Drift
+0.3 nav keyboardA down             # Use item
+0.6 shot kbm_16_settings_controls
+0.3 nav keyboardA confirm          # capture
+0.8 shot kbm_17_rebind_capture
+0.3 tap keyboardA camera           # C → Use item (conflicts with Camera)
+1.0 shot kbm_18_rebind_conflict
+0.3 nav keyboardA nextTab          # Accessibility
+0.6 nav keyboardA down             # Colour-blind markers
+0.3 nav keyboardA down             # Steering assist
+0.3 nav keyboardA confirm          # on
+0.6 shot kbm_19_settings_access
+0.3 nav keyboardA back
+
+# Championship: Rookie Cup, race 1 (Sofa Circuit)
+1.5 nav keyboardA confirm
+2.0 shot kbm_20_cup_select
+0.3 nav keyboardA right            # Pro Cup (locked)
+0.6 shot kbm_21_cup_locked
+0.3 nav keyboardA confirm          # locked: error cue, stays
+0.6 nav keyboardA left
+0.3 nav keyboardA confirm          # Rookie Cup → car select
+2.0 shot kbm_22_cup_car_select
+0.3 nav keyboardA confirm          # race
+wait countdown
+1.0 shot kbm_23_cup_countdown
+wait racing
+hold keyboardA throttle 1
+@300 shot kbm_24_cup_racing_low
+@420 tap keyboardA item            # rebound to C
+@600 release keyboardA
+0.2 tap keyboardA pause
+wait paused
+1.0 shot kbm_25_cup_pause
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA down             # How to play
+0.3 nav keyboardA confirm
+1.0 shot kbm_26_pause_howto
+0.3 nav keyboardA back
+0.8 nav keyboardA down             # Settings
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA confirm
+1.5 nav keyboardA nextTab          # Graphics
+0.6 nav keyboardA right            # Low → Medium
+0.3 nav keyboardA right            # → High
+0.6 shot kbm_27_pause_settings
+0.3 nav keyboardA back             # pause menu
+0.8 nav keyboardA back             # Esc in the pause menu: resume
+wait running
+0.2 hold keyboardA throttle 1
+2.0 shot kbm_28_cup_racing_high
+wait finished
+release keyboardA
+3.5 shot kbm_29_cup_results
+0.3 nav keyboardA confirm          # Continue → standings
+2.0 shot kbm_30_cup_standings
+0.3 nav keyboardA down             # Quit cup
+0.3 nav keyboardA confirm          # dialog: Cancel focused
+0.6 shot kbm_31_quit_cup_dialog
+0.3 nav keyboardA left             # Quit cup
+0.3 nav keyboardA confirm
+wait menu
+2.5 shot kbm_32_after_quit_cup
+0.3 nav keyboardA back             # cup select → main
+
+# Time Trial on Backyard Bash (3 laps, no rivals)
+1.5 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Backyard Bash
+0.6 shot kbm_33_tt_track_select
+0.3 nav keyboardA confirm          # → car select
+2.0 nav keyboardA confirm          # race
+wait racing
+hold keyboardA throttle 1
+@600 shot kbm_34_tt_racing
+wait finished
+release keyboardA
+3.5 shot kbm_35_tt_results
+0.3 nav keyboardA confirm          # Retry (instant, races the ghost)
+wait countdown
+1.0 shot kbm_36_tt_retry_countdown
+wait racing
+hold keyboardA throttle 1
+@240 shot kbm_37_tt_retry_ghost
+@300 release keyboardA
+0.2 tap keyboardA pause
+wait paused
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA down             # How to play
+0.3 nav keyboardA down             # Settings
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm
+0.4 nav keyboardA left
+0.3 nav keyboardA confirm
+wait menu
+2.0 shot kbm_38_after_tt_quit         # quitting a race returns to the Car select
+0.3 nav keyboardA back               # → Track select
+1.5 nav keyboardA back               # → main menu
+1.5 shot kbm_38b_main
+
+# Quit dialog: open, cancel
+0.3 nav keyboardA up               # Quit
+0.3 nav keyboardA confirm
+0.8 shot kbm_39_quit_dialog
+0.3 nav keyboardA confirm          # Cancel (focused)
+1.0 shot kbm_40_main_end
+1.0 exit

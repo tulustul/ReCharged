@@ -1,0 +1,44 @@
+# QA DoD-3 part 2: the app restarted on the profile of dod3_cup.script (same --user-data-dir, no
+# deletion). Shows what persisted: progress on the main menu, settings (HUD 125 %, mph), the trophy
+# and unlocked cups, unlocked cars, Toy Town's TT record and medal, and the saved ghost on the grid
+# of a new Time Trial (driven by --autopilot).
+#   cargo run -p recharged -- --user-data-dir target/qa/data/dod3 --window 1600x900 --autopilot \
+#     --input-script tools/scripts/qa/dod3_restart.script --exit-after 400
+
+wait ui
+3.5 nav keyboardA confirm          # Title
+1.5 shot rst_01_main
+0.3 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up               # Settings
+0.3 nav keyboardA confirm
+2.0 shot rst_02_settings_gameplay
+0.3 nav keyboardA back
+1.5 nav keyboardA confirm          # Championship
+2.0 shot rst_03_cup_select
+0.3 nav keyboardA back
+1.5 nav keyboardA down
+0.3 nav keyboardA down             # Time Trial
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town: record + medal
+0.8 shot rst_04_tt_track_select
+0.3 nav keyboardA confirm
+2.0 shot rst_05_tt_car_select
+0.3 nav keyboardA confirm
+wait countdown
+1.0 shot rst_06_tt_ghost_on_grid
+wait racing
+@180 shot rst_07_tt_ghost_racing
+@360 tap keyboardA pause
+wait paused
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm
+0.4 nav keyboardA left
+0.3 nav keyboardA confirm
+wait menu
+1.5 exit

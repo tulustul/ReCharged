@@ -1,0 +1,98 @@
+# QA DoD-4: 4P split-screen (quadrants, no minimap), mixed devices: P1 keyboard A, P2 gamepad,
+# P3 keyboard B, P4 gamepad 2. Steering assist on → lobby → Backyard Bash, 1 lap, Storm (per-view
+# rain + lightning) → P4 pauses (Start on pad 2) → P4 resumes → finish → results → scoreboard →
+# Lobby (players kept) → Esc leaves the lobby → menu.
+#   cargo run -p recharged -- --user-data-dir target/qa/data/vs4 --window 1600x900 \
+#     --input-script tools/scripts/qa/vs4.script --exit-after 700
+wait ui
+3.5 nav keyboardA confirm          # Title
+1.5 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up               # Settings
+0.3 nav keyboardA confirm
+2.0 nav keyboardA prevTab          # Accessibility
+0.6 nav keyboardA down
+0.3 nav keyboardA down             # Steering assist
+0.3 nav keyboardA confirm
+0.3 nav keyboardA back
+1.5 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Versus
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # P1 joins (Space)
+0.5 nav gamepad confirm            # P2 joins
+0.5 nav keyboardB confirm          # P3 joins (Enter)
+0.5 nav gamepad2 confirm           # P4 joins
+0.5 nav gamepad right              # P2: Dumpster
+0.3 nav keyboardB right
+0.3 nav keyboardB right            # P3: Zip
+0.3 nav gamepad2 down
+0.3 nav gamepad2 right             # P4: paint 2
+0.8 shot vs4_01_lobby
+0.3 nav keyboardA confirm
+0.3 nav gamepad confirm
+0.3 nav keyboardB confirm
+0.3 nav gamepad2 confirm           # all ready → track select
+2.5 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Backyard Bash
+0.3 nav keyboardA right            # options: Layout
+0.3 nav keyboardA down             # Mirror
+0.3 nav keyboardA down             # Laps 5
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # 1
+0.3 nav keyboardA down             # Rivals
+0.3 nav keyboardA down             # AI difficulty
+0.3 nav keyboardA down             # Items
+0.3 nav keyboardA down             # Weather
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Storm
+0.6 shot vs4_02_track_select
+0.3 nav keyboardA down             # Time of day
+0.3 nav keyboardA down             # Start race
+0.3 nav keyboardA confirm
+wait countdown
+1.0 shot vs4_03_countdown
+wait racing
+hold keyboardA throttle 1
+hold gamepad throttle 1
+hold keyboardB throttle 1
+hold gamepad2 throttle 1
+@200 tap gamepad item
+@200 tap keyboardB item
+@300 shot vs4_04_racing
+@540 shot vs4_05_racing_later
+@560 release keyboardA
+@560 release keyboardB
+@560 release gamepad
+@560 release gamepad2
+0.2 tap gamepad2 pause             # P4: Start
+wait paused
+1.0 shot vs4_06_p4_pause
+0.3 nav gamepad2 confirm           # Resume (P4)
+wait running
+0.2 hold keyboardA throttle 1
+0.0 hold gamepad throttle 1
+0.0 hold keyboardB throttle 1
+0.0 hold gamepad2 throttle 1
+wait finished
+release keyboardA
+release keyboardB
+release gamepad
+release gamepad2
+3.5 shot vs4_07_results
+0.3 nav keyboardA confirm          # Continue
+2.0 shot vs4_08_scoreboard
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Lobby
+0.3 nav keyboardA confirm
+wait menu
+2.5 shot vs4_09_lobby_again
+0.3 nav keyboardA back             # Esc (shared key, no slot): leaves the lobby
+2.0 shot vs4_10_after_lobby
+1.0 exit

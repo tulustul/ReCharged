@@ -1,0 +1,17 @@
+# QA: tools/scripts/smoke.script with a screenshot after every step (diagnoses where it stalls).
+wait ui
+0.5 shot s00_ui_ready
+3.0 shot s01_before_confirm
+0.0 nav keyboardA confirm          # the splash has timed out; Title: any button
+1.0 shot s02_after_title
+0.0 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+1.0 shot s03_track_select
+1.0 nav keyboardA confirm          # Track select: the focused track → Car select
+1.0 shot s04_car_select
+1.0 nav keyboardA confirm          # race
+2.0 shot s05_after_race_confirm
+3.0 shot s06_later
+wait racing
+1.0 shot s07_racing
+1.0 exit

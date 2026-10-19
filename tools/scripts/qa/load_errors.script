@@ -1,0 +1,28 @@
+# QA ROB-1: data load failures must show an error and return to the menu, never panic. Run with
+# --assets-dir target/qa/broken-assets (a copy of assets/ with data/tracks/toy_town.ron truncated
+# to 2000 bytes and `radius: "big"` in data/items.ron).
+wait ui
+3.5 nav keyboardA confirm          # Title
+1.5 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town (broken track + broken items)
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # race
+3.0 shot le_01_toy_town_error
+2.0 shot le_02_toy_town_error_later
+0.3 nav keyboardA confirm          # dismiss
+2.0 shot le_03_after_dismiss
+0.3 nav keyboardA down             # (wherever we are) try Sofa Circuit: broken items only
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # race
+3.0 shot le_04_sofa_error
+0.3 nav keyboardA confirm
+2.0 shot le_05_end
+1.0 exit

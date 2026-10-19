@@ -1,0 +1,106 @@
+# QA DoD-4: 3P split-screen (three quadrants + the minimap/standings panel), mixed devices:
+# P1 keyboard A, P2 keyboard B, P3 gamepad (run with --unlock-all for Maple Street). Steering
+# assist on → lobby → Maple Street, 1 lap, Snow, Night → P2 pauses (keyboard B) → Backspace
+# resumes → finish → results → scoreboard → Next track (Backyard Bash, picked in the race layer)
+# → race 2 → P3 pauses (Start) → quit.
+#   cargo run -p recharged -- --user-data-dir target/qa/data/vs3 --window 1600x900 --unlock-all \
+#     --input-script tools/scripts/qa/vs3.script --exit-after 700
+wait ui
+3.5 nav keyboardA confirm          # Title
+1.5 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up               # Settings
+0.3 nav keyboardA confirm
+2.0 nav keyboardA prevTab          # Accessibility
+0.6 nav keyboardA down
+0.3 nav keyboardA down             # Steering assist
+0.3 nav keyboardA confirm
+0.3 nav keyboardA back
+1.5 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Versus
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # P1 joins (Space)
+0.5 nav keyboardB confirm          # P2 joins (Enter)
+0.5 nav gamepad confirm            # P3 joins (A)
+0.5 nav keyboardB right            # P2: next car
+0.3 nav gamepad right
+0.3 nav gamepad right              # P3: car +2
+0.3 nav gamepad down               # P3: paint row
+0.3 nav gamepad right              # P3: next paint
+0.8 shot vs3_01_lobby
+0.3 nav keyboardA confirm
+0.3 nav keyboardB confirm
+0.3 nav gamepad confirm            # all ready → track select
+2.5 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA down             # Aisle Rush
+0.3 nav keyboardA right            # Wrench Works
+0.3 nav keyboardA right            # Maple Street
+0.3 nav keyboardA right            # options: Layout
+0.3 nav keyboardA down             # Mirror
+0.3 nav keyboardA down             # Laps 3
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # 1
+0.3 nav keyboardA down             # Rivals
+0.3 nav keyboardA down             # AI difficulty
+0.3 nav keyboardA down             # Items
+0.3 nav keyboardA down             # Weather
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Snow
+0.3 nav keyboardA down             # Time of day
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # → Night?
+0.6 shot vs3_02_track_select
+0.3 nav keyboardA down             # Start race
+0.3 nav keyboardA confirm
+wait countdown
+1.0 shot vs3_03_countdown
+wait racing
+hold keyboardA throttle 1
+hold keyboardB throttle 1
+hold gamepad throttle 1
+@300 shot vs3_04_racing
+@480 shot vs3_05_racing_later
+@500 release keyboardA
+@500 release keyboardB
+@500 release gamepad
+0.2 tap keyboardB pause            # P2 (keyboard B's Pause = Esc)
+wait paused
+1.0 shot vs3_06_pause
+0.3 nav keyboardB back             # Backspace: resume
+wait running
+0.2 hold keyboardA throttle 1
+0.0 hold keyboardB throttle 1
+0.0 hold gamepad throttle 1
+wait finished
+release keyboardA
+release keyboardB
+release gamepad
+3.5 shot vs3_07_results
+0.3 nav keyboardA confirm          # Continue
+2.0 shot vs3_08_scoreboard
+0.3 nav keyboardA down             # Next track
+0.3 nav keyboardA confirm
+2.0 shot vs3_09_next_track_select
+0.3 nav keyboardA up               # Backyard Bash
+0.3 nav keyboardA confirm
+wait racing
+@180 shot vs3_10_race2
+@240 tap gamepad pause             # P3: Start
+wait paused
+1.0 shot vs3_11_p3_pause
+0.3 nav gamepad down
+0.3 nav gamepad down
+0.3 nav gamepad down
+0.3 nav gamepad down               # Quit race
+0.3 nav gamepad confirm
+0.4 nav gamepad left
+0.3 nav gamepad confirm
+wait menu
+2.0 shot vs3_12_menu
+1.0 exit

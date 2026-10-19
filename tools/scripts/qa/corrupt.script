@@ -1,0 +1,31 @@
+# QA DoD-3 / ROB-1: start on a corrupt profile.ron + settings.ron + a broken Toy Town ghost
+# (prepared by corrupt.sh): the toast must show, defaults are used, the bad files are kept as
+# *.corrupt-<unix s>; a Time Trial on Toy Town must start without the broken ghost.
+wait ui
+0.3 shot cor_01_ui_ready
+1.0 shot cor_02_1s
+2.0 shot cor_03_3s
+1.0 nav keyboardA confirm          # Title
+1.5 shot cor_04_main
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Time Trial
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA confirm
+2.0 nav keyboardA confirm          # race
+wait countdown
+1.0 shot cor_05_tt_countdown
+wait racing
+0.5 tap keyboardA pause
+wait paused
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm
+0.4 nav keyboardA left
+0.3 nav keyboardA confirm
+wait menu
+1.0 exit

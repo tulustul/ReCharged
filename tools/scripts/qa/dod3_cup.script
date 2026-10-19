@@ -1,0 +1,135 @@
+# QA DoD-3 part 1 (run with --autopilot: the Elite AI drives, the script only uses the menus):
+# a settings change (HUD scale 125 %, mph), the whole Rookie Cup through the real menus (results →
+# standings → next race ×3, intro skip in race 2) → cup end → unlocks shown in Cup select, Main
+# menu, Garage and Track select; then a Time Trial on Toy Town in the newly unlocked Hornet →
+# results (medal, ghost saved) → Retry against the ghost → Records.
+# Part 2 (dod3_restart.script) restarts the app on the same profile.
+#   rm -rf target/qa/data/dod3 && cargo run -p recharged -- --user-data-dir target/qa/data/dod3 \
+#     --window 1600x900 --autopilot --input-script tools/scripts/qa/dod3_cup.script --exit-after 1200
+
+wait ui
+3.5 nav keyboardA confirm          # Title
+1.5 nav keyboardA up               # Quit
+0.3 nav keyboardA up               # Credits
+0.3 nav keyboardA up               # Settings
+0.3 nav keyboardA confirm
+2.0 nav keyboardA right            # speed unit → mph
+0.3 nav keyboardA down             # camera mode
+0.3 nav keyboardA down             # camera shake
+0.3 nav keyboardA down             # HUD scale 100 %
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # 125 %
+0.6 shot cup_00_settings
+0.3 nav keyboardA back
+
+# Rookie Cup
+1.5 nav keyboardA confirm          # Championship
+2.0 nav keyboardA confirm          # Rookie Cup
+2.0 nav keyboardA confirm          # Sparky → race 1 (Sofa Circuit)
+wait racing
+5.0 shot cup_01_r1_racing
+wait finished
+3.5 shot cup_02_r1_results
+0.3 nav keyboardA confirm          # Continue
+2.0 shot cup_03_r1_standings
+0.3 nav keyboardA confirm          # Next race (Toy Town)
+wait intro
+0.5 nav keyboardA confirm          # skip the intro
+wait countdown
+0.5 shot cup_04_r2_countdown
+wait finished
+3.5 shot cup_05_r2_results
+0.3 nav keyboardA confirm
+2.0 shot cup_06_r2_standings
+0.3 nav keyboardA confirm          # Next race (Backyard Bash)
+wait racing
+5.0 shot cup_07_r3_racing
+wait finished
+3.5 shot cup_08_r3_results
+0.3 nav keyboardA confirm
+2.0 shot cup_09_r3_standings
+0.3 nav keyboardA confirm          # Next race (Aisle Rush)
+wait racing
+5.0 shot cup_10_r4_racing
+wait finished
+3.5 shot cup_11_r4_results
+0.3 nav keyboardA confirm
+2.0 shot cup_12_r4_standings
+0.3 nav keyboardA confirm          # To the ceremony
+wait menu
+3.0 shot cup_13_cup_end
+6.0 shot cup_14_cup_end_later
+0.3 nav keyboardA confirm          # Continue → Cup select
+2.0 shot cup_15_cup_select
+0.3 nav keyboardA right            # Pro Cup (unlocked, NEW)
+0.8 shot cup_16_pro_cup
+0.3 nav keyboardA back
+2.0 shot cup_17_main_after_cup
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Garage
+0.3 nav keyboardA confirm
+2.0 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Torque
+0.8 shot cup_18_garage_torque
+0.3 nav keyboardA back
+1.5 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA down             # Aisle Rush
+0.3 nav keyboardA right            # Wrench Works
+0.3 nav keyboardA right            # Maple Street (unlocked)
+0.8 shot cup_19_track_select_unlocked
+0.3 nav keyboardA right            # options: Layout
+0.3 nav keyboardA right            # Reverse (unlocked)
+0.8 shot cup_20_reverse_unlocked
+0.3 nav keyboardA left             # Forward again
+0.3 nav keyboardA back
+
+# Time Trial on Toy Town in the Hornet
+1.5 nav keyboardA down
+0.3 nav keyboardA down             # Time Trial
+0.3 nav keyboardA confirm
+2.0 nav keyboardA up
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # Toy Town
+0.3 nav keyboardA confirm
+2.0 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right
+0.3 nav keyboardA right            # Hornet
+0.8 shot cup_21_tt_car
+0.3 nav keyboardA confirm
+wait finished
+3.5 shot cup_22_tt_results
+0.3 nav keyboardA confirm          # Retry
+wait racing
+@120 shot cup_23_tt_retry_ghost
+@600 shot cup_24_tt_retry_ghost_later
+wait finished
+3.5 shot cup_25_tt_retry_results
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Menu
+0.3 nav keyboardA confirm
+wait menu
+2.0 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Records
+0.3 nav keyboardA confirm
+2.0 shot cup_26_records_tracks
+0.3 nav keyboardA nextTab
+0.8 shot cup_27_records_trophies
+0.3 nav keyboardA nextTab
+0.3 nav keyboardA nextTab
+0.8 shot cup_28_records_stats
+0.3 nav keyboardA back
+1.0 exit
