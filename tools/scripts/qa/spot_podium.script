@@ -1,0 +1,15 @@
+# T21 DoD-6 / Q19: the podium_fanfare stinger plays on Cup end for a silver or bronze trophy
+# (gold plays cup_victory). Run with --quick-race aisle_rush --mode cup:rookie_cup (the cup starts at
+# its last race, so this one race decides the trophy) and steering assist on in settings.ron: the
+# player holds throttle from GO to the finish (spot_podium5.script: from 5 s after GO).
+wait racing
+hold keyboardA throttle 1
+wait finished
+release keyboardA
+3.5 shot pod_01_results
+0.3 nav keyboardA confirm          # Continue → standings
+2.0 shot pod_02_standings
+0.3 nav keyboardA confirm          # to the ceremony
+wait menu
+3.0 shot pod_03_cup_end
+2.0 exit

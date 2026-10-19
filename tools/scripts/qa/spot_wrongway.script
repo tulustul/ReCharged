@@ -1,0 +1,28 @@
+# T21 spot check: wrong way (HUD warning + wrong_way_buzzer cue, GDD §7.3/§13) — Quick Race on
+# Backyard Bash; the car U-turns on the open lawn at the start and drives back down the start
+# straight against the track. Gamepad for analog steering (single player owns every device).
+wait ui
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.3 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA right            # Backyard Bash
+0.3 nav keyboardA confirm          # select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.3 nav keyboardA confirm          # race
+wait racing
+hold gamepad throttle 0.8
+hold gamepad steer 1
+@100 hold gamepad steer 0
+@100 hold gamepad throttle 1
+@180 shot ww_01_3s
+@240 shot ww_02_4s
+@300 shot ww_03_5s
+@360 shot ww_04_6s
+@420 shot ww_05_7s
+@480 release gamepad
+1.0 exit

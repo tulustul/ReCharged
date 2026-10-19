@@ -7,6 +7,7 @@ from collections import Counter
 
 ansi = re.compile(r"\x1b\[[0-9;]*m")
 got, used, hits, blocked, selfhit, respawn = Counter(), Counter(), Counter(), Counter(), Counter(), Counter()
+goo = Counter()  # Goo Bomb explosions by whether the bomb was passed on at least once
 bands = Counter()
 for path in sys.argv[1:]:
     for line in open(path, errors="replace"):
@@ -22,8 +23,11 @@ for path in sys.argv[1:]:
                 selfhit[m[1]] += 1
         elif m := re.search(r"respawn (\S+) \((\w+)\)", line):
             respawn[m[2]] += 1
+        elif m := re.search(r"goo exploded on \S+ \(passed: (\w+)\)", line):
+            goo["passed on" if m[1] == "true" else "on its user"] += 1
 print(f"{'item':14} {'got':>4} {'used':>5} {'hits':>5} {'blocked':>8} {'self':>5}")
 for item in sorted(set(got) | set(used) | set(hits)):
     print(f"{item:14} {got[item]:4} {used[item]:5} {hits[item]:5} {blocked[item]:8} {selfhit[item]:5}")
 print("respawns:", dict(respawn))
+print("Goo Bomb explosions:", dict(goo), "(self = the user caught in a blast, also of a passed bomb)")
 print("grants by band:", {b: sum(v for (bb, _), v in bands.items() if bb == b) for b in {b for b, _ in bands}})

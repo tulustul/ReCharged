@@ -1,0 +1,74 @@
+# T21 spot check B15 (missed-checkpoint notice): Quick Race on Backyard Bash, steering assist off
+# (default), the car veers left off the grid so that it crosses the start line's s west of its
+# gate (start straight: centre x 44, half width 5 + off-road margin 6, open lawn to the west) →
+# "Missed checkpoint — go back" in the HUD. Three attempts (Restart between) with different steering;
+# a screenshot every 0.25 s after GO. Gamepad for analog steering (single player owns every device).
+wait ui
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.3 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA right            # Backyard Bash
+0.3 nav keyboardA confirm          # select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.3 nav keyboardA confirm          # race
+wait racing
+hold gamepad throttle 1
+hold gamepad steer -1
+@30 hold gamepad steer 0
+@45 shot b15_a_045
+@60 shot b15_a_060
+@75 shot b15_a_075
+@90 shot b15_a_090
+@105 shot b15_a_105
+@120 shot b15_a_120
+@135 shot b15_a_135
+@150 shot b15_a_150
+@180 shot b15_a_180
+@210 shot b15_a_210
+@240 shot b15_a_240
+release gamepad
+0.2 tap keyboardA pause
+wait screen pause
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA confirm
+wait countdown
+wait racing
+hold gamepad throttle 1
+hold gamepad steer -1
+@50 hold gamepad steer 0
+@60 shot b15_b_060
+@75 shot b15_b_075
+@90 shot b15_b_090
+@105 shot b15_b_105
+@120 shot b15_b_120
+@135 shot b15_b_135
+@150 shot b15_b_150
+@180 shot b15_b_180
+@210 shot b15_b_210
+@240 shot b15_b_240
+release gamepad
+0.2 tap keyboardA pause
+wait screen pause
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA confirm
+wait countdown
+wait racing
+hold gamepad throttle 1
+hold gamepad steer -0.5
+@80 hold gamepad steer 0
+@60 shot b15_c_060
+@90 shot b15_c_090
+@105 shot b15_c_105
+@120 shot b15_c_120
+@135 shot b15_c_135
+@150 shot b15_c_150
+@180 shot b15_c_180
+@210 shot b15_c_210
+@240 shot b15_c_240
+release gamepad
+1.0 exit

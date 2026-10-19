@@ -1,0 +1,56 @@
+# T21 (Q9): Loading → Intro from the menu after the menu warm-up, plus a restart and a repeat load.
+# Run with a build that warms up in automated runs (T20c's measurement build; the tested build skips
+# the menu warm-up in automated runs, so it measures the synchronous path instead):
+# Title → 50 s idle (the warm-up takes ~32 s) → Quick Race on Toy Town → GO → pause → Restart → GO
+# → pause → Quit → Car select → Track select → Backyard Bash (first outdoor load) → GO → pause →
+# Quit → Car select → race again (repeat load) → GO → exit. Loads: log_scan.py on the log.
+wait ui
+wait screen title
+50 nav keyboardA confirm           # Title (after the menu warm-up)
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.5 nav keyboardA confirm          # Toy Town (focused): select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.5 nav keyboardA confirm          # race
+wait racing
+2.0 tap keyboardA pause
+wait screen pause
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA confirm
+wait countdown
+wait racing
+2.0 tap keyboardA pause
+wait screen pause
+0.3 nav keyboardA down             # Restart
+0.3 nav keyboardA down             # How to play
+0.3 nav keyboardA down             # Settings
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm          # dialog: Cancel focused
+0.4 nav keyboardA left             # Quit
+0.3 nav keyboardA confirm
+wait screen carSelect
+0.5 nav keyboardA back             # → Track select (Toy Town selected and focused)
+wait screen trackSelect
+0.5 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA right            # Backyard Bash
+0.3 nav keyboardA confirm          # select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.5 nav keyboardA confirm          # race (first outdoor load)
+wait racing
+2.0 tap keyboardA pause
+wait screen pause
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Quit race
+0.3 nav keyboardA confirm
+0.4 nav keyboardA left
+0.3 nav keyboardA confirm
+wait screen carSelect
+0.5 nav keyboardA confirm          # the same race again (repeat load)
+wait racing
+2.0 exit

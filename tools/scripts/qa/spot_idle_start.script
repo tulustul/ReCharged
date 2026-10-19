@@ -1,0 +1,39 @@
+# T21 investigation: a human who does not drive after GO (a child looking at the screen, a player
+# who missed GO). In a human-mode run on Toy Town the HUD showed 2nd/8 eight seconds after GO with
+# six rivals still behind the parked car. Do the rivals get around a car parked on the grid?
+# Quick Race on Toy Town, no input after GO; chase and look-back views over 20 s, then drive.
+wait ui
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.3 nav keyboardA confirm          # Toy Town (focused): select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.3 nav keyboardA confirm          # race
+wait countdown
+0.5 shot idle_00_countdown
+wait racing
+@60 shot idle_01_1s
+@180 shot idle_02_3s
+@200 hold keyboardA lookBack 1
+@230 shot idle_03_3s_back
+@240 hold keyboardA lookBack 0
+@480 shot idle_04_8s
+@500 hold keyboardA lookBack 1
+@530 shot idle_05_8s_back
+@540 hold keyboardA lookBack 0
+@900 shot idle_06_15s
+@920 hold keyboardA lookBack 1
+@950 shot idle_07_15s_back
+@960 hold keyboardA lookBack 0
+@1200 shot idle_08_20s
+@1220 hold keyboardA lookBack 1
+@1250 shot idle_09_20s_back
+@1260 hold keyboardA lookBack 0
+@1270 hold keyboardA throttle 1
+@1500 shot idle_10_25s_driving
+@1510 release keyboardA
+1.0 exit

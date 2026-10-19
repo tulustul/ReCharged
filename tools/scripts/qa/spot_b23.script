@@ -1,0 +1,28 @@
+# T21 spot check B23 (look-back camera against a wall): Quick Race on Toy Town, no steering: the
+# car drives straight from the grid into the outer barrier of the first corner and stays nose-first
+# against it; look back there (the look-back camera sits ahead of the car, i.e. in/behind the
+# barrier → it must pull in, not show black). B10 is checked in keyboard_only.script's log.
+wait ui
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.3 nav keyboardA confirm          # Toy Town (focused): select → Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.3 nav keyboardA confirm          # race
+wait racing
+hold keyboardA throttle 1
+@300 shot b23_01_chase_5s
+@420 shot b23_02_chase_7s
+@440 hold keyboardA lookBack 1
+@470 shot b23_03_look_back_7s
+@520 shot b23_04_look_back_8s
+@540 hold keyboardA lookBack 0
+@600 shot b23_05_chase_10s
+@610 hold keyboardA lookBack 1
+@650 shot b23_06_look_back_10s
+@660 release keyboardA
+1.0 exit

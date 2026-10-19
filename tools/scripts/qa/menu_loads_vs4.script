@@ -1,0 +1,23 @@
+# T21 (Q9): a 4-player Versus load from the menu after the menu warm-up (keyboard A, gamepad,
+# keyboard B, gamepad 2 on the focused track), then exit. Same build note as menu_loads.script.
+wait ui
+wait screen title
+50 nav keyboardA confirm           # Title (after the menu warm-up)
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA down             # Time Trial
+0.3 nav keyboardA down             # Versus
+0.3 nav keyboardA confirm
+1.5 nav keyboardA confirm          # P1 joins
+0.5 nav gamepad confirm            # P2 joins
+0.5 nav keyboardB confirm          # P3 joins
+0.5 nav gamepad2 confirm           # P4 joins
+0.5 nav keyboardA confirm          # ready ×4 → track select (P1 picks)
+0.3 nav gamepad confirm
+0.3 nav keyboardB confirm
+0.3 nav gamepad2 confirm
+wait screen trackSelect
+0.5 nav keyboardA confirm          # the focused track: select → Start
+0.5 nav keyboardA confirm          # start
+wait racing
+3.0 exit

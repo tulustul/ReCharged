@@ -3,11 +3,11 @@
 # monitor while one game runs alone (nothing else may play audio) and prints the RMS level (dBFS)
 # per second. Runs: menu with default volumes (mute_unfocused off), menu with music 0, menu with
 # mute_unfocused on (the automated window is usually unfocused), an autopilot race (engines + SFX).
-#   tools/scripts/qa/audio_check.sh   → target/qa/audio/<run>.wav + RMS table
+#   tools/scripts/qa/audio_check.sh   → ${QA_OUT:-target/qa}/audio/<run>.wav + RMS table
 set -uo pipefail
 root=$(cd "$(dirname "$0")/../../.." && pwd)
 cd "$root"
-mkdir -p target/qa/audio
+mkdir -p ${QA_OUT:-target/qa}/audio
 sink=$(pactl get-default-sink)
 others=$(pactl list short sink-inputs | wc -l)
 [ "$others" -gt 0 ] && echo "warning: $others other audio streams are playing"
@@ -16,13 +16,13 @@ settings() { # music mute_unfocused
 }
 run() { # name music mute args...
   local name=$1 music=$2 mute=$3; shift 3
-  local dir="target/qa/data/audio_$name"
+  local dir="${QA_OUT:-target/qa}/data/audio_$name"
   mkdir -p "$dir" && settings "$music" "$mute" > "$dir/settings.ron"
-  parecord --device="$sink.monitor" --file-format=wav --channels=2 --rate=48000 "target/qa/audio/$name.wav" &
+  parecord --device="$sink.monitor" --file-format=wav --channels=2 --rate=48000 "${QA_OUT:-target/qa}/audio/$name.wav" &
   local rec=$!
-  tools/scripts/qa/pinned.sh --user-data-dir "$dir" --window 1280x720 "$@" >/dev/null 2>"target/qa/logs/audio_$name.log"
+  ${QA_RUN:-tools/scripts/qa/pinned.sh} --user-data-dir "$dir" --window 1280x720 "$@" >/dev/null 2>"${QA_OUT:-target/qa}/logs/audio_$name.log"
   kill $rec; wait $rec 2>/dev/null
-  python3 - "target/qa/audio/$name.wav" "$name" <<'PY'
+  python3 - "${QA_OUT:-target/qa}/audio/$name.wav" "$name" <<'PY'
 import sys, wave, numpy as np
 w = wave.open(sys.argv[1]); n = w.getnframes(); rate = w.getframerate()
 a = np.frombuffer(w.readframes(n), dtype=np.int16).astype(np.float32) / 32768.0

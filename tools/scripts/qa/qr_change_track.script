@@ -1,0 +1,51 @@
+# T21 Q12 in Quick Race: the post-race "Change track" offers the track's full options (laps,
+# rivals, AI difficulty, items, weather, time), not only layout/mirror. Run with --autopilot (the
+# AI drives; the script only uses the menus) and --unlock-all.
+wait ui
+wait screen title
+0.3 nav keyboardA confirm          # Title
+wait screen main
+0.3 nav keyboardA down             # Quick Race
+0.3 nav keyboardA confirm
+wait screen trackSelect
+0.3 nav keyboardA right            # Sofa Circuit
+0.3 nav keyboardA confirm          # select → Choose car
+0.3 nav keyboardA up               # Time of day
+0.3 nav keyboardA up               # Weather
+0.3 nav keyboardA up               # Items
+0.3 nav keyboardA up               # AI difficulty
+0.3 nav keyboardA up               # Rivals
+0.3 nav keyboardA up               # Laps
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left
+0.3 nav keyboardA left             # → 1 lap (clamped)
+0.6 shot qct_01_one_lap
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down
+0.3 nav keyboardA down             # Choose car
+0.3 nav keyboardA confirm          # → Car select
+wait screen carSelect
+0.3 nav keyboardA confirm          # race
+wait finished
+3.5 shot qct_02_results
+0.3 nav keyboardA down             # Change track
+0.6 shot qct_03_results_change_focused
+0.3 nav keyboardA confirm
+2.0 shot qct_04_change_track
+0.3 nav keyboardA confirm          # the current track card → its options (focus on Start)
+0.6 shot qct_05_options_start
+0.3 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up               # Items
+0.6 shot qct_06_options_items
+0.3 nav keyboardA up
+0.3 nav keyboardA up
+0.3 nav keyboardA up               # Laps
+0.6 shot qct_07_options_laps
+1.0 exit
