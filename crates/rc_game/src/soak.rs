@@ -3,9 +3,11 @@
 //! and, at every settled return to the menu, compares a census of the world — the set of resource
 //! types, the number of entities and the number of meshes, images, standard materials and audio
 //! sources — with the one taken at the first return after a session that reached the race (by
-//! then lazily built caches exist). A difference fails the run (exit code 1) and names what was
-//! left behind (resources, asset types, and entities per component signature); otherwise it exits
-//! with success after the given minutes of wall time.
+//! then lazily built caches exist). A difference that is still there after [`CENSUS_RETRIES`]
+//! more censuses fails the run (exit code 1) and names what was left behind (resources, asset
+//! types, and entities per component signature); otherwise it exits with success after the given
+//! minutes of wall time. Every census line also logs what the census cannot see (RSS, wgpu memory,
+//! all entities, glyph cache: [`memory`]).
 //!
 //! Asset types this crate cannot name (rc_audio's kira `AudioSource`) are counted through Bevy
 //! diagnostics: every diagnostic under [`ASSET_COUNT_PREFIX`] is part of the census. Font atlas
@@ -17,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use bevy::diagnostic::DiagnosticsStore;
 use bevy::ecs::resource::IsResource;
 use bevy::prelude::*;
+use bevy::render::renderer::RenderDevice;
 use bevy::text::FontAtlasSet;
 use rc_core::prelude::*;
 
@@ -29,6 +32,10 @@ const SETTLE_SECS: f32 = 2.0;
 const ACT_SECS: (f32, f32) = (0.5, 5.0);
 /// Actions per session; the next one quits to the menu (keeps menu checks frequent).
 const MAX_ACTIONS: u32 = 4;
+/// Censuses taken again, [`SETTLE_SECS`] apart, before a difference fails the run: under load
+/// the menu settles later (the navy backdrop, a window-sized SVG raster, stays until the
+/// showroom is ready and has faded in).
+const CENSUS_RETRIES: u32 = 3;
 /// Diagnostics whose path starts with this hold an asset count for the census (e.g. rc_audio's
 /// `assets/audio_sources`).
 const ASSET_COUNT_PREFIX: &str = "assets/";
@@ -204,6 +211,63 @@ fn image_kinds(world: &World) -> BTreeMap<String, usize> {
     kinds
 }
 
+/// What the census cannot see, logged at every menu check (QA R3): the process RSS as the kernel
+/// counts it (what `ps` shows), wgpu's GPU memory, all entities (UI included) against the
+/// allocated indices, and the glyph cache.
+fn memory(world: &World) -> String {
+    let rss = std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| rss_mb(&status))
+        .map_or("RSS n/a".to_owned(), |[rss, anon, file, shmem]| {
+            format!("RSS {rss} MB (anon {anon}, file {file}, shmem {shmem})")
+        });
+    let gpu = world
+        .get_resource::<RenderDevice>()
+        .and_then(|device| device.wgpu_device().generate_allocator_report())
+        .map_or(String::new(), |r| {
+            let mb = |bytes: u64| bytes >> 20;
+            format!(
+                ", wgpu {}/{} MB in {} allocations",
+                mb(r.total_allocated_bytes),
+                mb(r.total_reserved_bytes),
+                r.allocations.len()
+            )
+        });
+    let atlas_bytes = match (
+        world.get_resource::<FontAtlasSet>(),
+        world.get_resource::<Assets<Image>>(),
+    ) {
+        (Some(set), Some(images)) => set.total_bytes(images),
+        _ => 0,
+    };
+    // Indices grow when despawned entities are not freed for reuse (Bevy 0.20's `DespawnOnExit`
+    // never frees them: upstream U6). The census leaves UI entities out; the spawned count has them.
+    let entities = world.entities();
+    format!(
+        "{rss}{gpu}, entities {} spawned / {} indices, {} font atlases ({} MB)",
+        entities.count_spawned(),
+        entities.len(),
+        font_atlases(world).len(),
+        atlas_bytes >> 20
+    )
+}
+
+/// `[VmRSS, RssAnon, RssFile, RssShmem]` in MB from the text of `/proc/<pid>/status`.
+fn rss_mb(status: &str) -> Option<[u64; 4]> {
+    let mb = |key: &str| {
+        status.lines().find_map(|line| {
+            let kb = line.strip_prefix(key)?.trim().strip_suffix("kB")?;
+            Some(kb.trim().parse::<u64>().ok()? >> 10)
+        })
+    };
+    Some([
+        mb("VmRSS:")?,
+        mb("RssAnon:")?,
+        mb("RssFile:")?,
+        mb("RssShmem:")?,
+    ])
+}
+
 #[derive(Resource, Debug)]
 struct Soak {
     end_secs: f32,
@@ -221,9 +285,28 @@ struct Soak {
     races: u32,
     /// Actions in the current session.
     actions: u32,
+    /// Censuses that differed from the baseline since the last equal one.
+    retries: u32,
 }
 
 impl Soak {
+    fn new(minutes: f32, seed: u64) -> Self {
+        Self {
+            end_secs: minutes * 60.0,
+            seed,
+            draws: 0,
+            act_at: 0.0,
+            seen: (None, None),
+            baseline: None,
+            raced: false,
+            menus: 0,
+            checks: 0,
+            races: 0,
+            actions: 0,
+            retries: 0,
+        }
+    }
+
     fn unit(&mut self) -> f32 {
         self.draws += 1;
         rng::unit(self.seed, self.draws, RngStream::RaceSetup, 0)
@@ -254,19 +337,7 @@ fn start(automation: Option<Res<AutomationConfig>>, mut commands: Commands) {
         .and_then(|a| a.soak_seed)
         .unwrap_or_else(|| crate::save::unix_time().as_nanos() as u64);
     info!("--soak {minutes} min (seed {seed}; replay with --soak-seed {seed})");
-    commands.insert_resource(Soak {
-        end_secs: minutes * 60.0,
-        seed,
-        draws: 0,
-        act_at: 0.0,
-        seen: (None, None),
-        baseline: None,
-        raced: false,
-        menus: 0,
-        checks: 0,
-        races: 0,
-        actions: 0,
-    });
+    commands.insert_resource(Soak::new(minutes, seed));
 }
 
 fn drive(world: &mut World) {
@@ -297,9 +368,16 @@ fn step(world: &mut World, soak: &mut Soak) {
     }
     match state {
         AppState::Menu => {
-            if !check_menu(world, soak) {
-                world.write_message(AppExit::error());
-                return;
+            match check_menu(world, soak) {
+                Check::Equal => {}
+                Check::Again => {
+                    soak.schedule(now, (SETTLE_SECS, SETTLE_SECS));
+                    return;
+                }
+                Check::Differs => {
+                    world.write_message(AppExit::error());
+                    return;
+                }
             }
             if now >= soak.end_secs && soak.checks > 0 {
                 info!(
@@ -349,25 +427,51 @@ fn step(world: &mut World, soak: &mut Soak) {
     }
 }
 
-/// Census of a settled menu against the baseline; `false` = something was left behind.
-fn check_menu(world: &mut World, soak: &mut Soak) -> bool {
+/// Outcome of a menu census.
+enum Check {
+    /// Equal to the baseline (or the baseline was just taken).
+    Equal,
+    /// Different: census again later (the menu may not have settled yet).
+    Again,
+    /// Still different after [`CENSUS_RETRIES`] retries: something was left behind.
+    Differs,
+}
+
+/// Census of a settled menu against the baseline.
+fn check_menu(world: &mut World, soak: &mut Soak) -> Check {
     if !soak.raced {
-        return true; // no session reached the race yet: lazily built caches are missing
+        return Check::Equal; // no session reached the race yet: lazily built caches are missing
     }
     let census = Census::take(world);
     let Some(base) = &soak.baseline else {
         info!(
-            "soak baseline: {} entities, {} resources, assets {:?}",
+            "soak baseline: {} entities, {} resources, assets {:?}; {}",
             census.entities.values().sum::<usize>(),
             census.resources.len(),
-            census.assets
+            census.assets,
+            memory(world)
         );
         soak.baseline = Some(census);
-        return true;
+        return Check::Equal;
     };
     if census.matches(base) {
         soak.checks += 1;
-        return true;
+        soak.retries = 0;
+        info!(
+            "soak check {} ({} races): {}",
+            soak.checks,
+            soak.races,
+            memory(world)
+        );
+        return Check::Equal;
+    }
+    if soak.retries < CENSUS_RETRIES {
+        soak.retries += 1;
+        info!(
+            "soak: the menu is not settled yet ({}), census again in {SETTLE_SECS} s",
+            census.diff(base).join("; ")
+        );
+        return Check::Again;
     }
     error!(
         "soak FAILED after {} races (seed {}): the menu differs from the baseline:\n  {}",
@@ -375,7 +479,7 @@ fn check_menu(world: &mut World, soak: &mut Soak) -> bool {
         soak.seed,
         census.diff(base).join("\n  ")
     );
-    false
+    Check::Differs
 }
 
 /// A random action during a race (`None` = keep racing); quits once the session had its
@@ -482,6 +586,36 @@ mod tests {
                 "0 → 1 entities [Window + Hovered]",
             ]
         );
+    }
+
+    #[test]
+    fn a_menu_difference_must_outlast_the_retries_to_fail() {
+        let mut world = World::new();
+        let mut soak = Soak::new(1.0, 7);
+        soak.raced = true;
+        let check = |world: &mut World, soak: &mut Soak| match check_menu(world, soak) {
+            Check::Equal => "equal",
+            Check::Again => "again",
+            Check::Differs => "differs",
+        };
+        assert_eq!(check(&mut world, &mut soak), "equal", "the baseline");
+        let late = world.spawn(Transform::default()).id();
+        assert_eq!(check(&mut world, &mut soak), "again");
+        world.despawn(late);
+        assert_eq!(check(&mut world, &mut soak), "equal", "settled on a retry");
+        world.spawn(Transform::default());
+        for _ in 0..CENSUS_RETRIES {
+            assert_eq!(check(&mut world, &mut soak), "again");
+        }
+        assert_eq!(check(&mut world, &mut soak), "differs");
+    }
+
+    #[test]
+    fn rss_is_read_from_proc_status_in_mb() {
+        let status = "Name:\trecharged\nVmRSS:\t 3471836 kB\nRssAnon:\t 2007724 kB\n\
+                      RssFile:\t  871964 kB\nRssShmem:\t  592148 kB\nThreads:\t48\n";
+        assert_eq!(rss_mb(status), Some([3390, 1960, 851, 578]));
+        assert_eq!(rss_mb("VmRSS:\t1024 kB\n"), None, "every field is needed");
     }
 
     #[test]

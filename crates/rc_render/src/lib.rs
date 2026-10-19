@@ -20,6 +20,7 @@ mod cars;
 mod content;
 mod lighting;
 mod materials;
+mod preprocess_fix;
 mod props;
 mod proxy;
 mod quality;
@@ -59,6 +60,7 @@ impl Plugin for GraphicsPlugin {
         sky::build(app);
         weather_fx::build(app);
         showroom::build(app);
+        preprocess_fix::build(app);
         app.add_plugins(content::ContentVisualsPlugin);
     }
 }

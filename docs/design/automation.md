@@ -175,6 +175,39 @@ the window uncovered.
 | toy_town_2p | 115.1 | 7.17 | 18.18 | 39.67 |
 | toy_town_4p | 85.5 | 11.29 | 14.33 | 20.67 |
 
+## `--soak <minutes>` and memory
+The soak runner is rc_game's (`docs/design/rc_game.md`, Automation). Its census sees ECS and asset
+leaks only. wgpu objects, driver memory and allocator growth show only in RSS. Every census line
+therefore also logs `RSS … MB (anon …, file …, shmem …), wgpu <allocated>/<reserved> MB in <n>
+allocations, entities <spawned> spawned / <indices> indices, <k> font atlases (<m> MB)`.
+
+Long runs use `tools/scripts/qa/memsoak.sh <name> --window 1600x900 --soak 60 --soak-seed <s>`:
+- It runs a pinned binary copy (`BIN=…`, assets and UI bundle snapshots in
+  `target/agent-data/T22c/bin`).
+- Every minute it samples `/proc/<pid>/status` and `smaps_rollup`; every 5 min it copies `smaps`.
+  `smaps_split.py` splits a copy, or the growth between two, by mapping.
+- `JEMALLOC=35` also preloads jemalloc with heap dumps (one per 32 GiB allocated, ≈ 20 s).
+  `heap_diff.py` symbolizes them (llvm-symbolizer) and prints the growth between two dumps, or
+  with `--match <regex>` the timeline of one allocation site.
+
+Reading RSS with the NVIDIA driver: its system-memory allocations are mappings of
+`/dev/nvidiactl`, and VmRSS (what `ps` shows) exceeds the page-walk Rss of `smaps_rollup` by
+RssShmem. Diff the parts (RssAnon, the `/dev/nvidiactl` mappings, V8's heap below 0x7e00…), not
+VmRSS alone. Under memory pressure the kernel also evicts the binary's file pages, so RssFile
+drops.
+
+What a long soak shows (T22c, QA R3, 1600×900):
+- **Bevy 0.20 bind group leak** (`docs/upstream-notes.md` U5): without the rc_render workaround,
+  live wgpu allocations grow by ≈ 1,100 per race and RSS by 22–26 MB/min. With it they stay at
+  1.4–2.0 k, and after the first visits RSS is flat to +4 MB/min (≈ 10 min).
+- **Entity indices** (U6): `DespawnOnExit` never frees them. The `indices` figure doubles every
+  few dozen races (≈ 12 k per race, 2.1 M after 170) while the spawned count stays at ≈ 950; most
+  of the remaining ≈ 1 MB/min is the tables sized by the largest index.
+- Flat: the JS heap (V8, ≈ 25–35 MB), bevy-react (≈ 12 MB), kira's decoded sounds, and
+  `/dev/nvidiactl` (+0.3 MB/min). The driver's command-buffer memory under
+  `vkAllocateCommandBuffers` plateaus at ≈ 370 MB within 10 min. The font atlases grow
+  65 → 73 → 76 MB at 10 / 30 / 60 min.
+
 ## Known limitations
 - `@tick` steps fire in the first frame that sees the tick (frame resolution, not tick-exact):
   input is injected where devices are, before the frame's fixed ticks.

@@ -142,7 +142,13 @@ physical sky fill (`env_light` 15–32 k) so shade under trees, fences and parke
 
 ## Weather (`weather_fx.rs`, tested)
 `overcast = smoothstep(0.15, 1, cloudiness)`: sun × (1 − 0.9·overcast), exposure −1.6·overcast EV,
-sky IBL × (1 − 0.35·overcast) + grey flat ambient, greyer fog, saturation −22 %. Fog: log-lerp of
+sky IBL × (1 − 0.35·overcast) + grey flat ambient, greyer fog, saturation −22 %. Every look keeps
+white balance and sectional grading in use (a 1e-4 temperature / midtone gamma where it would
+grade nothing): Bevy keys the tonemapping pipeline on those two stages, clouds and snow switch them
+on, and the race's weather is planned only at Setup — after the Loading warm-up drew the
+menu-default clear look — so overcast races compiled a tonemapping pipeline at the Intro (QA R5)
+and a Dynamic change from Clear one mid-race. One tonemapping pipeline serves every environment,
+time and weather (test). Fog: log-lerp of
 visibility from the env's clear value to 25 u at density 1 (`fog^0.75`; the Fog preset, 0.85, sees
 ≈ 40 u: the next corner, not the far fence), exponential-squared `DistanceFog` (clear near field,
 dense at distance) with a key-light glow. Fog also acts as a low cloud deck (overcast from
@@ -176,14 +182,15 @@ epoxy floor, rubber mat with a volt-yellow marking, turntable with a cyan LED ri
 point light), warm key spot with shadows, cool rim spot, moonlit window in the side wall (the env's
 key light through a real opening), pegboard with tools, red tool chest, giant tyre, shelf with paint
 cans, cyan/volt neon strips, a warm work lamp. EV 8. `MenuBackdrop::focus == Room` (Garage grid,
-Credits roll, Cup-end podium) hides the turntable car — the room stays and `ShowroomReady` with it;
-the camera keeps the wide shot.
+Credits roll, Cup-end podium, and the card screens it would show through: Cup select, Track select,
+Versus lobby) hides the turntable car — the room stays and `ShowroomReady` with it; the camera keeps
+the wide shot.
 
 ## Verify
 - `cargo test -p rc_render` (quality mapping incl. AA rules, shadow tiers, sun angles, sky model,
-  cubemap orientation, half floats, weather maths, flash filter, room maps, lamp grid, window glass
-  placement, materials, paint, env files, lamp/fixture levels, proxies, warm-up, coat fix,
-  barrier materials, tour clearance, cutaway previews).
+  cubemap orientation, half floats, weather maths, one tonemapping key for every look, flash
+  filter, room maps, lamp grid, window glass placement, materials, paint, env files, lamp/fixture
+  levels, proxies, warm-up, coat fix, barrier materials, tour clearance, cutaway previews).
 - Screenshots: `recharged --user-data-dir target/agent-data/<id> --window 1600x900 --quick-race
   test_oval|toy_town --time <t> --weather <w> --screenshot-at 12 --screenshot <png> --exit-after 14`;
   the menu without `--quick-race`.
@@ -201,6 +208,10 @@ the camera keeps the wide shot.
   flags, `RUST_LOG=rc_render=debug`): the warm-up takes 11–13 s from the splash, worst frame
   ≤ 43 ms. Night Backyard Bash: nothing compiles after GO (before: 3 cube-map shadow pipelines
   4 s in). `--bench`, dev, 1080p: max frame 7–15 ms in all 12 QA scenarios (QA: 26–33 ms in 9).
+- Weather (T22b, QA R5): non-clear `tools/scripts/qa/weather_time.sh` cells with
+  `RUST_LOG=rc_render=debug` (Backyard cloudy/rain/fog, Maple storm/snow, Toy Town storm night,
+  Wrench storm, Sofa rain sunset) log `race start: 0 pipelines` (T21: 1, the white-balance
+  tonemapping variant); clear cells compile the same single variant.
 - Textures: `python3 tools/textures/gen_textures.py [--only a,b] [--preview DIR]`.
 
 ## Known limitations
@@ -214,3 +225,6 @@ the camera keeps the wide shot.
 - Textures are uncompressed on the GPU (RGBA8/RG8, ~250 MB VRAM for all sets). `ponytail:` BCn
   encoding when a compressor is available.
 - `--window` is needed for consistent screenshots on tiling window managers.
+- `preprocess_fix.rs` works around a Bevy 0.20 leak (`docs/upstream-notes.md` U5): bevy_pbr never
+  prunes the GPU-preprocessing bind groups of views that went away; we retain them against the live
+  `ExtractedView`s every frame. Remove it once Bevy prunes them itself.

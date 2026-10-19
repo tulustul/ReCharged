@@ -60,9 +60,15 @@ swap — the conflicting action receives the rebound action's previous primary b
 | `Profile`, `Settings`, `MedalTable`, `HintsSeen`, `LobbyState`, `Catalog` | app |
 
 ## Race setup per mode (`race_setup`)
-- Grid: local players first (slot order, slot colours; "Player" alone, P1–P4 otherwise), then
-  rivals in a seeded order (`RngStream::RaceSetup`, Fisher–Yates), so the seed picks the field in
-  Quick Race / Versus and the grid order everywhere. Same car twice → distinct base paints.
+- Grid (GDD §3.2, T22): rivals in a seeded order (`RngStream::RaceSetup`, Fisher–Yates) fill the
+  front, so the seed picks the field in Quick Race / Versus and the grid order everywhere; the
+  local players start behind them in slot order (slot colours; "Player" alone, P1–P4 otherwise).
+  In Versus, `series::versus_grid` (`OnEnter(RacePhase::Setup)`, every attempt) re-sorts the
+  players by the session standings, the leader last and players without a result first: the
+  first race keeps the slot order, a Rematch re-sorts, a Restart keeps the race's order (its
+  result was reverted), NextTrack / NextRace / a race from the lobby take the points so far.
+  Same car twice → distinct base paints. Before T22 the players started on the front rows: a
+  human drawing a 1st-band hazard at the first cube row could take out the whole field (T21 R1).
 - Rival class: the cup's (Rookie/Pro/Elite; Elite+ cups field Elite cars), else the best human car
   (Secret = Elite). Difficulty: the cup's, else the request's (must be unlocked; Elite+ never),
   else the settings default clamped down to the best unlocked one.
@@ -127,9 +133,15 @@ swap — the conflicting action receives the rebound action's previous primary b
   audio sources (QA Q21) — must equal the first census after a session that reached the race.
   Audio sources come from rc_audio's `assets/audio_sources` diagnostic: every Bevy diagnostic under
   `assets/` is counted (rc_game cannot name kira's types). Font atlas textures are left out (Bevy's
-  glyph cache grows with every font size drawn, bounded by the UI). A difference logs exactly what
-  differs (resources, asset counts, images by size and format, entities per component signature)
-  and exits 1. Runs automatically with `--unlock-all` semantics and never exits on load errors.
+  glyph cache grows with every font size drawn, bounded by the UI). A difference is censused again
+  up to 3 times, 2 s apart (under load the menu settles later: the navy backdrop, a window-sized
+  SVG raster, stays until the showroom is ready and has faded in). If it persists, the soak logs
+  exactly what differs (resources, asset counts, images by size and format, entities per component
+  signature) and exits 1. Runs automatically with `--unlock-all` semantics and never exits on load errors.
+  Every check and the baseline also log what the census cannot see (QA R3): `RSS … MB (anon,
+  file, shmem)` from `/proc/self/status`, wgpu's allocated/reserved GPU memory and allocation
+  count, all entities (UI included) against the allocated entity indices, and the font atlas count
+  and size (`docs/design/automation.md`, soak and memory).
 
 ## Tests
 `cargo test -p rc_game`: unit — unlock rules (every rule kind, unlock-all, announce once,
@@ -140,14 +152,13 @@ saves (round trip, v0 migration, newer/broken, corrupt backup, ghosts), settings
 rebinding, clamping, log rotation, census diff (incl. asset and diagnostic counts). Headless (`tests/`, private temp data dirs,
 placeholder racers in `tests/common`): lifecycle table, quit in Setup, restart+quit same frame,
 load errors, pause/disconnect/focus (incl. automated), finished races unpausable, locked content,
-Versus scoreboard/rematch/restart/drop/next track/lobby, `--quick-race --mode cup`, a full Rookie
+Versus scoreboard, grid by the session points (rematch re-sorts, restart keeps),
+rematch/restart/drop/next track/lobby, `--quick-race --mode cup`, a full Rookie
 Cup with restart and unlocks, abandoned cups, saves across an app restart (throttle + exit
 flush), corrupt files, geometry change, Golden Battery/hints/reset, a 1-minute soak and a leak
 the soak must catch.
 
 ## Known limitations
-- Grid order puts humans on pole (kept from T01; GDD is silent). Change in `race_setup` if
-  playtests want humans at the back.
 - Race phases are driven by rc_race (T06); rc_game only sets `RacePhase::Setup` (start/restart). `RaceResults` must exist
   no later than entering `Finished` and be removed in `OnEnter(Setup)`.
 - Distance counts finished races only; play time is wall time of the app.
