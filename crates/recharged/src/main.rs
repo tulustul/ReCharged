@@ -20,6 +20,7 @@ mod quit;
 use std::path::PathBuf;
 
 use bevy::prelude::*;
+use bevy::render::settings::{WgpuFeatures, WgpuSettings};
 use bevy::window::{PresentMode, WindowResolution};
 use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_react::prelude::*;
@@ -129,6 +130,16 @@ fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App {
             // their exit until the pipeline queue is idle instead ([`quit`]).
             .set(bevy::render::RenderPlugin {
                 synchronous_pipeline_compilation: automated,
+                // Bevy 0.20's binding arrays (bindless `StandardMaterial`, environment-map arrays)
+                // hang Intel GPUs on Mesa at the first 3D frame (DeviceLost seconds later,
+                // docs/upstream-notes.md U7). Without them Bevy binds per material and per view.
+                render_creation: WgpuSettings {
+                    disabled_features: Some(
+                        WgpuFeatures::TEXTURE_BINDING_ARRAY | WgpuFeatures::BUFFER_BINDING_ARRAY,
+                    ),
+                    ..default()
+                }
+                .into(),
                 ..default()
             })
             .set(WindowPlugin {
