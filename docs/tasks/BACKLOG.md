@@ -23,7 +23,7 @@ take B2, B4, B5, B8, B10–B13, B15–B17, B19, B23–B25, B27.
 | B15 | HUD: no message for a missed checkpoint (`RaceEventKind::MissedCheckpoint` added to rc_core; rc_race to emit, UI to show) | rc_race + ui | T05b |
 | B16 | AI never takes shortcuts; rockets/leech fired without line-of-sight; one steering geometry for all cars | rc_ai | T11 |
 | B17 | Item races are rough (0.14–0.33 respawns per racer-lap, mostly hits/Spring Pad launches over walls) — tune impulses, add wall checks | rc_items balance | T11 |
-| B18 | Re-run `every_layout` AI test once all environments are final (incl. aisle_rush) | QA | T11 |
+| B18 | ~~DONE~~ (T18: 23/24 pass; wrench_works mirror → QA Q4, T19a) Re-run `every_layout` AI test once all environments are final (incl. aisle_rush) | QA | T11 |
 | B19 | Maple Street: leaf piles look 0.9 u but collide at 0.5 u; decor beyond bounds sits 0.6 u below edge lawns; reverse curb-hop turn very slow (widen TURN_R) | env street | T16 street |
 | B20 | ~~DONE~~ Intro fly-by camera passes through walls (Aisle Rush lobby grid is 10 u from the glazing) — clamp the intro orbit inside `Track::bounds()` and under the ceiling | rc_camera | T16 supermarket |
 | B21 | Prop glbs embed their own copies of texture sheets (~4 MB VRAM each in the supermarket) — share external textures | env art pipeline | T16 supermarket |
