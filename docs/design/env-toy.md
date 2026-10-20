@@ -2,7 +2,7 @@
 
 Owner: T16-toy. Look: art bible §3.1–3.2. Track rules: `rc_track.md`. Files: generators
 `tools/blender/props/toy/`, models `assets/models/props/toy/`, catalog `assets/data/props/toy.ron`,
-layout `assets/data/tracks/toy_town.ron`, decor `assets/data/decor/toy_town.ron`.
+layout `assets/maps/toy_town/track.ron`, decor `assets/maps/toy_town/decor.ron`.
 
 ## Regenerate / verify
 
@@ -89,7 +89,7 @@ Intended lines: the racing line takes the raised banked turns at speed and threa
 in the middle; the shortcut is shorter but slower and blocked by blocks on lap 1; the
 battery line trades time for the collectible.
 
-## Lighting wishes (`environments/toy_store.ron`, rendering agent)
+## Lighting wishes (`assets/maps/toy_town/environment.ron`, rendering agent)
 
 - **Morning:** keep the low warm east sun raking across the mat through the three east windows;
   the shelves and castle should throw long soft shadows. The dollhouse tunnel and the lower helix

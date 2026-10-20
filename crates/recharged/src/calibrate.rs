@@ -46,9 +46,8 @@ pub fn run(paths: UserPaths) -> AppExit {
         "layout", "runs s", "reference", "plat", "gold", "silver", "bronze"
     );
     for track in &catalog.tracks {
-        let track_file = paths
-            .assets_dir
-            .join(format!("data/tracks/{}.ron", track.id));
+        let track_file =
+            rc_track::map_dir(&paths.assets_dir, track.id.as_str()).join(rc_track::TRACK_FILE);
         if !track_file.is_file() {
             notes.push(format!("{}: no track file, old entries kept", track.id));
             continue;

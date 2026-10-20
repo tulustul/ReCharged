@@ -4,7 +4,7 @@
 Per kind: the glb exists and parses (glTF 2.0 binary), triangles within budget (hero 15 k,
 kit 5 k), ground contact (lowest vertex at y = 0 +- 0.03), every collider primitive inside the
 model's bounds (+ 0.12 u), at least one material; dynamic props have a mass. Also checks that
-every model of data/decor/sofa_circuit.ron exists. Prints a triangle table.
+every model of maps/sofa_circuit/decor.ron exists. Prints a triangle table.
 
     python3 tools/blender/props/house/check.py
 """
@@ -106,7 +106,7 @@ def main():
                     break
         rows.append((kind, tris, budget, [h - l for h, l in zip(hi, lo)],
                      'dynamic' if d.get('dynamic') else 'static'))
-    decor = os.path.join(ROOT, 'assets', 'data', 'decor', 'sofa_circuit.ron')
+    decor = os.path.join(ROOT, 'assets', 'maps', 'sofa_circuit', 'decor.ron')
     if os.path.exists(decor):
         for item in toy_ron.loads(open(decor).read())['decor']:
             if not os.path.exists(os.path.join(ROOT, 'assets', item['model'])):

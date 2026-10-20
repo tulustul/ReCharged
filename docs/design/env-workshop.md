@@ -1,7 +1,7 @@
 # Wrench Works — auto-repair workshop (T16, env `workshop`)
 
 Owner: environment artist (T16 workshop). Look: art bible §3.6. Track: GDD §7.1 (`wrench_works`,
-indoor ★★★, ~700 u, 3 laps). Lighting file `assets/data/environments/workshop.ron` belongs to
+indoor ★★★, ~700 u, 3 laps). Lighting file `assets/maps/wrench_works/environment.ron` belongs to
 rendering (wishes below).
 
 > **Editor-owned layout.** Since the track editor (`docs/design/rc_editor.md`), the track and decor
@@ -12,7 +12,7 @@ rendering (wishes below).
 ## Files and regeneration
 | What | Path |
 |---|---|
-| Layout generator (track + decor + catalog) | `tools/blender/props/workshop/plan.py` → `assets/data/tracks/wrench_works.ron`, `assets/data/decor/wrench_works.ron` |
+| Layout generator (track + decor + catalog) | `tools/blender/props/workshop/plan.py` → `assets/maps/wrench_works/track.ron`, `assets/maps/wrench_works/decor.ron` |
 | Prop catalog (dims, colliders, lights) | `tools/blender/props/workshop/catalog.py` → `assets/data/props/workshop.ron` |
 | Prop generators (one per glb) | `tools/blender/props/workshop/<name>.py` → `assets/models/props/workshop/<name>.glb` |
 | Shared kit (palette, materials, textures, preview stage, tyres) | `tools/blender/props/workshop/wkit.py`, `liftkit.py`, `shelfkit.py` |
@@ -46,7 +46,7 @@ engine_stand 896, engine_crane 660, hanging_lamp 248 (neutral-cool fluorescent b
 14.85 u, tubes always lit, a 72° spot light at night: 22 over the lanes) (* = dynamic, masses
 0.08–1.2).
 
-**Decor (physics-free, `assets/data/decor/wrench_works.ron`):** roller_door 1 008,
+**Decor (physics-free, `assets/maps/wrench_works/decor.ron`):** roller_door 1 008,
 tyre_rack 4 884, shelf_a 3 504, shelf_b 3 728, tool_wall 1 164, compressor 1 452,
 safety_signs 640 (pictograms only), roof_truss 1 128, bay_marking 16, walkway_line 2, stains 180, start_line 70 (chequered tape —
 Invisible tracks get no drawn start line).

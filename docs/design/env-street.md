@@ -21,8 +21,8 @@ blender -b -P tools/blender/props/street/<script>.py -- [--preview DIR] [--only 
 ```
 
 **Generated files — edit the generators, not the outputs:**
-`assets/data/tracks/maple_street.ron`, `assets/data/props/street.ron` and
-`assets/data/decor/maple_street.ron` come from `plan.py` (street plan, race line, dressing,
+`assets/maps/maple_street/track.ron`, `assets/data/props/street.ron` and
+`assets/maps/maple_street/decor.ron` come from `plan.py` (street plan, race line, dressing,
 decor) and `catalog.py` (prop dimensions and colliders, shared with the Blender scripts).
 `check.py` checks every kind: glb present and parsing, triangle budget (kit 5 k / hero 15 k),
 colliders inside the mesh bounds, `lamp*` bulb material on lit kinds, decor models present,
@@ -122,7 +122,7 @@ U-turn.
 | `street_manhole`, `street_paint_dash/bar/stop` | 920 / 12 | flush, drivable |
 | `street_newspaper` (dynamic 0.08), `street_sprinkler`, `street_garden_light`, `street_bike` | 132 / 192 / 96 / 1 328 | |
 
-Decor (`assets/data/decor/maple_street.ron`): 9 houses and 13 maples beyond the bounds, standing
+Decor (`assets/maps/maple_street/decor.ron`): 9 houses and 13 maples beyond the bounds, standing
 at the edge-lawn height (0.6 u) on Grass lawn plates that `plan.py` lays 120 u beyond the bounds
 (`build_beyond`; Maple Street and Birch Lane leave between them at road level). Physics never
 reaches them.
@@ -133,7 +133,7 @@ paint and glass (art bible car paint); bulbs named `lamp*` (rc_render dims them 
 the catalog `lights` at night). Collider rotations use `rot: (0, yaw, 0)` (catalog helpers take
 `yaw=`).
 
-## Lighting wishes (for `assets/data/environments/street.ron`)
+## Lighting wishes (for `assets/maps/maple_street/environment.ron`)
 
 - **Morning:** low warm sun from the east-south-east, long shadows across Maple Street, cool
   blue sky fill; slight haze so the maples glow against it.

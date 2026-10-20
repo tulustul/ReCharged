@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Backyard Bash layout generator (pure Python, no Blender): the garden plan — lawn, patio, deck,
 dirt path, puddles, raised beds, sandbox — the race line and the props, written to
-assets/data/tracks/backyard_bash.ron; decorative (physics-free) dressing goes to
-assets/data/decor/backyard_bash.ron (decor.py).
+assets/maps/backyard_bash/track.ron; decorative (physics-free) dressing goes to
+assets/maps/backyard_bash/decor.ron (decor.py).
 
     python3 tools/blender/props/garden/plan.py
     cargo run -p rc_track --example plot -- backyard_bash [--rev] [--mirror]
@@ -20,7 +20,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..'))
-TRACK_OUT = os.path.join(ROOT, 'assets', 'data', 'tracks', 'backyard_bash.ron')
+TRACK_OUT = os.path.join(ROOT, 'assets', 'maps', 'backyard_bash', 'track.ron')
 
 # --- garden plan (u) ----------------------------------------------------------------------------
 BOUNDS = ((-56.0, -64.0), (56.0, 64.0))           # fences east/west/south, house wall north

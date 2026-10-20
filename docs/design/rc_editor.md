@@ -108,7 +108,7 @@ cargo run -p rc_editor -- toy_town --bake-time noon   # one volume (normal layou
 to compare the lighting with and without it. Scripted comparisons: `--window 1600x900` and the
 UI-script verb `editor lookAt x y z tx ty tz` (camera pose), then `editor toggleProbes`.
 or **Bake light** (this time, forward) / **Bake all** in the editor's toolbar. Files:
-`assets/data/lighting/<track>/<normal|mirror>_<time>.irv` (format and runtime: rc_render
+`assets/maps/<track>/<normal|mirror>_<time>.irv` (format and runtime: rc_render
 `lighting/gi.rs`, `rc_render.md` §Baked indirect light). Reverse layouts use the forward bake (only
 `dir`-filtered features differ); the sun is not mirrored, so mirror gets its own.
 

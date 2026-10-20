@@ -35,12 +35,10 @@ use rc_core::prelude::*;
 pub use capture::Overhead;
 pub use cars::{CarModel, CarModelReady};
 pub use content::{ContentVisualsPlugin, keep_cpu_copies};
-pub use lighting::gi::{
-    BakedGi, BakedLight, FACES, IrradianceGrid, LIGHTING_DIR, rgb9e5, volume_file,
-};
+pub use lighting::gi::{BakedGi, BakedLight, FACES, IrradianceGrid, rgb9e5, volume_file};
 pub use lighting::{
-    ActiveEnvironment, ENVIRONMENTS_DIR, EnvironmentDef, LUMEN_SCALE, LampGrid, PipelineQueue,
-    RoomDef, SHOWROOM_ENV, TimeLook, WindowDef, WindowWall, lamp_lumens,
+    ActiveEnvironment, ENVIRONMENT_FILE, EnvironmentDef, LUMEN_SCALE, LampGrid, PipelineQueue,
+    RoomDef, SHOWROOM_ENV, SHOWROOM_FILE, TimeLook, WindowDef, WindowWall, lamp_lumens,
 };
 pub use lighting::{EnvLight, environment_radiance};
 pub use materials::{

@@ -143,7 +143,7 @@ physical sky fill (`env_light` 15–32 k) so shade under trees, fences and parke
   Bevy fixes it upstream.
 
 ## Baked indirect light (`lighting/gi.rs`, tested)
-If `assets/data/lighting/<track>/<normal|mirror>_<time>.irv` exists (reverse layouts use the
+If `assets/maps/<track>/<normal|mirror>_<time>.irv` exists (reverse layouts use the
 forward file), the session gets one `LightProbe + IrradianceVolume` over its bounds: inside it,
 Bevy takes *diffuse* indirect light from the volume instead of the camera's environment map (whose
 specular stays); without a file nothing changes. Values are irradiance / π (cd/m²-like, they

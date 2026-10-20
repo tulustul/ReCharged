@@ -1,4 +1,4 @@
-//! Decorative-only models of a track, `assets/data/decor/<track>.ron` (ARCHITECTURE §5.9):
+//! Decorative-only models of a track, `assets/maps/<track>/decor.ron` (ARCHITECTURE §5.9):
 //! backdrops, posters, furniture beyond the barriers. Physics never sees them; rc_render draws
 //! them, the track editor edits them. Placed like props: mirror negates X and the yaw, `dir`
 //! filters by direction.
@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::def::{Dir, read, ron_list, ron_options};
 
-/// Decor files below the assets root.
-pub const DECOR_DIR: &str = "data/decor";
+/// The decor file of a map directory.
+pub const DECOR_FILE: &str = "decor.ron";
 
 /// One decorative model.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ struct DecorFile {
 
 /// The decor of `track`; no file = no decor.
 pub fn load_decor(assets_dir: &Path, track: &str) -> Result<Vec<DecorItem>, String> {
-    let path = assets_dir.join(DECOR_DIR).join(format!("{track}.ron"));
+    let path = crate::map_dir(assets_dir, track).join(DECOR_FILE);
     if !path.is_file() {
         return Ok(Vec::new());
     }
@@ -106,13 +106,8 @@ mod tests {
     #[test]
     fn every_decor_file_survives_a_save() {
         let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-        for entry in std::fs::read_dir(assets.join(DECOR_DIR))
-            .expect("decor dir")
-            .flatten()
-        {
-            let path = entry.path();
-            let track = path.file_stem().and_then(|s| s.to_str()).expect("stem");
-            let items = load_decor(&assets, track).unwrap_or_else(|e| panic!("{e}"));
+        for track in crate::map_ids(&assets) {
+            let items = load_decor(&assets, &track).unwrap_or_else(|e| panic!("{e}"));
             let saved = decor_to_ron(&items).expect("serializes");
             assert_eq!(parse_decor(&saved).expect("parses"), items, "{track}");
         }

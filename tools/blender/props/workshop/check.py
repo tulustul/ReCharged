@@ -4,7 +4,7 @@
     python3 tools/blender/props/workshop/check.py
 
 For every `workshop_*` kind in assets/data/props/workshop.ron and every model in
-assets/data/decor/wrench_works.ron: the glb parses (glTF 2.0 binary), triangles within budget
+assets/maps/wrench_works/decor.ron: the glb parses (glTF 2.0 binary), triangles within budget
 (hero 15 k, kit 5 k), ground contact (nothing below y = -0.02 except `BELOW`), every collider
 primitive inside the visual bounds (+0.06 u), embedded textures <= 1024 px; the track file only
 places catalogued kinds and <= 40 dynamic bodies.
@@ -127,7 +127,7 @@ def main():
                             f'{[round(v, 2) for v in clo]}..{[round(v, 2) for v in chi]} vs '
                             f'{[round(v, 2) for v in lo]}..{[round(v, 2) for v in hi]}')
         rows.append((kind, tris, 'dynamic' if d.get('dynamic') else 'static'))
-    decor = toy_ron.load(os.path.join(ROOT, 'assets', 'data', 'decor', 'wrench_works.ron'))['decor']
+    decor = toy_ron.load(os.path.join(ROOT, 'assets', 'maps', 'wrench_works', 'decor.ron'))['decor']
     for model in sorted({d['model'] for d in decor}):
         path = os.path.join(ROOT, 'assets', model)
         if not os.path.isfile(path):
@@ -137,7 +137,7 @@ def main():
         if tris > 5000:
             errs.append(f'decor {model}: {tris} triangles > 5000')
         rows.append((os.path.basename(model), tris, 'decor'))
-    track = toy_ron.load(os.path.join(ROOT, 'assets', 'data', 'tracks', 'wrench_works.ron'))
+    track = toy_ron.load(os.path.join(ROOT, 'assets', 'maps', 'wrench_works', 'track.ron'))
     kinds = [p['kind'] for p in track['props']]
     unknown = sorted({k for k in kinds if k not in cat and not k.startswith(('crate_', 'tyre_stack',
                                                                               'ramp_'))})

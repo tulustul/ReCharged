@@ -1,5 +1,5 @@
 //! Decorative-only props (ARCHITECTURE §5.9): models physics never sees — backdrops, posters,
-//! furniture beyond the barriers — from rc_track's decor format (`assets/data/decor/<track>.ron`,
+//! furniture beyond the barriers — from rc_track's decor format (`assets/maps/<track>/decor.ron`,
 //! or the track editor's `TrackDraft`), placed like rc_track's props (mirror negates X and the
 //! yaw, `dir` filters by direction).
 
@@ -95,16 +95,10 @@ mod tests {
     #[test]
     fn every_decor_file_loads() {
         let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-        let Ok(dir) = std::fs::read_dir(assets.join(rc_track::DECOR_DIR)) else {
-            return;
-        };
-        for entry in dir.flatten() {
-            let path = entry.path();
-            let Some(track) = path.file_stem().and_then(|s| s.to_str()) else {
-                continue;
-            };
+        for track in rc_track::map_ids(&assets) {
             for (reverse, mirror) in [(false, false), (true, false), (false, true), (true, true)] {
-                load_decor(&assets, None, track, reverse, mirror).unwrap_or_else(|e| panic!("{e}"));
+                load_decor(&assets, None, &track, reverse, mirror)
+                    .unwrap_or_else(|e| panic!("{e}"));
             }
         }
     }
@@ -112,9 +106,13 @@ mod tests {
     #[test]
     fn decor_follows_mirror_and_direction() {
         let dir = std::env::temp_dir().join(format!("rc_render_decor_{}", std::process::id()));
-        std::fs::create_dir_all(dir.join(rc_track::DECOR_DIR)).expect("temp dir");
+        let file = |map: &str| {
+            let d = rc_track::map_dir(&dir, map);
+            std::fs::create_dir_all(&d).expect("temp dir");
+            d.join(rc_track::DECOR_FILE)
+        };
         std::fs::write(
-            dir.join(rc_track::DECOR_DIR).join("t.ron"),
+            file("t"),
             r#"(decor: [
                 (model: "a.glb", pos: (5, 0, 2), yaw: 30),
                 (model: "b.glb", pos: (1, 0, 1), scale: 2, dir: Fwd),
@@ -137,13 +135,9 @@ mod tests {
                 .expect("no file")
                 .is_empty()
         );
-        std::fs::write(
-            dir.join(rc_track::DECOR_DIR).join("bad.ron"),
-            "(decor: [(model: 1)])",
-        )
-        .expect("write");
+        std::fs::write(file("bad"), "(decor: [(model: 1)])").expect("write");
         let err = load_decor(&dir, None, "bad", false, false).expect_err("bad file");
-        assert!(err.contains("bad.ron"), "{err}");
+        assert!(err.contains("bad"), "{err}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

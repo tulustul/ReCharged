@@ -12,8 +12,8 @@ beds, a vegetable patch along the south fence and a shed in the corner.
 ## Files and how to rebuild
 | What | Path |
 |---|---|
-| Layout generator (pure Python) → track file | `tools/blender/props/garden/plan.py` → `assets/data/tracks/backyard_bash.ron` |
-| Decor generator (physics-free dressing) | `tools/blender/props/garden/decor.py` → `assets/data/decor/backyard_bash.ron` |
+| Layout generator (pure Python) → track file | `tools/blender/props/garden/plan.py` → `assets/maps/backyard_bash/track.ron` |
+| Decor generator (physics-free dressing) | `tools/blender/props/garden/decor.py` → `assets/maps/backyard_bash/decor.ron` |
 | Prop catalog (hand-written) | `assets/data/props/garden.ron` (22 kinds, prefix `garden_`) |
 | Prop generators (Blender 5.2) | `tools/blender/props/garden/*.py` (shared helpers: `gardenkit.py`) → `assets/models/props/garden/*.glb` (43 models, 6.1 MB) |
 | Rebuild + validate everything | `tools/blender/props/garden/build.sh` (`PREVIEW=<dir>` adds EEVEE previews) |
@@ -90,7 +90,7 @@ Decor: 452 items, 0.28 M triangles in all; placed props: 79, 0.09 M (well under 
 visible budget even if everything were on screen). Lamp-lit house
 windows (`lamp_window`) and the lantern panes glow at night and are dimmed by day by rc_render.
 
-## Lighting wishes (`assets/data/environments/garden.ron`, render agent)
+## Lighting wishes (`assets/maps/backyard_bash/environment.ron`, render agent)
 - **All times:** shadowed vertical faces render near-black — the west-facing east fence and the
   shed's west wall at noon and in the morning. More sky/ambient fill would keep them readable.
 - **Morning:** low sun from the east over the fence: long shadows across the lawn toward the house;

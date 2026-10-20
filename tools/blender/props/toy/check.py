@@ -4,7 +4,7 @@
 Per catalog kind (assets/data/props/toy.ron): the glb parses (glTF 2.0 binary), triangle budget
 (kit 5 k, hero 15 k), named materials, no texture without UVs (texCoord -1), ground contact
 (lowest point at 0 except the support pillar), every collider primitive inside the visual
-bounds (+2 cm), dynamic kinds have a mass. Also: decor models (assets/data/decor/toy_town.ron)
+bounds (+2 cm), dynamic kinds have a mass. Also: decor models (assets/maps/toy_town/decor.ron)
 parse, the track places only known kinds and at most 40 dynamic bodies, no orphan glb.
 
     python3 tools/blender/props/toy/check.py
@@ -118,7 +118,7 @@ def main():
         for e in errs:
             print(f'  {kind}: {e}')
         failed |= bool(errs)
-    decor = os.path.join(ROOT, 'assets', 'data', 'decor', 'toy_town.ron')
+    decor = os.path.join(ROOT, 'assets', 'maps', 'toy_town', 'decor.ron')
     for item in toy_ron.load(decor)['decor'] if os.path.exists(decor) else []:
         used.add(os.path.normpath(item['model']))
         try:
@@ -126,7 +126,7 @@ def main():
         except (OSError, ValueError) as e:
             print(f'  decor {item["model"]}: {e}')
             failed = True
-    track = toy_ron.load(os.path.join(ROOT, 'assets', 'data', 'tracks', 'toy_town.ron'))
+    track = toy_ron.load(os.path.join(ROOT, 'assets', 'maps', 'toy_town', 'track.ron'))
     kinds = [p['kind'] for p in track['props']]
     unknown = sorted({k for k in kinds if k.startswith('toy_') and k not in cat})
     dynamic = sum(1 for k in kinds if cat.get(k, {}).get('dynamic'))

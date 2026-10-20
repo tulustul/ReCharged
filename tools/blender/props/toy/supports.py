@@ -10,7 +10,7 @@ prop's origin is the bracket top and its column runs down into the floor. Pillar
 pierce a lower part of the track, or a keep-out circle (the castle inside the helix), are
 skipped.
 
-    python3 tools/blender/props/toy/supports.py [assets/data/tracks/toy_town.ron]
+    python3 tools/blender/props/toy/supports.py [assets/maps/toy_town/track.ron]
 """
 import math
 import os
@@ -182,8 +182,8 @@ def merge(fwd, rev):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'assets', 'data', 'tracks',
-                                                              'toy_town.ron')
+    path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'assets', 'maps',
+                                                              'toy_town', 'track.ron')
     track = toy_ron.load(path)
     lines = merge(supports(track, False), supports(track, True))
     body = [f'        (kind: "{KIND}", pos: ({c[0]:.2f}, {c[1]:.2f}, {c[2]:.2f}), '

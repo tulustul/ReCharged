@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn lamp_materials_follow_their_levels() {
         let mut def =
-            crate::lighting::EnvironmentDef::load(&assets(), "supermarket").expect("loads");
+            crate::lighting::EnvironmentDef::load(&assets(), "aisle_rush").expect("loads");
         def.fixture_materials = vec!["tube_on".into()];
         def.night.lamps = 0.1;
         def.sunset.practicals = Some(0.2);

@@ -1,5 +1,5 @@
-"""Aisle Rush layout (GDD §7.1, art bible §3.5): writes assets/data/tracks/aisle_rush.ron (and
-assets/data/decor/aisle_rush.ron) from the store plan below, after checking that no static
+"""Aisle Rush layout (GDD §7.1, art bible §3.5): writes assets/maps/aisle_rush/track.ron (and
+assets/maps/aisle_rush/decor.ron) from the store plan below, after checking that no static
 obstacle reaches into the racing corridor (a Python copy of rc_track's centripetal Catmull-Rom).
 
     python3 tools/blender/props/supermarket/plan.py [--assets DIR]
@@ -478,7 +478,7 @@ def stand_x(n):
     return out
 
 
-# --- decor (physics-free: assets/data/decor/aisle_rush.ron) -------------------------------
+# --- decor (physics-free: assets/maps/aisle_rush/decor.ron) -------------------------------
 DECOR = []   # (model file stem, x, y, z, yaw)
 
 
@@ -690,8 +690,8 @@ def main():
     dyn = sum(1 for p in PROPS if KINDS[p[0]]['dynamic'])
     print(f'{len(P)} points, lap ≈ {length:.0f} u, {len(PROPS)} props ({dyn} dynamic)')
     place_decor()
-    for name, text in (('tracks', track_ron(gaps)), ('decor', decor_ron())):
-        path = os.path.join(assets, 'data', name, 'aisle_rush.ron')
+    for name, text in (('track', track_ron(gaps)), ('decor', decor_ron())):
+        path = os.path.join(assets, 'maps', 'aisle_rush', f'{name}.ron')
         if editor_owned(path):
             continue
         os.makedirs(os.path.dirname(path), exist_ok=True)

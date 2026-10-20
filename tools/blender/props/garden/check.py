@@ -72,13 +72,13 @@ def main():
             print(f'{name:18s} {tris:6d} tris  {"OK" if not errs else "FAIL: " + "; ".join(errs)}')
             failed |= bool(errs)
     refs = set()
-    for rel in ('assets/data/props/garden.ron', 'assets/data/decor/backyard_bash.ron'):
+    for rel in ('assets/data/props/garden.ron', 'assets/maps/backyard_bash/decor.ron'):
         refs |= set(re.findall(r'models/props/garden/(\w+)\.glb', open(os.path.join(ROOT, rel)).read()))
     for missing in sorted(refs - names):
         print(f'missing model: {missing}.glb')
         failed = True
     kinds = set(re.findall(r'"(garden_\w+)": \(', open(os.path.join(ROOT, 'assets/data/props/garden.ron')).read()))
-    placed = set(re.findall(r'kind: "(garden_\w+)"', open(os.path.join(ROOT, 'assets/data/tracks/backyard_bash.ron')).read()))
+    placed = set(re.findall(r'kind: "(garden_\w+)"', open(os.path.join(ROOT, 'assets/maps/backyard_bash/track.ron')).read()))
     for k in sorted(kinds - placed):
         print(f'note: catalog kind {k} is not placed by backyard_bash')
     for k in sorted(placed - kinds):

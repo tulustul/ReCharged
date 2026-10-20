@@ -206,7 +206,7 @@ pub(super) fn append(dst: &mut MeshData, src: MeshData) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rc_core::TrackVariant;
+    use rc_core::{Catalog, TrackVariant};
 
     fn track(id: &str) -> Track {
         let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
@@ -231,17 +231,11 @@ mod tests {
             .into_iter()
             .map(|(n, _)| n)
             .collect();
-        for env in [
-            "toy_store",
-            "test",
-            "street",
-            "garden",
-            "workshop",
-            "house",
-            "supermarket",
-        ] {
+        let catalog = Catalog::load(&assets).expect("catalog loads");
+        for track in &catalog.tracks {
+            let env = &track.environment;
             let style = block_style(env).expect("a style");
-            let def = crate::lighting::EnvironmentDef::load(&assets, env)
+            let def = crate::lighting::EnvironmentDef::load(&assets, track.id.as_str())
                 .unwrap_or_else(|e| panic!("{e}"));
             for name in style.materials {
                 let known = builtins.iter().any(|b| b == name) || def.materials.contains_key(*name);

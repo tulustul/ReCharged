@@ -41,7 +41,7 @@ def B(p):
 
 
 core.reset()
-track = toy_ron.load(os.path.join(ROOT, 'assets', 'data', 'tracks', f'{TRACK}.ron'))
+track = toy_ron.load(os.path.join(ROOT, 'assets', 'maps', TRACK, 'track.ron'))
 catalog = {}
 for f in sorted(os.listdir(os.path.join(ROOT, 'assets', 'data', 'props'))):
     if f.endswith('.ron'):
@@ -218,7 +218,7 @@ for pl in track.get('props', []):
     root.location = B(pl['pos'])
     root.rotation_euler = (0, 0, yaw)
 
-decor_path = os.path.join(ROOT, 'assets', 'data', 'decor', f'{TRACK}.ron')
+decor_path = os.path.join(ROOT, 'assets', 'maps', TRACK, 'decor.ron')
 if os.path.exists(decor_path):  # physics-free dressing drawn by rc_render
     for d in toy_ron.load(decor_path)['decor']:
         if not active(d.get('dir', 'Both')):

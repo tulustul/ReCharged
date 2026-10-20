@@ -1,6 +1,6 @@
 """Wrench Works layout generator (pure Python, no Blender): the race line, ground polygons, item
 rows, props, Golden Battery and the decorative dressing of the auto-repair workshop, written to
-assets/data/tracks/wrench_works.ron and assets/data/decor/wrench_works.ron; also rewrites the prop
+assets/maps/wrench_works/track.ron and assets/maps/wrench_works/decor.ron; also rewrites the prop
 catalog assets/data/props/workshop.ron (catalog.py).
 
     python3 tools/blender/props/workshop/plan.py
@@ -27,8 +27,8 @@ import catalog as C
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = C.ROOT
-TRACK_OUT = os.path.join(ROOT, 'assets', 'data', 'tracks', 'wrench_works.ron')
-DECOR_OUT = os.path.join(ROOT, 'assets', 'data', 'decor', 'wrench_works.ron')
+TRACK_OUT = os.path.join(ROOT, 'assets', 'maps', 'wrench_works', 'track.ron')
+DECOR_OUT = os.path.join(ROOT, 'assets', 'maps', 'wrench_works', 'decor.ron')
 
 # ---------------------------------------------------------------------------------------------
 # floor plan (u)
@@ -426,7 +426,7 @@ def dress(add):
 
 
 def decor():
-    """Physics-free wall dressing, lamps and floor markings (assets/data/decor)."""
+    """Physics-free wall dressing, lamps and floor markings (assets/maps/wrench_works/decor.ron)."""
     (x0, z0), (x1, z1) = BOUNDS
     D = []
 

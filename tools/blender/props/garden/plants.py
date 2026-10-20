@@ -1,4 +1,4 @@
-"""Decorative planting (physics-free, placed by decor.py in assets/data/decor/backyard_bash.ron),
+"""Decorative planting (physics-free, placed by decor.py in assets/maps/backyard_bash/decor.ron),
 one glb each: long-grass tufts (three sizes) for track edges, wall feet and fence lines; bed
 plants — hosta, daisies, fern, hydrangea shrub, ornamental grass; fallen leaves; a stepping
 stone; a pebble patch.

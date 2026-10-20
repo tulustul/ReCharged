@@ -32,10 +32,10 @@ pub use room::environment_radiance;
 pub use warmup::PipelineQueue;
 pub(crate) use warmup::WarmupCamera;
 
-/// Environment of the menu showroom.
+/// Environment id of the menu showroom ([`SHOWROOM_FILE`]).
 pub const SHOWROOM_ENV: &str = "showroom";
-/// Neutral environment used when a track's environment file is missing or broken.
-pub const FALLBACK_ENV: &str = "test";
+/// Map whose neutral environment is used when a track's environment file is missing or broken.
+pub const FALLBACK_MAP: &str = "test_oval";
 /// First shadow cascade's far bound (u): the car and its surroundings get the sharpest texels.
 const FIRST_CASCADE_U: f32 = 9.0;
 /// Shadow distance under the Loading warm-up camera, × its height: the far corners of the track
@@ -111,7 +111,7 @@ fn enter_menu(mut commands: Commands, paths: Option<Res<UserPaths>>, spawner: En
     let root = paths
         .map(|p| p.assets_dir.clone())
         .unwrap_or_else(|| "assets".into());
-    match EnvironmentDef::load(&root, SHOWROOM_ENV) {
+    match EnvironmentDef::load_file(&root.join(SHOWROOM_FILE)) {
         Ok(def) => {
             let active = ActiveEnvironment {
                 id: SHOWROOM_ENV.into(),
@@ -128,7 +128,7 @@ fn enter_menu(mut commands: Commands, paths: Option<Res<UserPaths>>, spawner: En
 
 /// `OnEnter(Loading)`: activates the track's environment, rebuilds the material library for it
 /// and spawns its lights. A missing or broken environment file falls back to the neutral
-/// [`FALLBACK_ENV`] (logged as an error); only when that fails too does the load fail.
+/// one of [`FALLBACK_MAP`] (logged as an error); only when that fails too does the load fail.
 #[allow(clippy::too_many_arguments)]
 fn enter_session(
     mut commands: Commands,
@@ -151,9 +151,9 @@ fn enter_session(
         .as_ref()
         .and_then(|c| c.tracks.iter().find(|t| t.id == track))
         .map_or_else(|| "test".to_owned(), |t| t.environment.clone());
-    let loaded = EnvironmentDef::load(&root, &env_id).or_else(|error| {
-        error!("visuals: {error}; using the '{FALLBACK_ENV}' environment");
-        EnvironmentDef::load(&root, FALLBACK_ENV)
+    let loaded = EnvironmentDef::load(&root, track.as_str()).or_else(|error| {
+        error!("visuals: {error}; using the '{FALLBACK_MAP}' environment");
+        EnvironmentDef::load(&root, FALLBACK_MAP)
     });
     let def = match loaded {
         Ok(def) => def,

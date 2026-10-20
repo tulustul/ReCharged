@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Sofa Circuit layout generator (plain Python, no Blender): writes
-assets/data/tracks/sofa_circuit.ron and assets/data/decor/sofa_circuit.ron.
+assets/maps/sofa_circuit/track.ron and assets/maps/sofa_circuit/decor.ron.
 
 The centreline is built from straights and arcs (points every 20-30 deg), the chair slalom from
 R = 8 arcs; every original prop placement lives here. Check the result with the plot tool in all
@@ -322,8 +322,8 @@ def decor_ron():
 def main():
     args = sys.argv[1:]
     out = args[args.index('--out-dir') + 1] if '--out-dir' in args else os.path.join(ROOT, 'assets')
-    for rel, text in (('data/tracks/sofa_circuit.ron', track_ron()),
-                      ('data/decor/sofa_circuit.ron', decor_ron())):
+    for rel, text in (('maps/sofa_circuit/track.ron', track_ron()),
+                      ('maps/sofa_circuit/decor.ron', decor_ron())):
         path = os.path.join(out, rel)
         if editor_owned(path):
             continue

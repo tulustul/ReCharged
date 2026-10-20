@@ -225,10 +225,13 @@ fn parked_probe() {
 fn every_layout() {
     let app = race_app();
     let catalog = app.world().resource::<Catalog>().clone();
-    let tracks_dir = rc_testkit::assets_dir().join("data/tracks");
+    let assets = rc_testkit::assets_dir();
     let mut failures = Vec::new();
     for info in &catalog.tracks {
-        if !tracks_dir.join(format!("{}.ron", info.id)).exists() {
+        if !rc_track::map_dir(&assets, info.id.as_str())
+            .join(rc_track::TRACK_FILE)
+            .exists()
+        {
             println!("skip {}: no data file yet", info.id);
             continue;
         }
@@ -370,13 +373,17 @@ fn tt_table() {
         Ok(list) => list.split(',').map(str::to_owned).collect(),
         Err(_) => {
             let app = race_app();
-            let dir = rc_testkit::assets_dir().join("data/tracks");
+            let assets = rc_testkit::assets_dir();
             let catalog = app.world().resource::<Catalog>();
             catalog
                 .tracks
                 .iter()
                 .map(|t| t.id.to_string())
-                .filter(|id| dir.join(format!("{id}.ron")).exists())
+                .filter(|id| {
+                    rc_track::map_dir(&assets, id)
+                        .join(rc_track::TRACK_FILE)
+                        .exists()
+                })
                 .collect()
         }
     };

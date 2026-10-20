@@ -14,7 +14,7 @@
 // are half banked, so the roll builds over two segments (a full roll over one threw cars off
 // the ground at 30 u/s: autopilot spins, T19a). Pillars under every raised stretch are
 // generated (tools/blender/props/toy/supports.py); out-of-reach decor (bunting, aisle signs)
-// lives in assets/data/decor/toy_town.ron.
+// lives in assets/maps/toy_town/decor.ron.
 (
     style: ToyTrack,
     start: 0,

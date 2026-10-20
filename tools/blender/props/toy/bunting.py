@@ -1,6 +1,6 @@
 """Pennant bunting (decor, out of reach): 15 triangular flags in toy colours on a string spanning
 30 u with a 1.6 u sag. Origin at the middle of the span at the attachment height (the ends);
-everything hangs below it. Placed by assets/data/decor/toy_town.ron near the ceiling.
+everything hangs below it. Placed by assets/maps/toy_town/decor.ron near the ceiling.
 
     blender -b -P tools/blender/props/toy/bunting.py -- [--preview DIR]
 """

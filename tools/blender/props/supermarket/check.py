@@ -106,7 +106,7 @@ def main():
         e, tris = check_model(rel, budget, d['colliders'], name.startswith(AIRBORNE))
         errs += e
         rows.append((rel, tris, budget))
-    decor = os.path.join(ASSETS, 'data', 'decor', 'aisle_rush.ron')
+    decor = os.path.join(ASSETS, 'maps', 'aisle_rush', 'decor.ron')
     if os.path.isfile(decor):
         import re
         models = sorted(set(re.findall(r'model: "([^"]+)"', open(decor, encoding='utf-8').read())))

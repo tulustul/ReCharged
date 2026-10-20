@@ -106,7 +106,7 @@ on which cars a session showed).
   are shared by all instances. Unknown lamp fields are load errors naming the file and kind; a
   test loads every shipped `props/*.ron`.
 - **Decor** (`decor.rs`): decorative-only models without colliders (backdrops, furniture beyond
-  the barriers) from the optional `assets/data/decor/<track>.ron`:
+  the barriers) from the optional `assets/maps/<track>/decor.ron`:
   `(decor: [(model: "models/...glb", pos: (x, y, z), yaw: 90, scale: 1.0, dir: Both)])` —
   placed like track props (mirror negates X and yaw, `dir` filters by direction).
 

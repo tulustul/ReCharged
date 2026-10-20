@@ -380,7 +380,7 @@ Rapier components on the racer are private to rc_vehicle.
 Each subsystem owns its crate, its data files and a short note `docs/design/<crate>.md`.
 
 ### 5.1 `rc_track`
-- **TrackDef** (`assets/data/tracks/<id>.ron`): closed list of control points
+- **TrackDef** (`assets/maps/<id>/track.ron`): closed list of control points
   `{ pos, width, bank_deg, surface, wall_left, wall_right, offroad_margin }` (the loop's shape is
   identical in both directions), ribbon `style`
   (`ToyTrack | Asphalt | CarpetRunner | Invisible` — Invisible lies on the environment's floor),
@@ -520,7 +520,7 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
 - **Quality:** `Settings.graphics` + split-screen tier → camera components (HDR, tonemapping,
   bloom, SSAO, AA, motion blur, distance fog; volumetric fog only at Ultra in single view) and
   shadow/cascade config. No SSR. Display mode windowed/borderless, vsync, window size.
-- **Lighting & sky:** per environment (`assets/data/environments/<env>.ron`) and `TimeOfDay`: sun
+- **Lighting & sky:** per environment (`assets/maps/<track>/environment.ron`) and `TimeOfDay`: sun
   + atmosphere (outdoor), window light + lamps/work lights (indoor), environment light probes,
   and a baked irradiance volume for the session's layout and time when one exists (`gi.rs`);
   blends from `WeatherState` (cloudiness, fog, lightning, wetness: darker & glossier ground,
@@ -635,15 +635,21 @@ telemetry & contacts → race → weather → (FixedLast) pose snapshots`; then 
 
 ## 7. Data files
 
+Everything of one map lives in `assets/maps/<track>/` (`<track>` = the catalog `TrackInfo.id`): its
+layout, decor, environment and baked light. The catalog's `environment` names the map's environment
+*kind* (barrier style, ambience, menu art); the lighting itself is the map's `environment.ron`.
+
 | Path | Owner | Content |
 |---|---|---|
 | `assets/data/catalog.ron` | orchestrator (designer) | cars, paints, tracks, cups, rivals, unlocks |
 | `assets/data/medals.ron` | generated (`--calibrate-medals`) | medal targets per layout |
 | `assets/data/vehicles/<car>.ron` | vehicle | physics tuning |
-| `assets/data/tracks/<track>.ron` | track designers | layout, surfaces, ground areas, props, items, features with `dir` |
-| `assets/data/environments/<env>.ron` | render | lighting/sky per time of day, materials, ambience ids, windows |
+| `assets/maps/<track>/track.ron` | track designers | layout, surfaces, ground areas, props, items, features with `dir` |
+| `assets/maps/<track>/environment.ron` | render | lighting/sky per time of day, materials, ambience ids, windows |
+| `assets/maps/<track>/decor.ron` | track editor | physics-free decor models (optional) |
+| `assets/data/showroom.ron` | render | the menu showroom's environment (same format) |
 | `assets/data/props/<env>.ron` (+ `common.ron`) | track (format) + environment designers (content) | prop kind → model path, collider primitives, mass, surface, light attachments; all files merged, duplicate kinds rejected |
-| `assets/data/lighting/<track>/<normal\|mirror>_<time>.irv` | the track editor's light baker (format: rc_render `gi.rs`) | baked irradiance volume of a layout at a time of day; optional (no file = environment-map lighting) |
+| `assets/maps/<track>/<normal\|mirror>_<time>.irv` | the track editor's light baker (format: rc_render `gi.rs`) | baked irradiance volume of a layout at a time of day; optional (no file = environment-map lighting) |
 | `assets/data/items.ron` | items | odds table, item tuning |
 | `assets/data/ai.ron` | ai | difficulty profiles, personalities |
 | `assets/models/cars/<car>.glb` + `<car>.wheels.ron` | art | model (nodes `body`, `wheel_fl/fr/rl/rr`; materials `paint`, `paint_accent`, `light_head`, `light_tail`, `light_brake`) + wheel metadata |

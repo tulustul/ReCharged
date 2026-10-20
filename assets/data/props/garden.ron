@@ -4,7 +4,7 @@
 // (pitch about X, yaw about Y, roll about Z) in degrees. Format: docs/design/rc_track.md §A9;
 // `lights` (rc_render): offset (prop space), linear colour, real-world lumens, range (u).
 // Soft dressing cars drive through (grass tufts, leaves, hose, stepping stones) and the
-// out-of-reach backdrop (house wall, fences) live in assets/data/decor/backyard_bash.ron.
+// out-of-reach backdrop (house wall, fences) live in assets/maps/backyard_bash/decor.ron.
 (
     props: {
         // --- hero props -------------------------------------------------------------------

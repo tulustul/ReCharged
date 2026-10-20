@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn fog_reads_as_fog() {
         let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-        let env = EnvironmentDef::load(&assets, "garden").expect("garden loads");
+        let env = EnvironmentDef::load(&assets, "backyard_bash").expect("garden loads");
         let clear = WeatherState {
             cloudiness: 0.1,
             ..default()
@@ -424,12 +424,12 @@ mod tests {
             cloudiness: 1.0,
             ..default()
         };
-        let street = EnvironmentDef::load(&assets, "street").expect("street loads");
+        let street = EnvironmentDef::load(&assets, "maple_street").expect("street loads");
         assert_eq!(
             look(&street, TimeOfDay::Noon, &storm, 1.0).flash.lux,
             FLASH_LUX_OUTDOOR
         );
-        let toys = EnvironmentDef::load(&assets, "toy_store").expect("toy store loads");
+        let toys = EnvironmentDef::load(&assets, "toy_town").expect("toy store loads");
         for (env, time) in [
             (&street, TimeOfDay::Sunset),
             (&street, TimeOfDay::Night),
@@ -481,13 +481,13 @@ mod tests {
         });
         weathers.push(WeatherState::default());
         let mut envs = 0;
-        for entry in std::fs::read_dir(assets.join("data/environments")).expect("environments") {
-            let path = entry.expect("environment file").path();
-            let id = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .expect("file name");
-            let env = EnvironmentDef::load(&assets, id).expect("environment loads");
+        let files = rc_track::map_ids(&assets)
+            .into_iter()
+            .map(|id| rc_track::map_dir(&assets, &id).join(crate::lighting::ENVIRONMENT_FILE))
+            .chain([assets.join(crate::lighting::SHOWROOM_FILE)]);
+        for path in files {
+            let id = path.display();
+            let env = EnvironmentDef::load_file(&path).expect("environment loads");
             for time in TimeOfDay::ALL {
                 for w in &weathers {
                     let key = tonemapping_key(&look(&env, time, w, 0.0).grading);

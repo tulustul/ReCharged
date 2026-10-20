@@ -1,4 +1,4 @@
-//! The track file format, `assets/data/tracks/<id>.ron` (authoring guide:
+//! The track file format, `assets/maps/<id>/track.ron` (authoring guide:
 //! `docs/design/rc_track.md`). Pure data + field-level validation; geometry checks happen when the
 //! track is built ([`crate::Track::build`]).
 //!
@@ -7,14 +7,17 @@
 //! defaults below). `surface`, walls and `offroad_margin` apply to the segment from a point to the
 //! next one; `width` and `bank_deg` are interpolated between points.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use bevy::math::{Vec2, Vec3};
 use rc_core::SurfaceKind;
 use serde::{Deserialize, Serialize};
 
-/// Track files relative to the assets root: `data/tracks/<id>.ron`.
-pub const TRACKS_DIR: &str = "data/tracks";
+/// Map directories relative to the assets root: `maps/<id>/` holds everything of one map — the
+/// track ([`TRACK_FILE`]), its decor, environment and baked light.
+pub const MAPS_DIR: &str = "maps";
+/// The track file of a map directory.
+pub const TRACK_FILE: &str = "track.ron";
 /// Racing width of point 0 when it gives none (u).
 pub const DEFAULT_WIDTH_U: f32 = 10.0;
 /// Off-road margin of point 0 when it gives none (u, GDD §5.4).
@@ -317,14 +320,32 @@ pub(crate) fn ron_options() -> ron::Options {
 }
 
 /// Reads a whole data file; errors name the path.
+/// The directory of map `id`.
+pub fn map_dir(assets_dir: &Path, id: &str) -> PathBuf {
+    assets_dir.join(MAPS_DIR).join(id)
+}
+
+/// Ids of the maps under `assets_dir` (directories with a track file), sorted.
+pub fn map_ids(assets_dir: &Path) -> Vec<String> {
+    let mut ids: Vec<String> = std::fs::read_dir(assets_dir.join(MAPS_DIR))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().join(TRACK_FILE).is_file())
+        .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+        .collect();
+    ids.sort();
+    ids
+}
+
 pub(crate) fn read(path: &Path) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 impl TrackDef {
-    /// Reads and validates `<assets_dir>/data/tracks/<id>.ron`.
+    /// Reads and validates `<assets_dir>/maps/<id>/track.ron`.
     pub fn load(assets_dir: &Path, id: &str) -> Result<Self, String> {
-        let path = assets_dir.join(TRACKS_DIR).join(format!("{id}.ron"));
+        let path = map_dir(assets_dir, id).join(TRACK_FILE);
         Self::parse(&read(&path)?).map_err(|e| format!("{}: {e}", path.display()))
     }
 

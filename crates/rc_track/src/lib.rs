@@ -1,6 +1,6 @@
 //! # rc_track — tracks (L1)
 //!
-//! - **Responsibilities:** track data (`assets/data/tracks/<id>.ron`, [`TrackDef`]) → variants
+//! - **Responsibilities:** track data (`assets/maps/<id>/track.ron`, [`TrackDef`]) → variants
 //!   (reverse, mirror) → centreline spline with banked frames → geometry buffers
 //!   ([`TrackGeometry`]) → checkpoints, respawn points, grid, item rows, racing line & speed
 //!   profile, ground areas, props (`assets/data/props/*.ron`, [`PropCatalog`]); the [`Track`]
@@ -38,7 +38,7 @@ use rc_core::prelude::*;
 
 pub use analysis::{MAX_BANK_GUIDE_DEG, MAX_CHOKEPOINTS, MAX_SLOPE_DEG, STACK_CLEARANCE_U};
 pub use build::{KILL_FLOOR_DEPTH_U, WALL_THICKNESS_U, variant_name};
-pub use decor::{DECOR_DIR, DecorItem, decor_to_ron, load_decor, parse_decor};
+pub use decor::{DECOR_FILE, DecorItem, decor_to_ron, load_decor, parse_decor};
 pub use def::*;
 pub use geometry::{GroundMesh, RibbonMesh, TrackGeometry};
 pub use mesh::MeshData;
@@ -53,7 +53,7 @@ pub use spline::{MIN_UP_Y, SAMPLE_SPACING_U};
 pub use track::*;
 pub use turns::{MERGE_U, MIN_ANGLE_DEG, MIN_TURN_RATE, SMOOTH_U};
 
-/// What the session builds and draws instead of `data/tracks/<id>.ron` and `data/decor/<id>.ron`
+/// What the session builds and draws instead of `maps/<id>/track.ron` and `maps/<id>/decor.ron`
 /// when it races track `id`: the track editor's unsaved edits (written only by rc_editor; the
 /// game never has one).
 #[derive(Resource, Debug, Clone, PartialEq)]

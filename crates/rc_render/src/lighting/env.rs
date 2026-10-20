@@ -1,5 +1,5 @@
-//! Environment definitions: `assets/data/environments/<env>.ron` (one per `TrackInfo.environment`,
-//! plus `showroom` for the menu). Pure data + loading/validation; light units are physical
+//! Environment definitions: `assets/maps/<map>/environment.ron` (one per map; `TrackInfo.environment`
+//! names its kind for styles and ambience), plus `data/showroom.ron` for the menu. Pure data + loading/validation; light units are physical
 //! (lux, real-world lumens via [`lamp_lumens`], EV100) and colours sRGB 0–1.
 
 use std::collections::HashMap;
@@ -10,8 +10,10 @@ use serde::Deserialize;
 
 use crate::materials::MaterialDef;
 
-/// Directory of the environment files below the assets root.
-pub const ENVIRONMENTS_DIR: &str = "data/environments";
+/// The environment file of a map directory.
+pub const ENVIRONMENT_FILE: &str = "environment.ron";
+/// The menu showroom's environment below the assets root.
+pub const SHOWROOM_FILE: &str = "data/showroom.ron";
 
 /// World units per real metre is 4.44, so a real lamp's lumens are scaled by 4.44² to light the
 /// same area (falloff is inverse-square in u).
@@ -81,11 +83,14 @@ impl EnvironmentDef {
             .unwrap_or(if time == TimeOfDay::Night { 1.0 } else { 0.0 })
     }
 
-    /// Reads and validates `<assets>/data/environments/<id>.ron`.
-    pub fn load(assets_dir: &Path, id: &str) -> Result<Self, String> {
-        let path = assets_dir.join(ENVIRONMENTS_DIR).join(format!("{id}.ron"));
-        let text =
-            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    /// Reads and validates `<assets>/maps/<map>/environment.ron`.
+    pub fn load(assets_dir: &Path, map: &str) -> Result<Self, String> {
+        Self::load_file(&rc_track::map_dir(assets_dir, map).join(ENVIRONMENT_FILE))
+    }
+
+    /// Reads and validates an environment file.
+    pub fn load_file(path: &Path) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let def: Self = ron::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
         def.validate()
             .map_err(|e| format!("{}: {e}", path.display()))?;
@@ -469,36 +474,28 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets")
     }
 
-    /// Every environment the catalog uses (and the showroom) loads and validates.
+    /// Every catalog map's environment (and the showroom) loads and validates.
     #[test]
     fn every_environment_file_loads() {
         let catalog = Catalog::load(&assets()).expect("catalog loads");
-        let mut ids: Vec<String> = catalog
-            .tracks
-            .iter()
-            .map(|t| t.environment.clone())
-            .collect();
-        ids.push("showroom".into());
-        ids.sort();
-        ids.dedup();
-        for id in ids {
-            let def = EnvironmentDef::load(&assets(), &id).unwrap_or_else(|e| panic!("{e}"));
-            let indoor_tracks = catalog
-                .tracks
-                .iter()
-                .filter(|t| t.environment == id)
-                .all(|t| t.indoor == def.indoor);
-            assert!(
-                indoor_tracks,
-                "{id}: indoor flag disagrees with the catalog"
+        for t in &catalog.tracks {
+            let def =
+                EnvironmentDef::load(&assets(), t.id.as_str()).unwrap_or_else(|e| panic!("{e}"));
+            assert_eq!(
+                def.indoor, t.indoor,
+                "{}: indoor flag disagrees with the catalog",
+                t.id
             );
         }
+        EnvironmentDef::load_file(&assets().join(SHOWROOM_FILE)).unwrap_or_else(|e| panic!("{e}"));
     }
 
     #[test]
     fn validation_names_the_bad_field() {
-        let text = std::fs::read_to_string(assets().join(ENVIRONMENTS_DIR).join("test.ron"))
-            .expect("test env exists");
+        let text = std::fs::read_to_string(
+            rc_track::map_dir(&assets(), "test_oval").join(ENVIRONMENT_FILE),
+        )
+        .expect("test env exists");
         let mut def: EnvironmentDef = ron::from_str(&text).expect("parses");
         def.surfaces
             .insert(SurfaceKind::Ice, "no_such_material".into());

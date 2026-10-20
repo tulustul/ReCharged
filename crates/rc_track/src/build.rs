@@ -33,13 +33,13 @@ const MIN_LENGTH_U: f32 = 50.0;
 const TURN_CLEARANCE_U: f32 = 0.25;
 
 impl Track {
-    /// Reads `data/tracks/<id>.ron` and `data/props/*.ron` under `assets_dir`, builds `variant`.
+    /// Reads `maps/<id>/track.ron` and `data/props/*.ron` under `assets_dir`, builds `variant`.
     pub fn load(assets_dir: &Path, variant: &TrackVariant) -> Result<Self, String> {
         let def = TrackDef::load(assets_dir, variant.track.as_str())?;
         let props = PropCatalog::load(assets_dir)?;
         Self::build(&def, &props, variant).map_err(|e| {
             format!(
-                "{TRACKS_DIR}/{}.ron ({}): {e}",
+                "{MAPS_DIR}/{}/{TRACK_FILE} ({}): {e}",
                 variant.track,
                 variant_name(variant)
             )

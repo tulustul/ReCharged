@@ -2,7 +2,7 @@
 // ceiling and hanging aisle signs over the wall shelves. Format: crates/rc_track/src/
 // decor.rs. Models: tools/blender/props/toy/{bunting,sign}.py; both have their origin at the
 // ceiling attachment (the room is 16 u high) and hang below it. Touchable dressing lives in the
-// track's prop list (assets/data/tracks/toy_town.ron) with colliders.
+// track's prop list (assets/maps/toy_town/track.ron) with colliders.
 (
     decor: [
         // Bunting east–west, 30 u spans, lowest flag tip ≈ 13 u (none over the castle).

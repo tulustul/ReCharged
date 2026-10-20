@@ -54,7 +54,7 @@ pub const TEXTURE_SETS: &[(&str, f32)] = &[
 /// Anisotropic filtering for ground textures seen at grazing angles.
 const ANISOTROPY: u16 = 16;
 
-/// A material of an environment's list (`assets/data/environments/<env>.ron`, `materials`).
+/// A material of an environment's list (`assets/maps/<map>/environment.ron`, `materials`).
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MaterialDef {

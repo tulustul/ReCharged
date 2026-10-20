@@ -1,7 +1,7 @@
 # Environment — Supermarket (Aisle Rush)
 
 T16 environment note (art bible §3.5, GDD §7.1). Track `aisle_rush`, props directory
-`supermarket`, lighting file `assets/data/environments/supermarket.ron` (rendering agent).
+`supermarket`, lighting file `assets/maps/aisle_rush/environment.ron` (rendering agent).
 
 > **Editor-owned layout.** Since the track editor (`docs/design/rc_editor.md`), the track and decor
 > files are edited with `cargo run -p rc_editor -- aisle_rush`; the layout script below writes them only
@@ -14,7 +14,7 @@ T16 environment note (art bible §3.5, GDD §7.1). Track `aisle_rush`, props dir
 | prop generators (Blender 5.2) | `tools/blender/props/supermarket/<prop>.py`, shared kit `smkit.py` |
 | textures (PIL, invented brands, OFL Saira text) | `textures.py` → `tex/packaging.png` (64 products), `tex/signs.png` (256-colour PNGs), `tex/atlas.json` |
 | prop catalog (dimensions, colliders, lights) | `catalog.py` → `assets/data/props/supermarket.ron` (43 kinds, 64 glbs incl. decor) |
-| layout + decor | `plan.py` → `assets/data/tracks/aisle_rush.ron`, `assets/data/decor/aisle_rush.ron` |
+| layout + decor | `plan.py` → `assets/maps/aisle_rush/track.ron`, `assets/maps/aisle_rush/decor.ron` |
 | glb validation (no Blender) | `check.py`: glTF 2.0, embedded textures, budgets, ground contact, colliders inside the mesh |
 | everything | `tools/blender/props/supermarket/build.sh [--preview DIR]` (≈ 30 s without previews) |
 
@@ -85,7 +85,7 @@ strips + endcap SPECIAL OFFER boards; basket, pallet, wet-floor sign, mop bucket
 (2), fruit (table/bin/rack), bag = paper_bag (decor on the open lanes' bagging shelves), shelf
 dividers = gondola uprights/strips.
 
-## Lighting wishes (for `environments/supermarket.ron`)
+## Lighting wishes (for `assets/maps/aisle_rush/environment.ron`)
 - **Sunset:** keep the warm low sun through the shopfront (it rakes across the lobby and the
   checkouts beautifully); room lamps at ~50 % ("half the tubes off"); my `ceiling_light_on` decor
   rows (route aisles, freezer aisle) carry the cold fluorescent look, so the disc lamp fixtures

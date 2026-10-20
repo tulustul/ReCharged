@@ -1,5 +1,5 @@
 //! Baked indirect light (`docs/design/rc_editor.md` §Irradiance bake): the session's
-//! `IrradianceVolume` from `assets/data/lighting/<track>/<normal|mirror>_<time>.irv`, written by the
+//! `IrradianceVolume` from `assets/maps/<track>/<normal|mirror>_<time>.irv`, written by the
 //! track editor's baker. Inside it, Bevy takes diffuse indirect light from the volume instead of
 //! the camera's environment map (whose specular stays); without a file the look is unchanged.
 //!
@@ -24,8 +24,6 @@ use rc_track::Track;
 use super::ActiveEnvironment;
 use crate::weather_fx::Look;
 
-/// Baked volumes below the assets root.
-pub const LIGHTING_DIR: &str = "data/lighting";
 const MAGIC: &[u8; 4] = b"RCIV";
 const VERSION: u32 = 1;
 const HEADER_BYTES: usize = 4 + 4 + 3 * 4 + 6 * 4;
@@ -173,10 +171,7 @@ impl IrradianceGrid {
 pub fn volume_file(assets_dir: &Path, track: &str, mirror: bool, time: TimeOfDay) -> PathBuf {
     let variant = if mirror { "mirror" } else { "normal" };
     let time = format!("{time:?}").to_lowercase();
-    assets_dir
-        .join(LIGHTING_DIR)
-        .join(track)
-        .join(format!("{variant}_{time}.irv"))
+    rc_track::map_dir(assets_dir, track).join(format!("{variant}_{time}.irv"))
 }
 
 /// Packs a linear colour into RGB9E5 (shared exponent; negatives clamp to 0).

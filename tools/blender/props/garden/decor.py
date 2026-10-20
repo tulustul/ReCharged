@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Backyard Bash decor (physics-free models, rc_render) written to
-assets/data/decor/backyard_bash.ron: the house back wall, fences and trees beyond them, long
+assets/maps/backyard_bash/decor.ron: the house back wall, fences and trees beyond them, long
 grass along the track edges and wall feet, planting on the raised beds, the hose spiral around
 the reel, stepping stones, pebbles and fallen leaves. Everything a car can bump into is a
 catalog prop instead (plan.py).
@@ -17,7 +17,7 @@ import random
 
 import plan as P
 
-OUT = os.path.join(P.ROOT, 'assets', 'data', 'decor', 'backyard_bash.ron')
+OUT = os.path.join(P.ROOT, 'assets', 'maps', 'backyard_bash', 'decor.ron')
 M = 'models/props/garden'
 
 

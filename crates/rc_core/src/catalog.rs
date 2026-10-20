@@ -337,7 +337,8 @@ pub struct TrackInfo {
     pub id: TrackId,
     /// Display name.
     pub name: String,
-    /// Environment id (`environments/<env>.ron`).
+    /// Environment kind: barrier style, ambience, menu art (the lighting itself is the map's
+    /// `maps/<id>/environment.ron`).
     pub environment: String,
     /// Indoor tracks get "outside weather" only (no grip effect).
     pub indoor: bool,

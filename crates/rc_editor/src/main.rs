@@ -1,6 +1,5 @@
 //! `rc_editor <track> [options]` (see [`USAGE`]): the track editor on
-//! `assets/data/tracks/<track>.ron`; `rc_editor new <id> --env <environment>` creates the track
-//! first. It runs the whole game ([`recharged::game`]) plus
+//! `assets/maps/<track>/`; `rc_editor new <id> --env <map>` creates the map first. It runs the whole game ([`recharged::game`]) plus
 //! [`rc_editor::EditorPlugin`]; saves, settings and records go to `<user data>/editor`, apart
 //! from the game's.
 
@@ -8,24 +7,25 @@ use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
+use rc_render::ENVIRONMENT_FILE;
 use rc_render::EnvironmentDef;
-use rc_track::{PropCatalog, RibbonStyle, TRACKS_DIR};
+use rc_track::{PropCatalog, RibbonStyle, TRACK_FILE, map_dir};
 
 const USAGE: &str = "usage: rc_editor <track> [--assets-dir <dir>] [--user-data-dir <dir>]
                  [--screenshot <png> [--screenshot-at <s>]] [--exit-after <s>]
-       rc_editor new <id> --env <environment> [--name <name>] [--style <style>] [options]
+       rc_editor new <id> --env <map> [--name <name>] [--style <style>] [options]
 
-  <track>                  track id: assets/data/tracks/<track>.ron
+  <track>                  track id: the map directory assets/maps/<track>/
   new <id>                 create a hidden track (an oval of <style>: ToyTrack, Asphalt,
-                           CarpetRunner or Invisible; default ToyTrack) in <environment>
-                           (assets/data/environments/<environment>.ron), then edit it
+                           CarpetRunner or Invisible; default ToyTrack) with a copy of <map>'s
+                           environment (assets/maps/<map>/environment.ron), then edit it
   --assets-dir <dir>       assets root (default: ./assets, then next to the executable)
   --user-data-dir <dir>    saves, settings and logs (default: the game's, + /editor)
   --screenshot <png>       save the window to <png> (at --screenshot-at seconds, default 3)
   --exit-after <s>         quit after <s> seconds of wall time
   --window <W>x<H>         fixed window size (reproducible screenshots)
   --bake                   bake the irradiance volumes (every allowed time, normal and mirror)
-                           into assets/data/lighting/<track>/, then quit
+                           into assets/maps/<track>/, then quit
   --bake-time <time>       bake one volume (morning, noon, sunset or night; normal layout), then quit
 
   Keys: F5 test drive / back to editing · Ctrl+S save · Ctrl+Z / Ctrl+Y undo / redo
@@ -102,7 +102,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
             name,
             style,
         }),
-        (true, None) => return Err("new needs --env <environment>".into()),
+        (true, None) => return Err("new needs --env <map>".into()),
         (false, _) if name.is_some() || style.is_some() => {
             return Err("--name and --style go with new".into());
         }
@@ -124,7 +124,8 @@ fn parse(args: &[String]) -> Result<Args, String> {
     })
 }
 
-/// Writes a new track's layout and catalog entry (refusing to replace an existing track).
+/// Writes a new map — its layout, a copy of the `--env` map's environment — and its catalog entry
+/// (refusing to replace an existing map).
 fn create(assets_dir: &Path, id: &str, new: &NewTrack) -> Result<(), String> {
     let valid = id
         .chars()
@@ -134,38 +135,50 @@ fn create(assets_dir: &Path, id: &str, new: &NewTrack) -> Result<(), String> {
             "track id \"{id}\": use lowercase letters, digits and _"
         ));
     }
-    let path = assets_dir.join(TRACKS_DIR).join(format!("{id}.ron"));
+    let dir = map_dir(assets_dir, id);
+    let path = dir.join(TRACK_FILE);
     if path.exists() {
         return Err(format!(
             "{} exists: edit it with rc_editor {id}",
             path.display()
         ));
     }
-    let indoor = EnvironmentDef::load(assets_dir, &new.environment)?
-        .room
-        .is_some();
+    let template = map_dir(assets_dir, &new.environment).join(ENVIRONMENT_FILE);
+    let indoor = EnvironmentDef::load_file(&template)?.room.is_some();
     let style = match &new.style {
         Some(s) => rc_editor::fields::parse::<RibbonStyle>(s)?,
         None => RibbonStyle::ToyTrack,
     };
     let track = TrackId::new(id);
     let name = new.name.clone().unwrap_or_else(|| id.replace('_', " "));
-    let doc = rc_editor::doc::new_track(&track, &name, &new.environment, indoor, style);
+    let kind = catalog_kind(assets_dir, &new.environment)?;
+    let doc = rc_editor::doc::new_track(&track, &name, &kind, indoor, style);
     rc_editor::doc::validate(&doc, &PropCatalog::load(assets_dir)?, &track)?;
     let catalog_path = assets_dir.join(CATALOG_FILE);
     let catalog = std::fs::read_to_string(&catalog_path)
         .map_err(|e| format!("{}: {e}", catalog_path.display()))?;
     let catalog = rc_editor::catalog::with_entry(&catalog, &doc.info)?;
     let header = format!("// Written by the track editor: cargo run -p rc_editor -- {id}\n");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    std::fs::copy(&template, dir.join(ENVIRONMENT_FILE))
+        .map_err(|e| format!("{}: {e}", template.display()))?;
     std::fs::write(&path, format!("{header}{}", doc.def.to_ron()?))
         .map_err(|e| format!("{}: {e}", path.display()))?;
     std::fs::write(&catalog_path, catalog)
         .map_err(|e| format!("{}: {e}", catalog_path.display()))?;
     println!(
         "created {} and its (hidden) entry in {CATALOG_FILE}",
-        path.display()
+        dir.display()
     );
     Ok(())
+}
+
+/// The environment kind (`TrackInfo.environment`) of catalog map `map`.
+fn catalog_kind(assets_dir: &Path, map: &str) -> Result<String, String> {
+    let catalog = Catalog::load(assets_dir).map_err(|e| e.to_string())?;
+    let info = catalog.track(&TrackId::new(map));
+    info.map(|t| t.environment.clone())
+        .ok_or_else(|| format!("--env {map}: not a map in {CATALOG_FILE}"))
 }
 
 fn main() -> AppExit {

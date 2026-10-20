@@ -6,7 +6,7 @@
 // `lights` (rc_render): offset (prop space, u), linear colour, lumens, range (u), spot_deg
 // (0 = point light) — the same format as street.ron.
 // Format: docs/design/rc_track.md §Props. Decorative, out-of-reach dressing lives in
-// data/decor/sofa_circuit.ron instead.
+// maps/sofa_circuit/decor.ron instead.
 (
     props: {
         // ---- hero props ------------------------------------------------------------------

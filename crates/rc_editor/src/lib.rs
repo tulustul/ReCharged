@@ -34,8 +34,10 @@ use bevy::text::EditableText;
 use bevy::window::PrimaryWindow;
 use rc_core::prelude::*;
 use rc_game::{GameCommand, RaceRequest, TrackPick};
-use rc_render::{BakedGi, BakedLight, ENVIRONMENTS_DIR, SHOWROOM_ENV};
-use rc_track::{DECOR_DIR, PropCatalog, TRACKS_DIR, Track, TrackDef, TrackDraft, decor_to_ron};
+use rc_render::{BakedGi, BakedLight};
+use rc_track::{
+    DECOR_FILE, PropCatalog, TRACK_FILE, Track, TrackDef, TrackDraft, decor_to_ron, map_dir,
+};
 pub use rc_ui::editor::{
     EditorAdd, EditorCommand, EditorCommandMsg, EditorItem, EditorOptions, EditorSelect,
     EditorSelection, EditorSet, EditorSetOptions, EditorStatus,
@@ -79,13 +81,14 @@ impl EditorPlugin {
         let info = catalog.track(&id).cloned().ok_or_else(|| {
             format!("{track} is not in {CATALOG_FILE} (new tracks: rc_editor new {track} --env …)")
         })?;
-        let mut environments: Vec<String> = std::fs::read_dir(assets_dir.join(ENVIRONMENTS_DIR))
-            .map_err(|e| format!("{ENVIRONMENTS_DIR}: {e}"))?
-            .flatten()
-            .filter_map(|e| Some(e.path().file_stem()?.to_str()?.to_owned()))
-            .filter(|env| env != SHOWROOM_ENV)
+        // Environment kinds (styles, ambience); the lighting itself is the map's environment.ron.
+        let mut environments: Vec<String> = catalog
+            .tracks
+            .iter()
+            .map(|t| t.environment.clone())
             .collect();
         environments.sort();
+        environments.dedup();
         Ok(Self {
             track: id,
             doc: Doc {
@@ -618,7 +621,7 @@ fn on_options(msg: On<EditorSetOptions>, mut editor: ResMut<Editor>) {
     }
 }
 
-/// Writes `<assets>/data/tracks/<id>.ron`, `<assets>/data/decor/<id>.ron` and (if the entry
+/// Writes `<assets>/maps/<id>/track.ron`, `<assets>/maps/<id>/decor.ron` and (if the entry
 /// changed) `catalog.ron` through temporary files, so a failed write never truncates them. What
 /// it writes must parse back. No decor and no decor file: none is created. Returns the track
 /// file and the catalog text now on disk.
@@ -627,8 +630,8 @@ fn save(assets_dir: &Path, editor: &Editor) -> Result<(PathBuf, String), String>
     let ron = editor.doc.def.to_ron()?;
     TrackDef::parse(&ron).map_err(|e| format!("the saved layout would not load: {e}"))?;
     let header = format!("// Written by the track editor: cargo run -p rc_editor -- {id}\n");
-    let path = assets_dir.join(TRACKS_DIR).join(format!("{id}.ron"));
-    let decor_path = assets_dir.join(DECOR_DIR).join(format!("{id}.ron"));
+    let dir = map_dir(assets_dir, id.as_str());
+    let (path, decor_path) = (dir.join(TRACK_FILE), dir.join(DECOR_FILE));
     write(&path, &format!("{header}{ron}"))?;
     if !editor.doc.decor.is_empty() || decor_path.exists() {
         let decor = decor_to_ron(&editor.doc.decor)?;
@@ -752,10 +755,10 @@ mod tests {
     fn save_writes_files_that_load_back_and_replace_the_old_ones() {
         let real = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
         let assets = std::env::temp_dir().join(format!("rc_editor-save-{}", std::process::id()));
-        for dir in [TRACKS_DIR, DECOR_DIR, "data"] {
-            std::fs::create_dir_all(assets.join(dir)).unwrap();
-        }
-        std::fs::write(assets.join(TRACKS_DIR).join("test_oval.ron"), "old").unwrap();
+        let dir = map_dir(&assets, "test_oval");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(assets.join("data")).unwrap();
+        std::fs::write(dir.join(TRACK_FILE), "old").unwrap();
         let plugin = EditorPlugin::load(&real, "test_oval").unwrap();
         let mut doc = plugin.doc.clone();
         doc.def.points[1].pos.x += 0.5;

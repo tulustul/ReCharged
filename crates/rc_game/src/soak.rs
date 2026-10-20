@@ -503,9 +503,8 @@ fn race_action(soak: &mut Soak, config: Option<&RaceConfig>, time_up: bool) -> O
 
 fn random_request(soak: &mut Soak, catalog: &Catalog, paths: &UserPaths) -> RaceRequest {
     let built = |t: &&TrackInfo| {
-        paths
-            .assets_dir
-            .join(format!("data/tracks/{}.ron", t.id))
+        rc_track::map_dir(&paths.assets_dir, t.id.as_str())
+            .join(rc_track::TRACK_FILE)
             .is_file()
     };
     let mut tracks: Vec<&TrackInfo> = catalog.tracks.iter().filter(built).collect();

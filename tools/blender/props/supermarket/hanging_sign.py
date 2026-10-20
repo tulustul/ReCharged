@@ -1,6 +1,6 @@
 """Hanging aisle signs (decor, art bible §3.5): double-sided AISLE n boards (6 x 3.75 u) hung on
 two wires from the 22 u ceiling over each aisle, readable from both ends; plus a CHECKOUT board.
-Physics-free (assets/data/decor/aisle_rush.ron), origin on the floor.
+Physics-free (assets/maps/aisle_rush/decor.ron), origin on the floor.
 
     blender -b -P tools/blender/props/supermarket/hanging_sign.py -- [--preview DIR] [--only 3]
 """

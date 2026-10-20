@@ -1,5 +1,5 @@
 # QA ROB-1: data load failures must show an error and return to the menu, never panic. Run with
-# --assets-dir target/qa/broken-assets (a copy of assets/ with data/tracks/toy_town.ron truncated
+# --assets-dir target/qa/broken-assets (a copy of assets/ with maps/toy_town/track.ron truncated
 # to 2000 bytes and `radius: "big"` in data/items.ron).
 wait ui
 wait screen title                  # the splash ends after its fade (frame clock)

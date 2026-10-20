@@ -27,7 +27,7 @@ props/*.ron ─────┴─ TrackDef ─ Layout(variant) ─ centreline �
 ## A2. Files
 | File | Content |
 |---|---|
-| `assets/data/tracks/<id>.ron` | one layout ([`TrackDef`](../../crates/rc_track/src/def.rs)); `<id>` is the catalog `TrackInfo.id` |
+| `assets/maps/<id>/track.ron` | one layout ([`TrackDef`](../../crates/rc_track/src/def.rs)); `<id>` is the catalog `TrackInfo.id` |
 | `assets/data/props/<environment>.ron` | prop kinds of one environment, **prefixed** with it (`toy_block_cube`, `garden_flower_pot`) |
 | `assets/data/props/common.ron` | generic props any track may use (unprefixed: `crate_small`, `tyre_stack`, `ramp_wedge`) |
 
@@ -42,7 +42,7 @@ The track editor (`cargo run -p rc_editor -- <id>`, `docs/design/rc_editor.md`) 
 point, inherited and default fields left out, floats written as `12.0`. **Comments in a
 hand-written file are not kept** — a control point's optional `label: "T1"` is the place for
 per-point notes (the editor shows it; the game ignores it). Tests round-trip every shipped track
-and decor file. The decor format (`assets/data/decor/<id>.ron`: model, pos, yaw, scale, dir) lives
+and decor file. The decor format (`assets/maps/<id>/decor.ron`: model, pos, yaw, scale, dir) lives
 in rc_track (`decor.rs`); rc_render draws it.
 
 ## A3. A minimal track, annotated

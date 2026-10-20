@@ -4,7 +4,7 @@
 //! Knockable props wear the model on their visual proxy; static props get a session-scoped model
 //! entity at their pose. Lamp props add real lights at Night (`lights` in `props/*.ron`, which
 //! rc_track ignores) and dim their `lamp*` bulb materials by day. Decorative-only models without
-//! colliders come from `assets/data/decor/<track>.ron` ([`decor`]).
+//! colliders come from `assets/maps/<track>/decor.ron` ([`decor`]).
 
 mod decor;
 mod lamps;

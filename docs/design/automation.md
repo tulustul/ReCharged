@@ -138,7 +138,7 @@ the CLI gives identical JSON across processes too (checked with three runs).
   determinism — rapier's `enhanced-determinism` is off).
 
 ## `--calibrate-medals`
-For every catalog track with a `data/tracks/<id>.ron`, each layout (forward/reverse × mirror) runs
+For every catalog track with a `maps/<id>/track.ron`, each layout (forward/reverse × mirror) runs
 headless as a Time Trial — rc_game's TT rules give 3 laps, items and catch-up off, no rivals — with
 the Phantom on autopilot (Elite), `--unlock-all`, seeds 1, 2, 3, in a private temp data dir (no
 ghosts/records reach a profile). The median time (seeds vary the AI's mistakes by ~2 %, about the

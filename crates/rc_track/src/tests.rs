@@ -22,11 +22,8 @@ fn variants(id: &str) -> [TrackVariant; 4] {
 }
 
 fn track_ids() -> Vec<String> {
-    let mut ids: Vec<String> = std::fs::read_dir(assets().join(TRACKS_DIR))
-        .expect("tracks dir")
-        .filter_map(|e| e.ok()?.path().file_stem()?.to_str().map(str::to_owned))
-        .collect();
-    ids.sort();
+    let ids = map_ids(&assets());
+    assert!(!ids.is_empty(), "no maps");
     ids
 }
 
