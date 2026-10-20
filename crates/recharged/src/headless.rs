@@ -46,7 +46,7 @@ pub fn app(mut config: AutomationConfig, paths: UserPaths) -> App {
         .insert_resource(TimeUpdateStrategy::FixedTimesteps(1))
         .insert_resource(paths)
         .insert_resource(config);
-    crate::add_sim_plugins(&mut app);
+    recharged::add_sim_plugins(&mut app);
     app.add_plugins(rc_game::GameFlowPlugin);
     app
 }

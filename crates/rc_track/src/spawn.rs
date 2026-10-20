@@ -6,11 +6,11 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use rc_core::prelude::*;
 
-use crate::LOADING_KEY;
 use crate::build::{KILL_FLOOR_DEPTH_U, variant_name};
 use crate::mesh::MeshData;
 use crate::props::{Primitive, PropDef};
 use crate::track::Track;
+use crate::{LOADING_KEY, PropCatalog, TrackDraft};
 
 /// Barrier friction (low, combined with `Min`: cars slide along walls, never stick).
 const WALL_FRICTION: f32 = 0.1;
@@ -31,16 +31,22 @@ fn groups(layer: u32) -> CollisionGroups {
     CollisionGroups::new(Group::from_bits_truncate(layer), Group::ALL)
 }
 
-/// `OnEnter(AppState::Loading)`: build the track of `RaceConfig::variant`.
+/// `OnEnter(AppState::Loading)`: build the track of `RaceConfig::variant` (from the [`TrackDraft`]
+/// when it is of that track).
 pub(crate) fn load_track(
     mut commands: Commands,
     config: Option<Res<RaceConfig>>,
     paths: Option<Res<UserPaths>>,
+    draft: Option<Res<TrackDraft>>,
     mut done: MessageWriter<LoadingDone>,
     mut failed: MessageWriter<LoadingFailed>,
 ) {
     let built = match (config, paths) {
-        (Some(config), Some(paths)) => Track::load(&paths.assets_dir, &config.variant),
+        (Some(config), Some(paths)) => match draft.filter(|d| d.id == config.variant.track) {
+            Some(draft) => PropCatalog::load(&paths.assets_dir)
+                .and_then(|props| Track::build(&draft.def, &props, &config.variant)),
+            None => Track::load(&paths.assets_dir, &config.variant),
+        },
         _ => Err("no RaceConfig or UserPaths when loading started".to_owned()),
     };
     let track = match built {

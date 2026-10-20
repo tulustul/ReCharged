@@ -1,9 +1,10 @@
 // Scripted steps for automated screenshots (`RECHARGED_UI_SCRIPT`, see rc_ui `debug.rs`):
 // `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample data for
 // screens whose data only exists after real races (`demo hud …`: the race HUD, see `hud/demo.ts`),
-// `tab <id>` is handled by tabbed screens. Navigation is scripted through the real input path
-// (`--input-script`, `docs/design/automation.md`).
-import type { AppStatus, UiCupStandings, UiResults, UiVersusScore } from "./bevy";
+// `tab <id>` is handled by tabbed screens, `editor drive` toggles a track editor test drive.
+// Navigation is scripted through the real input path (`--input-script`,
+// `docs/design/automation.md`).
+import { bevy, type AppStatus, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
 import { useDebug } from "./hooks";
 import { demoHud, endHudDemo } from "./hud/demo";
 import { resetTo, type Route } from "./nav/routes";
@@ -115,6 +116,9 @@ function setup(mode: "quickRace" | "timeTrial" | "versus" | "championship") {
 }
 
 export function useDebugRoutes() {
+  useDebug("editor", (command) => {
+    if (command === "drive") bevy.editor.drive(null);
+  });
   useDebug("go", (arg) => {
     const [route, mode] = arg.split(" ") as [Route, MenuMode | undefined];
     if (mode) draft.update((d) => ({ ...d, mode }));

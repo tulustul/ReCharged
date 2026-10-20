@@ -40,6 +40,14 @@ pub enum Dir {
     Rev,
 }
 
+fn is_both(dir: &Dir) -> bool {
+    *dir == Dir::Both
+}
+
+fn is_zero(value: &f32) -> bool {
+    *value == 0.0
+}
+
 impl Dir {
     /// Whether the feature exists when the layout is driven `reverse`.
     pub fn active(self, reverse: bool) -> bool {
@@ -86,22 +94,22 @@ pub struct ControlPoint {
     /// Centreline position (world u).
     pub pos: Vec3,
     /// Racing width (u, ≥ 5; < 8 is a chokepoint). Inherited.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<f32>,
     /// Bank in degrees; positive raises the **left** edge (for right-hand turns). Not inherited.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub bank_deg: f32,
     /// Ribbon surface from this point to the next. Inherited.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surface: Option<SurfaceKind>,
     /// Barrier on the left edge from this point to the next. Inherited.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wall_left: Option<bool>,
     /// Barrier on the right edge from this point to the next. Inherited.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wall_right: Option<bool>,
     /// Off-track tolerance beyond the edge from this point to the next (u, GDD §5.4). Inherited.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offroad_margin: Option<f32>,
 }
 
@@ -116,7 +124,7 @@ pub struct Gap {
     /// Control point where the landing starts (forward order).
     pub to: usize,
     /// Layouts with the gap (the jump direction).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_both")]
     pub dir: Dir,
 }
 
@@ -132,7 +140,7 @@ pub struct Ground {
     /// Simple polygon outline, world (x, z), either winding, ≥ 3 points.
     pub points: Vec<Vec2>,
     /// Layouts with this area.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_both")]
     pub dir: Dir,
 }
 
@@ -150,7 +158,7 @@ pub struct ItemRowDef {
     #[serde(default = "default_row_count")]
     pub count: u8,
     /// Layouts with the row.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_both")]
     pub dir: Dir,
 }
 
@@ -163,10 +171,10 @@ pub struct PropPlacement {
     /// Ground-contact centre (u).
     pub pos: Vec3,
     /// Rotation about +Y in degrees (0 = the prop's front faces −Z).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub yaw: f32,
     /// Layouts with the prop.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_both")]
     pub dir: Dir,
 }
 
@@ -185,7 +193,7 @@ pub struct ShortcutDef {
     #[serde(default = "default_shortcut_width")]
     pub width: f32,
     /// Layouts with the shortcut.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_both")]
     pub dir: Dir,
 }
 
@@ -251,10 +259,10 @@ pub struct TrackDef {
     #[serde(default)]
     pub shortcuts: Vec<ShortcutDef>,
     /// The Golden Battery (forward layouts).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub golden_battery: Option<GoldenBatteryDef>,
     /// World bounds; `None` = the content's bounding box plus a margin.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounds: Option<BoundsDef>,
 }
 
@@ -273,6 +281,66 @@ impl TrackDef {
     pub fn load(assets_dir: &Path, id: &str) -> Result<Self, String> {
         let path = assets_dir.join(TRACKS_DIR).join(format!("{id}.ron"));
         Self::parse(&read(&path)?).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// Track RON in the shipped files' shape, which [`Self::parse`] reads back: one line per
+    /// top-level field and per list entry (control points end with `// <index>`); empty lists and
+    /// inherited or default fields are left out. Comments of a hand-written file are not kept.
+    pub fn to_ron(&self) -> Result<String, String> {
+        fn value<T: Serialize>(v: &T) -> Result<String, String> {
+            let pretty = ron::ser::PrettyConfig::new()
+                .compact_structs(true)
+                .compact_arrays(true);
+            ron_options()
+                .to_string_pretty(v, pretty)
+                .map_err(|e| e.to_string())
+        }
+        fn list<T: Serialize>(
+            out: &mut String,
+            name: &str,
+            items: &[T],
+            index: bool,
+        ) -> Result<(), String> {
+            if items.is_empty() {
+                return Ok(());
+            }
+            out.push_str(&format!("    {name}: [\n"));
+            for (i, item) in items.iter().enumerate() {
+                let note = if index {
+                    format!(" // {i}")
+                } else {
+                    String::new()
+                };
+                out.push_str(&format!("        {},{note}\n", value(item)?));
+            }
+            out.push_str("    ],\n");
+            Ok(())
+        }
+        let mut out = String::from("(\n");
+        out.push_str(&format!("    style: {},\n", value(&self.style)?));
+        out.push_str(&format!("    start: {},\n", self.start));
+        out.push_str(&format!(
+            "    kill_height: {},\n",
+            value(&self.kill_height)?
+        ));
+        out.push_str(&format!(
+            "    wall_height: {},\n",
+            value(&self.wall_height)?
+        ));
+        if let Some(bounds) = &self.bounds {
+            out.push_str(&format!("    bounds: {},\n", value(bounds)?));
+        }
+        list(&mut out, "points", &self.points, true)?;
+        list(&mut out, "gaps", &self.gaps, false)?;
+        list(&mut out, "ground", &self.ground, false)?;
+        list(&mut out, "item_rows", &self.item_rows, false)?;
+        list(&mut out, "props", &self.props, false)?;
+        list(&mut out, "shortcuts", &self.shortcuts, false)?;
+        if let Some(battery) = &self.golden_battery {
+            out.push_str(&format!("    golden_battery: {},\n", value(battery)?));
+        }
+        out.push_str(")\n");
+        Ok(out)
     }
 
     /// Parses and validates track RON.

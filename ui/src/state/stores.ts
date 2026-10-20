@@ -3,6 +3,7 @@
 import type {
   AppInfo,
   AppStatus,
+  EditorStatus,
   UiBindings,
   UiCatalog,
   UiDeviceKind,
@@ -31,4 +32,6 @@ export const loadingProgress = store<number>("loadingProgress", 0);
 /** Glyph device per player slot (the last device that player used). */
 export const devices = store<UiDeviceKind[]>("devices", ["keyboardA", "keyboardA", "keyboardA", "keyboardA"]);
 /** Scripted demo scenes (debug.ts) own the session data: snapshots must not overwrite them. */
+/** The track editor's status (`null` in the game). */
+export const editor = store<EditorStatus | null>("editor", null);
 export const demoMode = store<boolean>("demoMode", false);

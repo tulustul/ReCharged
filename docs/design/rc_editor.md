@@ -1,35 +1,49 @@
 # rc_editor — track editor (design note, proposal)
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
-lighting. Status: **agreed scope, not started.**
+lighting. Status: **P1 done** (open, fly, test drive, save); P2–P4 to do.
+
+```sh
+npm --prefix ui run build                 # the editor uses the game's React bundle
+cargo run -p rc_editor -- toy_town        # F5 drive / back · Ctrl+S save · RMB look · WASD · Q/E
+```
+Saves, settings and records of test drives go to `<game user data>/editor` (`--user-data-dir`
+overrides). Automation as in the game: `--screenshot <png> [--screenshot-at <s>]`,
+`--exit-after <s>`, and `RECHARGED_UI_SCRIPT="8 editor drive; 20 editor drive"` toggles test drives
+through the real React channel.
 
 ## Decisions
 | # | Decision | Consequence |
 |---|---|---|
 | D1 | **The editor is the source of truth** for track layouts | `tracks/<id>.ron` and `decor/<id>.ron` become editor-owned. The `plan.py` track sections are retired one track at a time (§Migration). Blender scripts keep building prop models and catalogs. |
-| D2 | **UI in bevy-react** | Second bundle `ui/dist/editor.js` reusing `ui/src/components` and `theme`. TS types via ts-rs. |
+| D2 | **UI in bevy-react** | The game's bundle: `App` shows `ui/src/editor/` while `editor.status` says editing (the game answers `editor.snapshot` with `null`); test drives show the game's race UI. Channels in rc_ui (`editor.rs`), handled by rc_editor. |
 | D3 | **Irradiance volumes only; no lightmaps** (maybe later) | Bake indirect diffuse into one `IrradianceVolume` per track variant × time of day. Direct light stays real-time. |
 | D4 | **No geometry or draw-call "compile" step** | The QA bench is well inside budget (1P 185–204 fps, 4P ≈ 105 fps at High, RTX 3070). Revisit only if a measurement says so (e.g. Iris Xe). |
 
 ## Architecture
 ```
-crates/recharged      lib: game app assembly (moved out of main.rs) ─┬─ bin recharged (game, as today)
-                                                                      └─ bin rc_editor  (+ EditorPlugin)
-crates/rc_editor      EditorPlugin: editing session, tools, undo, save, test drive, bake
-ui/src/editor/        React editor UI → ui/dist/editor.js
+crates/recharged      lib.rs: the game app (`recharged::game`) ── main.rs: the game binary
+crates/rc_editor      lib.rs: EditorPlugin ── main.rs: `rc_editor <track>` = recharged::game + EditorPlugin
+crates/rc_ui          editor.rs: `editor.status` / `editor.snapshot` / `editor.save` / `editor.drive`
+ui/src/editor/        EditorLayer (same bundle as the game)
 ```
-- **The game, unchanged, renders the edited track.** Editing runs a normal track session
-  (`Loading` → `InRace`) with no racers, the race clock held, and an editor fly camera with an
-  orthographic top-down toggle. The room shell, props, decor, ground, lighting and weather all
+- **The game, unchanged, renders the edited track.** On `OnEnter(Menu)` the editor starts a Quick
+  Race (no AI) on the track; while editing, `SimSet::Race` (rc_race's phase driver) does not run,
+  so the session stays in `RacePhase::Setup`: track, props, lighting, no cars. The editor writes
+  the `GameCamera`'s transform (rc_camera holds its pose without a racer). *(P2: an orthographic
+  top-down toggle.)* The room shell, props, decor, ground, lighting and weather all
   come from the existing plugins, so nothing is duplicated.
-- **In-memory overrides.** `rc_track` and rc_render's decor loader read an optional
-  `TrackDefOverride` / `DecorOverride` resource before falling back to the file. The editor sets
-  them, so test drives and rebuilds use unsaved edits. Disk is written only on save.
+- **In-memory layout.** rc_track builds the `TrackDraft` resource instead of the file when the
+  session's track has its id, so test drives and rebuilds use unsaved edits; disk is written only
+  on save (temporary file + rename). *(P2: the same for rc_render's decor file once decor is
+  editable.)*
 - **Rebuild on commit, preview while dragging.** A finished edit (mouse release, field change)
   reloads the session: Unloading → Loading takes about 0.25 s. While dragging, the editor draws
   the centreline and edges with gizmos from rc_track's pure spline code.
-- **Test drive:** F5 puts the player's car on the grid (the `--quick-race` path with the override)
-  in the chosen variant, time and weather. Esc returns to editing at the same camera position.
+- **Test drive:** F5 lifts the hold (Setup → Intro → Countdown → Racing with the player's car);
+  F5 again sends `Restart` (→ Setup, no reload) and editing resumes at the same camera position.
+  The pause menu works as in the game; "Quit to menu" reopens the editing session. *(P2: pick the
+  variant, time and weather; skip the intro.)*
 - **Undo:** a stack of `(TrackDef, DecorDef)` snapshots, one per committed edit. The defs are
   small, so no command pattern.
 
@@ -101,10 +115,12 @@ spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 
 | P4 Bake | baker, `.irv` loader, weather scaling | Sofa Circuit baked; visible occlusion under furniture; bench within budget on the 3070 **and** runs on the Iris Xe |
 
 ## Risks / to verify first
-- **A session with zero racers:** check rc_race, rc_camera, rc_ai and the HUD tolerate it. The
-  fallback is one parked, hidden racer.
-- **bevy-react with two bundles from one `ui/`:** check that `bevy-react build` supports a second
-  entry. Otherwise use a second package dir.
+- ~~A session with zero racers~~ — not needed: editing holds `RacePhase::Setup`, where no attempt
+  entities exist (`tests/session.rs`).
+- ~~Two bundles~~ — not needed: `bevy-react build` has a fixed entry; one bundle serves both.
+- **A load failure** stops the editor from restarting the session (it would loop through the
+  menu); the error shows in the editor. P2 must build edits with `Track::build` before sending a
+  draft, so a bad edit is rejected in the editor instead.
 - **Bake time:** ~50 k probes × 6 views. Bevy renders shadow cascades per view, so measure on one
   track before committing to 2 u spacing. The budget is ≤ 10 min per track (8 volumes) on the
   3070.

@@ -8,6 +8,7 @@ import { Button } from "./components/Button";
 import { DialogHost } from "./components/Dialog";
 import { ToastHost } from "./components/Toast";
 import { useDebugRoutes } from "./debug";
+import { EditorLayer } from "./editor/EditorLayer";
 import { SplitContext } from "./hooks";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ScreenName, useNav } from "./nav/input";
@@ -29,7 +30,7 @@ import { Splash } from "./screens/Splash";
 import { Title } from "./screens/Title";
 import { TrackSelect } from "./screens/TrackSelect";
 import { Feeds } from "./state/Feeds";
-import { appState, session } from "./state/stores";
+import { appState, editor, session } from "./state/stores";
 import { useStore } from "./state/useStore";
 import { appStrings } from "./strings/app";
 import { hint } from "./strings/common";
@@ -62,6 +63,16 @@ export function App() {
 
 function Main() {
   const status = useStore(appState);
+  const editing = useStore(editor);
+  // The track editor has no menus: its own screen everywhere but loading and test drives.
+  if (editing && !editing.driving && status?.state !== "loading") {
+    return (
+      <>
+        <ScreenName name="editor" />
+        <EditorLayer status={editing} />
+      </>
+    );
+  }
   switch (status?.state) {
     case "loading":
       return (

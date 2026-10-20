@@ -599,3 +599,13 @@ fn print_corners() {
         }
     }
 }
+
+#[test]
+fn every_track_file_survives_a_save() {
+    for id in track_ids() {
+        let def = TrackDef::load(&assets(), &id).expect("loads");
+        let saved = def.to_ron().expect("serializes");
+        let back = TrackDef::parse(&saved).unwrap_or_else(|e| panic!("{id}: {e}\n{saved}"));
+        assert_eq!(back, def, "{id}");
+    }
+}

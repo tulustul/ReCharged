@@ -133,6 +133,33 @@ export type DropPlayer = {
  * Slot 0–3.
  */
 slot: number, };
+export type EditorDrive = null;
+export type EditorSave = null;
+export type EditorStatus = { 
+/**
+ * Track id (file stem).
+ */
+track: string, 
+/**
+ * Display name from the catalog.
+ */
+name: string, 
+/**
+ * The layout differs from the file.
+ */
+dirty: boolean, 
+/**
+ * Test driving (the game's race UI is up) instead of editing.
+ */
+driving: boolean, 
+/**
+ * The last failure (load, save), if any.
+ */
+error: string | null, 
+/**
+ * Build warnings of the session's track.
+ */
+lints: Array<string>, };
 export type GamepadAxisChange = { gamepad: number, axis: GamepadAxisName, value: number, };
 export type GamepadAxisName = "leftStickX" | "leftStickY" | "leftZ" | "rightStickX" | "rightStickY" | "rightZ" | { "other": number };
 export type GamepadButtonChange = { gamepad: number, button: GamepadButtonName, 
@@ -1701,6 +1728,8 @@ export type WindowSize = { width: number, height: number, };
 /** Every `emit` name and the payload type it carries. */
 export interface ReactMessages {
   "app.quit": AppQuit;
+  "editor.drive": EditorDrive;
+  "editor.save": EditorSave;
   "gamepad.rumble": GamepadRumble;
   "gamepad.stopRumble": GamepadStopRumble;
   "hud.bind": BindHud;
@@ -1734,6 +1763,7 @@ export interface ReactRequests {
   "app.snapshot": { request: null; response: AppStatus };
   "bindings.get": { request: null; response: UiBindings };
   "catalog.get": { request: null; response: UiCatalog };
+  "editor.snapshot": { request: null; response: EditorStatus | null };
   "gamepad.getAll": { request: null; response: Array<GamepadConnectedData> };
   "lobby.snapshot": { request: null; response: UiLobby };
   "profile.get": { request: null; response: UiProfile };
@@ -1749,6 +1779,7 @@ export interface ReactEvents {
   "bindings.changed": UiBindings;
   "cup.standings": UiCupStandings;
   "debug.act": DebugAct;
+  "editor.status": EditorStatus;
   gamepadConnected: GamepadConnected;
   gamepadDisconnected: GamepadDisconnected;
   gamepadInput: GamepadInputEvent;
@@ -2022,6 +2053,11 @@ export const bevy = {
   },
   catalog: {
     get(): Promise<UiCatalog> { return request("catalog.get", null); },
+  },
+  editor: {
+    drive(value: EditorDrive): void { emit("editor.drive", value); },
+    save(value: EditorSave): void { emit("editor.save", value); },
+    snapshot(): Promise<EditorStatus | null> { return request("editor.snapshot", null); },
   },
   gamepad: {
     getAll(): Promise<Array<GamepadConnectedData>> { return request("gamepad.getAll", null); },

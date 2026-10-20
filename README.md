@@ -42,6 +42,9 @@ cd ui && npm install && npm run build && cd ..
 
 # 2. The game
 cargo run -p recharged
+
+# Or the track editor on one track (F5 test drive, Ctrl+S save; docs/design/rc_editor.md)
+cargo run -p rc_editor -- toy_town
 ```
 Run from the repository root. Saves, settings and logs go to your OS config dir
 (`~/.config/recharged` on Linux); pass `--user-data-dir <path>` to keep them elsewhere.
@@ -97,7 +100,8 @@ crates/
   rc_game      game flow, modes, progression, saves
   rc_ui        bevy-react bridge (typed channels, HUD data)
   rc_testkit   headless test harness
-  recharged    the binary
+  recharged    the game binary (and its app assembly, shared with the editor)
+  rc_editor    the track editor binary
 ui/            React/TypeScript UI (bevy-react)
 assets/        data (RON), models, textures, audio, fonts
 tools/         asset generators: Blender (cars, props), Python (SFX, music, textures)

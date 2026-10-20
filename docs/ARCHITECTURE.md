@@ -56,7 +56,8 @@ bevy-volt/
 │  ├─ rc_ui/                  F2  bevy-react bridge: typed channels per namespace, HUD data push, bindings export
 │  ├─ rc_testkit/             T   headless app builders + helpers for integration tests (used only from `tests/`)
 │  ├─ rc_pins/                —   build hygiene only: pins third-party features so per-crate builds reuse one Bevy build (no code)
-│  └─ recharged/              BIN main.rs: assembles plugins, CLI flags (automation, capture, bench, bindings export)
+│  ├─ recharged/              BIN lib.rs: app assembly (`game`); main.rs: CLI flags (automation, capture, bench, bindings export)
+│  └─ rc_editor/              BIN track editor: editing session on the game's race session, fly camera, test drives, save (docs/design/rc_editor.md)
 ├─ ui/                        React app (npm package; bundles → ui/dist/{vendor,app}.js)
 ├─ assets/                    data/ models/ textures/ audio/ fonts/ ui/   (all runtime content)
 ├─ tools/                     blender/ audio/ textures/ … asset generators (Python/Blender scripts)
@@ -65,8 +66,8 @@ bevy-volt/
 
 ### 2.1 Dependency rules
 Layers: **L0** core → **L1** foundation sim → **L2** gameplay sim → **P** presentation →
-**F1** flow → **F2** UI bridge → **BIN**. A crate may depend only on crates in lower layers and
-only on those listed:
+**F1** flow → **F2** UI bridge → **BIN** (the game, then the editor on top of it). A crate may
+depend only on crates in lower layers and only on those listed:
 
 | Crate | May depend on (workspace) | External |
 |---|---|---|
@@ -86,6 +87,7 @@ only on those listed:
 | rc_ui | rc_core, rc_game | bevy-react (+ serde, ts-rs as its macros require) |
 | rc_testkit | rc_core, L1, L2 crates | bevy_rapier3d |
 | recharged | everything | bevy-react |
+| rc_editor | rc_core, rc_track, rc_game, rc_ui, recharged (lib) | bevy-react |
 
 - Sim crates (L0–L2) never depend on presentation or flow crates.
 - Same-layer crates do not depend on each other; they share data via `rc_core`.
@@ -348,6 +350,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `RaceStatus { phase_ticks, race_ticks, countdown, total_laps, leader_lap, ends_in, attempt }` | race | ui, audio, camera |
 | `Standings(Vec<Entity>)` | race | ui, items (odds), ai |
 | `RaceResults { entries, ghost: Option<GhostData>, geometry_hash }` | race (on finish) | game, ui |
+| `TrackDraft { id, def: TrackDef }` (editor only: the session builds it instead of the track file) | editor | track |
 | `TrackSummary { outline_2d, edges_2d, gates_2d, turns: Vec<TrackTurn { start_s, span, right, angle, severity }>, length, checkpoints, geometry_hash }` | track | ui (minimap, turn indicator), game (records) |
 | `WeatherState { kind, time, precipitation, wetness, snow_cover, wind, fog, cloudiness, lightning, outside_only }` | weather | vehicle, render, vfx, audio, ui |
 | `LocalPlayers { slots: Vec<SlotBinding { slot, devices, last_used: DeviceKind }> }` | input | game, ui, camera |

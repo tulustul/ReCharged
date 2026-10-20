@@ -1,8 +1,8 @@
 //! # rc_ui — the bevy-react bridge (F2)
 //!
 //! - **Responsibilities:** every typed React channel, one module per namespace (`app`, `ui`,
-//!   `input`, `menu`, `profile`, `records`, `settings`, `lobby`, `race`, `results`, `hud`; shared
-//!   types in `content`), mapping React messages to `GameCommand`s and rc_core messages and
+//!   `editor`, `input`, `menu`, `profile`, `records`, `settings`, `lobby`, `race`, `results`,
+//!   `hud`; shared types in `content`), mapping React messages to `GameCommand`s and rc_core messages and
 //!   pushing state to React;
 //!   [`register_bindings`], shared by the app and the TypeScript exporter ([`export_bindings`]);
 //!   the UI fonts ([`with_fonts`]); `UiScale` (menus are authored at [`DESIGN_SIZE`] UI px and
@@ -63,6 +63,7 @@ macro_rules! mirror_enum {
 pub mod app;
 pub mod content;
 pub mod debug;
+pub mod editor;
 pub mod filters;
 pub mod hud;
 pub mod input;
@@ -112,6 +113,7 @@ impl Plugin for GameUiPlugin {
                     race::push_loading,
                     results::push_results,
                     results::push_series,
+                    editor::push_status,
                 )
                     .in_set(UiSet),
             );
@@ -130,6 +132,7 @@ pub fn with_fonts(plugin: ReactUiPlugin) -> ReactUiPlugin {
 pub fn register_bindings(app: &mut App) {
     app::register(app);
     debug::register(app);
+    editor::register(app);
     filters::register(app);
     hud::register(app);
     input::register(app);

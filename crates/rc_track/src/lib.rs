@@ -5,7 +5,8 @@
 //!   ([`TrackGeometry`]) → checkpoints, respawn points, grid, item rows, racing line & speed
 //!   profile, ground areas, props (`assets/data/props/*.ron`, [`PropCatalog`]); the [`Track`]
 //!   query resource; session colliders; resetting dynamic props in `OnEnter(RacePhase::Setup)`.
-//! - **Inputs:** `RaceConfig::variant`, `UserPaths::assets_dir`, the session lifecycle states.
+//! - **Inputs:** `RaceConfig::variant`, `UserPaths::assets_dir`, [`TrackDraft`] (rc_editor), the
+//!   session lifecycle states.
 //! - **Outputs:** [`Track`], `TrackSummary`, session-scoped collider entities (`TrackPiece`,
 //!   `Surface`, `Prop` + `Interpolated` for dynamic props) on rc_core collision layers,
 //!   `Teleported` (prop resets), `LoadingDone("track")` / `LoadingFailed`.
@@ -49,6 +50,16 @@ pub use racing::{LINE_MARGIN_U, LOCKED_OFFSET_U, SpeedModel};
 pub use spline::{MIN_UP_Y, SAMPLE_SPACING_U};
 pub use track::*;
 pub use turns::{MERGE_U, MIN_ANGLE_DEG, MIN_TURN_RATE, SMOOTH_U};
+
+/// A layout the session builds instead of `data/tracks/<id>.ron` when it races track `id`: the
+/// track editor's unsaved edits (written only by rc_editor; the game never has one).
+#[derive(Resource, Debug, Clone, PartialEq)]
+pub struct TrackDraft {
+    /// Track it stands in for.
+    pub id: TrackId,
+    /// The layout.
+    pub def: TrackDef,
+}
 
 /// Loading-gate key of this crate.
 pub const LOADING_KEY: &str = "track";

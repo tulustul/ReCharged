@@ -37,6 +37,11 @@ environment owns one props file, so parallel work never collides.
 Data files use RON with `implicit_some`: write `width: 12`, not `width: Some(12)`. Unknown fields
 in track files are errors (typos are caught); integers are fine for floats (`(0, 0.3, 10)`).
 
+The track editor (`cargo run -p rc_editor -- <id>`, `docs/design/rc_editor.md`) saves through
+`TrackDef::to_ron`: one line per list entry, `// <index>` after each control point, inherited and
+default fields left out, floats written as `12.0`. **Comments in a hand-written file are not kept**
+(a test round-trips every shipped track through it).
+
 ## A3. A minimal track, annotated
 ```ron
 (

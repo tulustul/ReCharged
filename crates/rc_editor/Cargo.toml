@@ -1,0 +1,30 @@
+[package]
+name = "rc_editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rc_core.workspace = true
+rc_track.workspace = true
+rc_game.workspace = true
+rc_ui.workspace = true
+recharged = { path = "../recharged" }
+bevy.workspace = true
+bevy-react.workspace = true
+
+[dev-dependencies]
+rc_testkit.workspace = true
+rc_vehicle.workspace = true
+rc_weather.workspace = true
+rc_race.workspace = true
+rc_ai.workspace = true
+rc_items.workspace = true
+
+[features]
+# Faster incremental dev builds + asset hot reload: `cargo run -p rc_editor --features dev -- <track>`.
+dev = ["recharged/dev"]
