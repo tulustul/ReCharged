@@ -2,9 +2,8 @@
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
 lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
-editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout), P6 (select & gizmo),
-P7 (incremental rebuilds), P8 (asset library) and P9 (lighting) done** (§Editor v2): settings
-(P10) to come.
+editor-owned; irradiance bake). **v2 (P5–P10) done** (§Editor v2): layout, select & gizmo,
+incremental rebuilds, asset library, lighting, the game's settings.
 Only Toy Town is baked so far (§Irradiance bake).
 
 ```sh
@@ -32,8 +31,9 @@ path points) show only in the Track tab:
 
 While a drag is live, Ctrl+Z/Y, Delete, F5 and a tab switch cancel it first.
 
-Saves, settings and records of test drives go to `<game user data>/editor` (`--user-data-dir`
-overrides; v2 reads settings from the game instead, D10). Automation as in the game:
+Saves and records of test drives go to `<game user data>/editor` (`--user-data-dir <dir>`
+overrides: everything in `<dir>`); settings are read, never written, from the game's
+`settings.ron` (`<dir>/settings.ron` with the flag; D10). Automation as in the game:
 `--screenshot <png> [--screenshot-at <s>]`, `--exit-after <s>`, and `RECHARGED_UI_SCRIPT` with
 `editor <command>` (`drive`, `undo`, `topView`, `cancel`, …), `editor select <kind> <index>`,
 `editor tab <assets|track|lighting>`, `editor gizmo <move|rotate|scale>` and
@@ -602,7 +602,7 @@ an art call. Other times of day and the mirror layout are not baked.
 | P7 Incremental (done) | `TrackPreview` for point drags, track key + per-source diffs, `RoomPiece` rebuild, `TrackSummary` re-insert, no `ChangeTrack` per edit, both equivalence tests | both tests pass; a point drag updates the road visibly while dragging on the Iris Xe; no session reload on any edit outside the reload list |
 | P8 Library (done) | `library.rs`, `editor.library`, categories + search, placement mode with ghost (+ `editor place` verb), swap | build a lap of Toy Town's decor from the library without typing a model path |
 | P9 Lighting (done) | `environment.ron` in the `Doc` (+ `to_ron`, save, undo), `EnvironmentDraft`, light objects + sun/fill markers, Lighting tab's time look, bake-stale flags; mirrored environment lights (game fix) | add a spot light, aim it, change noon's sun and exposure, undo it all, save, reopen: identical |
-| P10 Settings | `rc_game::read_settings`, inserted before Boot | the editor renders at the player's preset; the file is untouched after an editor run |
+| P10 Settings | `rc_game::read_settings`, inserted before Boot | the editor renders at the player's preset; the file is untouched after an editor run (done: `reading_settings_never_touches_the_file`; checked by a run against a scratch dir) |
 
 ## Risks / to verify first
 - ~~A session with zero racers~~ — not needed: editing holds `RacePhase::Setup`, where no attempt

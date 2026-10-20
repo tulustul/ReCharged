@@ -44,7 +44,8 @@ pub use profile::{unlock_rule, variant_key};
 pub use records::NextMedal;
 pub use results::RaceOutcome;
 pub use save::{
-    GHOSTS_DIR, KEPT_LOGS, LOGS_DIR, PROFILE_FILE, SAVE_VERSION, SETTINGS_FILE, session_log_layer,
+    GHOSTS_DIR, KEPT_LOGS, LOGS_DIR, PROFILE_FILE, SAVE_VERSION, SETTINGS_FILE, read_settings,
+    session_log_layer,
 };
 pub use series::{CupRun, POINTS, RacerKey, Series, Standing, VersusSession, points_for};
 

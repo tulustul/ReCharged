@@ -139,6 +139,28 @@ pub(crate) fn save<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     write_atomic(path, &to_versioned(value)).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// The settings in `path`, sanitized, without ever changing the file (unlike the game's load,
+/// which renames a corrupt file aside): for tools that borrow the player's settings (the track
+/// editor). Missing → defaults; unreadable or unparsable → defaults and the error.
+pub fn read_settings(path: &Path) -> (Settings, Option<String>) {
+    let (mut settings, error) = match fs::read_to_string(path) {
+        Ok(text) => match parse_versioned(&text) {
+            Ok(settings) => (settings, None),
+            Err(e) => (
+                Settings::default(),
+                Some(format!("{}: {e}", path.display())),
+            ),
+        },
+        Err(e) if e.kind() == io::ErrorKind::NotFound => (Settings::default(), None),
+        Err(e) => (
+            Settings::default(),
+            Some(format!("{}: {e}", path.display())),
+        ),
+    };
+    crate::prefs::sanitize(&mut settings);
+    (settings, error)
+}
+
 /// `ghosts/<key>.ghost` in `data_dir`.
 pub(crate) fn ghost_path(data_dir: &Path, key: &str) -> PathBuf {
     data_dir.join(GHOSTS_DIR).join(format!("{key}.ghost"))
@@ -331,6 +353,25 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("rc_game-save-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         dir
+    }
+
+    #[test]
+    fn reading_settings_never_touches_the_file() {
+        let dir = temp_dir("read-settings");
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(SETTINGS_FILE);
+        assert_eq!(read_settings(&path), (Settings::default(), None));
+        let mut wide = Settings::default();
+        wide.graphics.fov_deg = 90.0;
+        save(&path, &wide).unwrap();
+        assert_eq!(read_settings(&path).0.graphics.fov_deg, 90.0);
+        fs::write(&path, "garbage").unwrap();
+        let (settings, error) = read_settings(&path);
+        assert_eq!(settings, Settings::default());
+        assert!(error.is_some());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "garbage");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1, "no backup made");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

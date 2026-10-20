@@ -196,6 +196,9 @@ fn main() -> AppExit {
         }
     };
     let mut paths = UserPaths::resolve(args.assets_dir.as_deref(), args.user_data_dir.as_deref());
+    // The player's settings, read-only: the editor's own saves stay in `editor/`.
+    let (settings, settings_error) =
+        rc_game::read_settings(&paths.data_dir.join(rc_game::SETTINGS_FILE));
     if args.user_data_dir.is_none() {
         paths.data_dir = paths.data_dir.join("editor");
     }
@@ -231,6 +234,10 @@ fn main() -> AppExit {
     // The light baker reads meshes, materials and textures on the CPU.
     rc_render::keep_cpu_copies();
     let mut app = recharged::game(config, paths, bundle);
+    if let Some(e) = settings_error {
+        warn!("settings: {e}; using defaults");
+    }
+    app.insert_resource(settings); // boot_saves keeps a `Settings` that is already there
     if let Some(time) = args.bake {
         rc_editor::bake_on_start(&mut app, time);
     }
