@@ -105,7 +105,7 @@ impl<T: Serialize + DeserializeOwned> Pick for OptPick<'_, T> {
     }
 }
 
-/// A string out of a list (prop kinds, environments).
+/// A string out of a list (environments).
 struct StringPick<'a> {
     value: &'a mut String,
     options: Vec<String>,
@@ -147,11 +147,10 @@ impl<T: Serialize + DeserializeOwned> RonText for &mut T {
     }
 }
 
-/// What fields choose from besides fixed enums.
+/// What fields choose from besides fixed enums (a prop's kind and a decor item's model are not
+/// fields: they swap through the library).
 #[derive(Debug, Clone, Default)]
 pub struct Choices {
-    /// Prop kinds.
-    pub kinds: Vec<String>,
     /// Environment ids.
     pub environments: Vec<String>,
 }
@@ -337,14 +336,9 @@ fn slots<'a>(
         }
         EditorItem::Prop { index } => {
             let p = &mut doc.def.props[i(index)];
-            let kind = StringPick {
-                value: &mut p.kind,
-                options: choices.kinds.clone(),
-            };
             (
                 format!("Prop {index}"),
                 vec![
-                    ("kind", Slot::Pick(Box::new(kind))),
                     ("pos", Slot::V3(&mut p.pos)),
                     ("yaw", Slot::Num(&mut p.yaw)),
                     ("dir", pick(&mut p.dir, &DIRS)),
@@ -389,7 +383,6 @@ fn slots<'a>(
             (
                 format!("Decor {index}"),
                 vec![
-                    ("model", Slot::Text(&mut d.model)),
                     ("pos", Slot::V3(&mut d.pos)),
                     ("rot", Slot::V3(&mut d.rot)),
                     ("scale", Slot::V3(&mut d.scale)),
@@ -624,7 +617,6 @@ mod tests {
 
     fn choices() -> Choices {
         Choices {
-            kinds: vec!["crate_small".into()],
             environments: vec!["toy_store".into()],
         }
     }
@@ -661,12 +653,12 @@ mod tests {
     fn choices_reject_unknown_names_and_bounds_switch_on_with_corners() {
         let mut doc = oval();
         let kinds = choices();
-        let prop = EditorItem::Prop { index: 0 };
         let bogus = Some(FieldValue::Choice {
             value: "nope".into(),
             options: Vec::new(),
         });
-        assert!(set_field(&mut doc, prop, "kind", bogus, &kinds, None).is_err());
+        let track = EditorItem::Track;
+        assert!(set_field(&mut doc, track, "environment", bogus, &kinds, None).is_err());
         let on = Some(FieldValue::Toggle { value: true });
         set_field(&mut doc, EditorItem::Track, "bounds", on, &kinds, None).unwrap();
         assert!(doc.def.bounds.is_some());

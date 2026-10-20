@@ -102,7 +102,67 @@ pub struct EditorSelection {
     pub title: String,
     /// Its fields, in file order.
     pub fields: Vec<EditorField>,
+    /// The library asset it shows (props and decor: what a swap replaces).
+    pub asset: Option<EditorAsset>,
 }
+
+/// A library asset: what placing adds and swapping puts in place of the selection.
+#[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum EditorAsset {
+    /// A prop kind (`assets/data/props/*.ron`).
+    Prop {
+        /// The kind's id.
+        id: String,
+    },
+    /// A decorative model.
+    Decor {
+        /// glb path under the assets root (`models/props/toy/sign.glb`).
+        model: String,
+    },
+    /// An item pickup row.
+    ItemRow,
+    /// The Golden Battery (one per track).
+    Battery,
+}
+
+/// One entry of the asset library.
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LibraryEntry {
+    /// Shown name ("Toy block cube").
+    pub name: String,
+    /// What it places.
+    pub asset: EditorAsset,
+}
+
+/// A group of the asset library ("Props · toy").
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LibraryGroup {
+    /// Heading.
+    pub title: String,
+    /// Expanded at first (the track's own environment, gameplay items).
+    pub open: bool,
+    /// Its entries, by name.
+    pub entries: Vec<LibraryEntry>,
+}
+
+/// The asset library (response of `editor.library`), built once when the editor starts.
+#[derive(serde::Serialize, ts_rs::TS, Resource, Debug, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct EditorLibrary {
+    /// Groups: the track's own environment first.
+    pub groups: Vec<LibraryGroup>,
+}
+
+/// React → Bevy request `editor.library`: the [`EditorLibrary`], `null` outside the editor.
+#[react_request(name = "editor.library", response = Option<EditorLibrary>)]
+pub struct EditorLibraryRequest;
 
 /// How many of each item the layout has (the item list).
 #[derive(serde::Serialize, ts_rs::TS, Debug, Clone, Default, PartialEq, Eq)]
@@ -192,25 +252,24 @@ pub struct EditorStatus {
     pub weathers: Vec<String>,
     /// The open left-pane tab.
     pub tab: EditorTab,
+    /// The library asset placement mode is armed with (the next click in the view adds it).
+    pub placing: Option<EditorAsset>,
 }
 
 /// React → Bevy request `editor.snapshot`: the [`EditorStatus`], `null` outside the editor.
 #[react_request(name = "editor.snapshot", response = Option<EditorStatus>)]
 pub struct EditorSnapshot;
 
-/// Something added at the view's focus (the point under the screen centre).
+/// A layout feature added at the view's focus (the point under the screen centre; library assets
+/// are placed instead, [`EditorPlace`]).
 #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 #[allow(missing_docs)]
 pub enum EditorAdd {
-    Prop,
-    ItemRow,
     Ground,
     Shortcut,
     Gap,
-    Battery,
-    Decor,
 }
 
 /// What the transform gizmo does to the selection.
@@ -278,8 +337,13 @@ pub enum EditorCommand {
     },
     /// Gizmo space for move and rotate: world ↔ the selection's own axes (L).
     GizmoSpace,
-    /// Cancel a live gizmo drag, else clear the selection (Esc).
+    /// Cancel placement or a live gizmo drag, else clear the selection (Esc).
     Cancel,
+    /// The selected prop or decor item becomes `asset` (same type), keeping its transform.
+    Swap {
+        /// The new asset.
+        asset: EditorAsset,
+    },
     /// Move, turn and scale the selection as a gizmo drag would (automation): `hold` leaves the
     /// drag live (previewed, uncommitted), else it is committed as one undo step. Only what the
     /// selection's data stores applies (props turn about Y only, points only move).
@@ -330,6 +394,17 @@ pub struct EditorSetOptions {
     pub options: EditorOptions,
 }
 
+/// React → Bevy message `editor.place`: arm placement mode with `asset` (the same asset again
+/// disarms it; another re-arms), or, with `at`, add it there at once (automation).
+#[react_message(name = "editor.place")]
+#[derive(Debug, Clone)]
+pub struct EditorPlace {
+    /// What to place.
+    pub asset: EditorAsset,
+    /// Add it here now (u) instead of arming.
+    pub at: Option<[f32; 3]>,
+}
+
 /// React → Bevy message `editor.tab`: the left pane switched tabs.
 #[react_message(name = "editor.tab")]
 #[derive(Debug, Clone)]
@@ -345,9 +420,15 @@ pub(crate) fn register(app: &mut App) {
         .add_react_message::<EditorSet>()
         .add_react_message::<EditorSetOptions>()
         .add_react_message::<EditorSetTab>()
+        .add_react_message::<EditorPlace>()
         .add_react_request_handler(
             |request: On<Request<EditorSnapshot>>, status: Option<Res<EditorStatus>>| {
                 request.respond(status.map(|s| s.clone()));
+            },
+        )
+        .add_react_request_handler(
+            |request: On<Request<EditorLibraryRequest>>, library: Option<Res<EditorLibrary>>| {
+                request.respond(library.map(|l| l.clone()));
             },
         );
 }

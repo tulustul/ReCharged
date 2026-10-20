@@ -424,8 +424,8 @@ fn commit(editor: &mut Editor, gizmo: &mut Gizmo) {
     gizmo.drag = None;
 }
 
-/// `editor.command`s of the gizmo, and the commands that cancel a live drag first (undo, redo,
-/// delete, test drive; the drag also ends when the selection, tab or mode changes: [`sync`]).
+/// `editor.command`s of the gizmo, and the commands that cancel a live drag or placement first
+/// (undo, redo, delete, test drive; the drag also ends when the selection, tab or mode changes: [`sync`]).
 pub(crate) fn commands(
     mut commands: MessageReader<Cmd>,
     mut editor: ResMut<Editor>,
@@ -437,7 +437,9 @@ pub(crate) fn commands(
             EditorCommand::GizmoSpace => gizmo.local = !gizmo.local,
             EditorCommand::Cancel => {
                 // Esc in a test drive is the game's pause.
-                if !gizmo.cancel() && editor.mode == Mode::Editing {
+                if editor.placing.is_some() {
+                    editor.placing = None;
+                } else if !gizmo.cancel() && editor.mode == Mode::Editing {
                     editor.select(None);
                 }
             }
@@ -446,6 +448,9 @@ pub(crate) fn commands(
             | EditorCommand::Delete
             | EditorCommand::Drive => {
                 gizmo.cancel();
+                if editor.placing.is_some() {
+                    editor.placing = None;
+                }
             }
             EditorCommand::Drag {
                 translate,

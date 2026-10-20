@@ -2,14 +2,14 @@
 //! under the screen centre, where additions land) and the cutaway.
 //!
 //! Picking runs on demand, on pointer moves and presses only, and never while bevy-react's
-//! `PointerCapture` holds the pointer: a left press takes the selection's gizmo handle
-//! ([`gizmo`]), else the marker or model under the cursor (or clears the selection); with Ctrl in
-//! the Track tab, a press on the road inserts a control point there. Models are hit with
-//! `MeshRayCast` against meshes under a `PropSource` / `DecorSource` (the road and ground carry
-//! none); items without a mesh in the editing session (item rows, the battery, the Track tab's
-//! points and vertices, reverse-only props and decor, dimmed) are screen-sized markers picked in
-//! screen space. A model wins over a marker only when the marker is farther away.
-//! Right drag looks around; WASD move, Q/E down/up, Shift faster.
+//! `PointerCapture` holds the pointer or placement mode is armed ([`crate::placement`]): a left
+//! press takes the selection's gizmo handle ([`gizmo`]), else the marker or model under the
+//! cursor (or clears the selection); with Ctrl in the Track tab, a press on the road inserts a
+//! control point there. Models are hit with `MeshRayCast` against meshes under a `PropSource` /
+//! `DecorSource` (the road and ground carry none); items without a mesh in the editing session
+//! (item rows, the battery, the Track tab's points and vertices, reverse-only props and decor,
+//! dimmed) are screen-sized markers picked in screen space. A model wins over a marker only when
+//! the marker is farther away. Right drag looks around; WASD move, Q/E down/up, Shift faster.
 
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
@@ -69,13 +69,14 @@ impl Plugin for EditorViewPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Gizmo>()
             .init_resource::<Hover>()
+            .init_resource::<crate::placement::Ghost>()
             .init_resource::<DragPreview>()
             .init_resource::<crate::live::PreviewBuild>()
             .add_systems(Startup, gizmo_look)
             .add_systems(Update, cutaway.run_if(in_state(AppState::InRace)))
             .add_systems(
                 Update,
-                (focus_point, pointer, fly, draw)
+                (focus_point, crate::placement::placement, pointer, fly, draw)
                     .chain()
                     .after(CameraSet)
                     .run_if(in_state(AppState::InRace))
@@ -87,7 +88,11 @@ impl Plugin for EditorViewPlugin {
                 Update,
                 (
                     gizmo::commands.before(pointer),
-                    (gizmo::sync, crate::live::preview_track)
+                    (
+                        gizmo::sync,
+                        crate::live::preview_track,
+                        crate::placement::ghost,
+                    )
                         .chain()
                         .after(draw),
                 ),
@@ -189,15 +194,19 @@ fn focus_point(
     let Ok(camera) = cameras.single() else {
         return;
     };
-    let (origin, dir) = (camera.translation(), camera.forward().as_vec3());
+    let ray = Ray3d::new(camera.translation(), camera.forward());
+    focus.set_if_neq(ViewFocus(surface(&rapier, ray)));
+}
+
+/// Where `ray` first meets a fixed collider (track, ground, static props), else the floor
+/// plane y = 0 when it looks down at it.
+pub(crate) fn surface(rapier: &ReadRapierContext, ray: Ray3d) -> Option<Vec3> {
+    let (origin, dir) = (ray.origin, *ray.direction);
     let filter = QueryFilter::only_fixed().exclude_sensors();
-    let hit = rapier
-        .single()
-        .ok()
+    (rapier.single().ok())
         .and_then(|c| c.cast_ray(origin, dir, FOCUS_REACH_U, true, filter))
         .map(|(_, toi)| origin + dir * toi)
-        .or_else(|| (dir.y < -0.05).then(|| origin + dir * (-origin.y / dir.y)));
-    focus.set_if_neq(ViewFocus(hit));
+        .or_else(|| (dir.y < -0.05).then(|| origin + dir * (-origin.y / dir.y)))
 }
 
 /// What [`pointer`] reads of the input.
@@ -291,7 +300,8 @@ pub(crate) fn pointer(
         return;
     }
     let captured = pointer.capture.as_ref().is_some_and(|c| c.is_captured());
-    if captured || editor.bake.is_some() {
+    // Placement mode owns the clicks (crate::placement).
+    if captured || editor.bake.is_some() || editor.placing.is_some() {
         hover.set_if_neq(Hover(None));
         gizmo.hot = None;
         return;
@@ -457,6 +467,7 @@ fn draw(
     editor: Res<Editor>,
     gizmo: Res<Gizmo>,
     hover: Res<Hover>,
+    ghost: Res<crate::placement::Ghost>,
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     mut gizmos: Gizmos,
 ) {
@@ -486,6 +497,13 @@ fn draw(
             color
         };
         gizmos.sphere(Isometry3d::from_translation(pos), size, color);
+    }
+    if editor.placing.is_some()
+        && let Some(pos) = ghost.at
+    {
+        let size = at.translation().distance(pos) * MARKER_PER_U;
+        gizmos.sphere(Isometry3d::from_translation(pos), size, SELECTED);
+        gizmos.line(pos, pos + Vec3::Y * size * 12.0, SELECTED);
     }
     gizmo::draw(&editor, &gizmo, &Eye { camera, at }, &mut gizmos);
 }

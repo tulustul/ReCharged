@@ -1,11 +1,12 @@
 //! The edited document (layout + decor): handles of the items, structural edits (add, insert,
-//! delete, duplicate) with index fix-ups, and validation. Pure; the ECS side is in `lib.rs`.
+//! delete, duplicate) with index fix-ups, and validation (placing and swapping library assets:
+//! [`crate::library`]). Pure; the ECS side is in `lib.rs`.
 
 use bevy::math::{EulerRot, Quat, Vec2, Vec3};
 use rc_core::prelude::*;
 use rc_track::{
-    ControlPoint, DecorItem, Dir, Gap, GoldenBatteryDef, Ground, ItemRowDef, PropCatalog,
-    PropPlacement, RibbonStyle, ShortcutDef, Track, TrackDef,
+    ControlPoint, DecorItem, Dir, Gap, Ground, ItemRowDef, PropCatalog, RibbonStyle, ShortcutDef,
+    Track, TrackDef,
 };
 pub use rc_ui::editor::{EditorAdd, EditorCounts, EditorItem};
 
@@ -15,8 +16,6 @@ const DUPLICATE_OFFSET_U: f32 = 2.0;
 const NEW_GROUND_U: f32 = 10.0;
 /// A new shortcut leaves and rejoins the track this far before and after the focus (u).
 const NEW_SHORTCUT_REACH_U: f32 = 12.0;
-/// The Golden Battery floats this high above the focus (u).
-const BATTERY_LIFT_U: f32 = 1.0;
 
 /// Where an item is, as the gizmo moves it (scale is along the item's own axes).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -463,47 +462,17 @@ impl Doc {
         }
     }
 
-    /// Adds `what` at `focus` (`selected` gives a gap its lip point and new props/decor their
-    /// model); `track` is the session's (a new shortcut leaves and rejoins it).
+    /// Adds `what` at `focus` (`selected` gives a gap its lip point); `track` is the session's (a
+    /// new shortcut leaves and rejoins it). Library assets are placed instead ([`Doc::place`]).
     pub fn add(
         &mut self,
         what: EditorAdd,
         focus: Vec3,
         selected: Option<EditorItem>,
         track: Option<&Track>,
-        props: &PropCatalog,
     ) -> Result<EditorItem, String> {
         let d = &mut self.def;
         match what {
-            EditorAdd::Prop => {
-                let kind = match selected {
-                    Some(EditorItem::Prop { index }) => d.props[at(index)].kind.clone(),
-                    _ => match d.props.last() {
-                        Some(p) => p.kind.clone(),
-                        None => props.props.keys().next().cloned().ok_or("no prop kinds")?,
-                    },
-                };
-                d.props.push(PropPlacement {
-                    kind,
-                    pos: focus,
-                    yaw: 0.0,
-                    dir: Dir::Both,
-                    on_line: false,
-                });
-                Ok(EditorItem::Prop {
-                    index: idx(d.props.len() - 1),
-                })
-            }
-            EditorAdd::ItemRow => {
-                d.item_rows.push(ItemRowDef {
-                    pos: focus,
-                    count: 5,
-                    dir: Dir::Both,
-                });
-                Ok(EditorItem::ItemRow {
-                    index: idx(d.item_rows.len() - 1),
-                })
-            }
             EditorAdd::Ground => {
                 let h = NEW_GROUND_U / 2.0;
                 let c = Vec2::new(focus.x, focus.z);
@@ -547,35 +516,6 @@ impl Doc {
                 });
                 Ok(EditorItem::Gap {
                     index: idx(d.gaps.len() - 1),
-                })
-            }
-            EditorAdd::Battery => {
-                if d.golden_battery.is_some() {
-                    return Err("the track already has its Golden Battery".into());
-                }
-                d.golden_battery = Some(GoldenBatteryDef {
-                    pos: focus + Vec3::Y * BATTERY_LIFT_U,
-                    dir: Dir::Fwd,
-                });
-                Ok(EditorItem::Battery)
-            }
-            EditorAdd::Decor => {
-                let model =
-                    match selected {
-                        Some(EditorItem::Decor { index }) => self.decor[at(index)].model.clone(),
-                        _ => self.decor.last().map(|d| d.model.clone()).ok_or(
-                            "no decor to copy the model from: duplicate one or edit the file",
-                        )?,
-                    };
-                self.decor.push(DecorItem {
-                    model,
-                    pos: focus,
-                    rot: Vec3::ZERO,
-                    scale: Vec3::ONE,
-                    dir: Dir::Both,
-                });
-                Ok(EditorItem::Decor {
-                    index: idx(self.decor.len() - 1),
                 })
             }
         }

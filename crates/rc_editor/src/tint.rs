@@ -1,7 +1,7 @@
 //! Hover and selection tint: every mesh of the hovered and of the selected prop or decor model
 //! wears its own clone of its material (`StandardMaterial`, or `SurfaceMaterial` for fallback
-//! props) with an emissive boost; un-hovering or deselecting puts the original back and drops the
-//! clone. A material swapped under a tint (a model's glb arriving after it was selected, the lamp
+//! props) mixed toward the tint colour and glowing a little; un-hovering or deselecting puts the
+//! original back and drops the clone. A material swapped under a tint (a model's glb arriving after it was selected, the lamp
 //! dimming on `WorldInstanceReady`) is re-tinted from the new one.
 
 use std::collections::HashMap;
@@ -16,9 +16,35 @@ use rc_ui::editor::EditorItem;
 use crate::view::Hover;
 use crate::{Editor, Mode};
 
-/// Added light of a tinted mesh (emissive is not scaled by the exposure: a fraction of white).
-const HOVER: LinearRgba = LinearRgba::rgb(0.02, 0.08, 0.12);
-const SELECTED: LinearRgba = LinearRgba::rgb(0.12, 0.09, 0.0);
+/// How a tinted mesh looks: its base colour mixed this far toward `color` (shows on lit,
+/// bright materials) plus `glow` of emitted light (shows on dark or shadowed ones; emissive is
+/// not scaled by the exposure: a fraction of white).
+struct Look {
+    color: LinearRgba,
+    mix: f32,
+    glow: LinearRgba,
+}
+
+const HOVER: Look = Look {
+    color: LinearRgba::rgb(0.2, 0.75, 1.0),
+    mix: 0.3,
+    glow: LinearRgba::rgb(0.03, 0.1, 0.14),
+};
+const SELECTED: Look = Look {
+    color: LinearRgba::rgb(1.0, 0.7, 0.05),
+    mix: 0.5,
+    glow: LinearRgba::rgb(0.16, 0.1, 0.0),
+};
+
+impl Look {
+    fn apply(&self, m: &mut StandardMaterial) {
+        let base = LinearRgba::from(m.base_color);
+        m.base_color = base
+            .mix(&self.color.with_alpha(base.alpha), self.mix)
+            .into();
+        m.emissive += self.glow;
+    }
+}
 
 /// A tinted mesh: its own material and the clone it wears.
 #[derive(Debug)]
@@ -120,7 +146,7 @@ fn tint(
         } // else swapped by someone else meanwhile (or despawned): theirs stays
     }
     for (e, selected) in want {
-        let boost = if selected { SELECTED } else { HOVER };
+        let look = if selected { &SELECTED } else { &HOVER };
         // The material under the tint: kept from our swap while it is still worn, else what the
         // mesh wears now.
         let base = match tint.meshes.get(&e) {
@@ -150,7 +176,7 @@ fn tint(
                 let Some(mut copy) = standard.get(&original).cloned() else {
                     continue;
                 };
-                copy.emissive += boost;
+                look.apply(&mut copy);
                 let clone = standard.add(copy);
                 commands.entity(e).insert(MeshMaterial3d(clone.clone()));
                 Swap::Standard(original, clone)
@@ -159,7 +185,7 @@ fn tint(
                 let Some(mut copy) = surface.get(&original).cloned() else {
                     continue;
                 };
-                copy.base.emissive += boost;
+                look.apply(&mut copy.base);
                 let clone = surface.add(copy);
                 commands.entity(e).insert(MeshMaterial3d(clone.clone()));
                 Swap::Surface(original, clone)

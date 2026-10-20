@@ -120,8 +120,9 @@ pub(crate) fn asset_usage() -> RenderAssetUsages {
 /// Loads a glb's first scene with its meshes and textures kept only on the GPU: nothing in the
 /// game reads model vertices or texels on the CPU (colliders come from the prop RON files), and
 /// the main-world copies of every prop and car were most of the game's RSS (Q21). Every glb load
-/// goes through here, so a file is never requested with two different settings.
-pub(crate) fn load_scene(server: &AssetServer, path: &str) -> Handle<WorldAsset> {
+/// goes through here (the track editor's placement ghost too), so a file is never requested with
+/// two different settings.
+pub fn load_scene(server: &AssetServer, path: &str) -> Handle<WorldAsset> {
     server
         .load_builder()
         .with_settings(|s: &mut GltfLoaderSettings| {

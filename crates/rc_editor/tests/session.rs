@@ -1,13 +1,13 @@
 //! The editing session on the real sim and flow: editing holds the race in Setup with no cars,
 //! a test drive runs the race, ending it returns to Setup without reloading, accepted edits
 //! update the session in place (only reload-list fields reload), rejected ones change nothing,
-//! undo restores.
+//! undo restores; library assets are placed, armed and swapped.
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
 use rc_editor::{
-    EditorCommand, EditorCommandMsg, EditorItem, EditorPlugin, EditorSelect, EditorSet,
-    EditorStatus,
+    EditorAsset, EditorCommand, EditorCommandMsg, EditorItem, EditorLibrary, EditorPlace,
+    EditorPlugin, EditorSelect, EditorSet, EditorStatus,
 };
 use rc_testkit::*;
 use rc_track::{Track, TrackDraft};
@@ -162,4 +162,58 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
     step(&mut app, 2);
     assert!(app.world().resource::<EditorStatus>().loading, "reloading");
     step_until(&mut app, "the reloaded session", in_race_setup);
+}
+
+#[test]
+fn library_assets_are_placed_selected_and_swapped_in_place() {
+    let mut app = editor_app("place");
+    step_until(&mut app, "the editing session", in_race_setup);
+    assert!(!app.world().resource::<EditorLibrary>().groups.is_empty());
+    let props = app.world().resource::<TrackDraft>().def.props.len();
+    let crate_small = EditorAsset::Prop {
+        id: "crate_small".into(),
+    };
+    // Without a position: arms placement mode (the same asset again disarms).
+    let arm = || EditorPlace {
+        asset: crate_small.clone(),
+        at: None,
+    };
+    app.world_mut().trigger(arm());
+    step(&mut app, 1);
+    let placing = |app: &App| app.world().resource::<EditorStatus>().placing.clone();
+    assert_eq!(placing(&app), Some(crate_small.clone()));
+    app.world_mut().trigger(arm());
+    step(&mut app, 1);
+    assert_eq!(placing(&app), None);
+
+    let at = Vec3::new(3.0, 0.0, -4.0);
+    app.world_mut().trigger(EditorPlace {
+        asset: crate_small.clone(),
+        at: Some(at.to_array()),
+    });
+    step(&mut app, 2);
+    assert!(in_race_setup(app.world()), "placed in place");
+    let draft = &app.world().resource::<TrackDraft>().def;
+    assert_eq!(draft.props.len(), props + 1);
+    let placed = EditorItem::Prop {
+        index: props as u32,
+    };
+    let status = app.world().resource::<EditorStatus>();
+    let selection = status.selection.as_ref().expect("the new prop is selected");
+    assert_eq!(
+        (selection.item, selection.asset.clone()),
+        (placed, Some(crate_small))
+    );
+
+    app.world_mut().trigger(EditorCommandMsg {
+        command: EditorCommand::Swap {
+            asset: EditorAsset::Prop {
+                id: "tyre_stack".into(),
+            },
+        },
+    });
+    step(&mut app, 2);
+    let prop = &app.world().resource::<TrackDraft>().def.props[props];
+    assert_eq!((prop.kind.as_str(), prop.pos), ("tyre_stack", at));
+    assert!(in_race_setup(app.world()));
 }

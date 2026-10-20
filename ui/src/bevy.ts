@@ -133,7 +133,16 @@ export type DropPlayer = {
  * Slot 0–3.
  */
 slot: number, };
-export type EditorAdd = "prop" | "itemRow" | "ground" | "shortcut" | "gap" | "battery" | "decor";
+export type EditorAdd = "ground" | "shortcut" | "gap";
+export type EditorAsset = { "kind": "prop", 
+/**
+ * The kind's id.
+ */
+id: string, } | { "kind": "decor", 
+/**
+ * glb path under the assets root (`models/props/toy/sign.glb`).
+ */
+model: string, } | { "kind": "itemRow" } | { "kind": "battery" };
 export type EditorCommand = { "kind": "save" } | { "kind": "drive" } | { "kind": "undo" } | { "kind": "redo" } | { "kind": "delete" } | { "kind": "insert" } | { "kind": "duplicate" } | { "kind": "add", 
 /**
  * What.
@@ -146,7 +155,11 @@ all: boolean, } | { "kind": "toggleProbes" } | { "kind": "gizmo",
 /**
  * The mode.
  */
-mode: EditorGizmo, } | { "kind": "gizmoSpace" } | { "kind": "cancel" } | { "kind": "drag", 
+mode: EditorGizmo, } | { "kind": "gizmoSpace" } | { "kind": "cancel" } | { "kind": "swap", 
+/**
+ * The new asset.
+ */
+asset: EditorAsset, } | { "kind": "drag", 
 /**
  * Added to the position (u, world axes).
  */
@@ -188,6 +201,11 @@ optional: boolean,
 set: boolean, };
 export type EditorGizmo = "move" | "rotate" | "scale";
 export type EditorItem = { "kind": "track" } | { "kind": "point", index: number, } | { "kind": "gap", index: number, } | { "kind": "ground", index: number, } | { "kind": "vertex", ground: number, index: number, } | { "kind": "itemRow", index: number, } | { "kind": "prop", index: number, } | { "kind": "shortcut", index: number, } | { "kind": "pathPoint", shortcut: number, index: number, } | { "kind": "battery" } | { "kind": "decor", index: number, };
+export type EditorLibrary = { 
+/**
+ * Groups: the track's own environment first.
+ */
+groups: Array<LibraryGroup>, };
 export type EditorOptions = { 
 /**
  * Time of day of the session.
@@ -205,6 +223,15 @@ reverse: boolean,
  * Test drives run the mirrored layout.
  */
 mirror: boolean, };
+export type EditorPlace = { 
+/**
+ * What to place.
+ */
+asset: EditorAsset, 
+/**
+ * Add it here now (u) instead of arming.
+ */
+at: [number, number, number] | null, };
 export type EditorSelect = { 
 /**
  * The item.
@@ -222,7 +249,11 @@ title: string,
 /**
  * Its fields, in file order.
  */
-fields: Array<EditorField>, };
+fields: Array<EditorField>, 
+/**
+ * The library asset it shows (props and decor: what a swap replaces).
+ */
+asset: EditorAsset | null, };
 export type EditorSet = { 
 /**
  * Field name.
@@ -310,7 +341,11 @@ weathers: Array<string>,
 /**
  * The open left-pane tab.
  */
-tab: EditorTab, };
+tab: EditorTab, 
+/**
+ * The library asset placement mode is armed with (the next click in the view adds it).
+ */
+placing: EditorAsset | null, };
 export type EditorTab = "assets" | "track" | "lighting";
 export type FieldValue = { "type": "number", value: number, } | { "type": "integer", value: number, } | { "type": "toggle", value: boolean, } | { "type": "choice", value: string, options: Array<string>, } | { "type": "vector", value: Array<number>, } | { "type": "text", value: string, };
 export type GamepadAxisChange = { gamepad: number, axis: GamepadAxisName, value: number, };
@@ -399,6 +434,28 @@ repeat: boolean, ctrlKey: boolean, shiftKey: boolean, altKey: boolean,
  * The "Meta"/"Super" key (Windows/Command).
  */
 metaKey: boolean, };
+export type LibraryEntry = { 
+/**
+ * Shown name ("Toy block cube").
+ */
+name: string, 
+/**
+ * What it places.
+ */
+asset: EditorAsset, };
+export type LibraryGroup = { 
+/**
+ * Heading.
+ */
+title: string, 
+/**
+ * Expanded at first (the track's own environment, gameplay items).
+ */
+open: boolean, 
+/**
+ * Its entries, by name.
+ */
+entries: Array<LibraryEntry>, };
 export type LinearWipeParams = { angle: number | string, softness: number | string, };
 export type LoadingProgress = { 
 /**
@@ -1888,6 +1945,7 @@ export interface ReactMessages {
   "app.quit": AppQuit;
   "editor.command": EditorCommandMsg;
   "editor.options": EditorSetOptions;
+  "editor.place": EditorPlace;
   "editor.select": EditorSelect;
   "editor.set": EditorSet;
   "editor.tab": EditorSetTab;
@@ -1924,6 +1982,7 @@ export interface ReactRequests {
   "app.snapshot": { request: null; response: AppStatus };
   "bindings.get": { request: null; response: UiBindings };
   "catalog.get": { request: null; response: UiCatalog };
+  "editor.library": { request: null; response: EditorLibrary | null };
   "editor.snapshot": { request: null; response: EditorStatus | null };
   "gamepad.getAll": { request: null; response: Array<GamepadConnectedData> };
   "lobby.snapshot": { request: null; response: UiLobby };
@@ -2218,7 +2277,9 @@ export const bevy = {
   },
   editor: {
     command(value: EditorCommandMsg): void { emit("editor.command", value); },
+    library(): Promise<EditorLibrary | null> { return request("editor.library", null); },
     options(value: EditorSetOptions): void { emit("editor.options", value); },
+    place(value: EditorPlace): void { emit("editor.place", value); },
     select(value: EditorSelect): void { emit("editor.select", value); },
     set(value: EditorSet): void { emit("editor.set", value); },
     snapshot(): Promise<EditorStatus | null> { return request("editor.snapshot", null); },

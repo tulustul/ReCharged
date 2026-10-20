@@ -11,6 +11,7 @@ import { text } from "../theme/styles";
 import { color, space } from "../theme/tokens";
 import { command, Cycle, Field, panel, select, solid, Tool } from "./controls";
 import { LeftPane } from "./LeftPane";
+import { SwapPicker } from "./Library";
 
 export function EditorLayer({ status }: { status: EditorStatus }) {
   return (
@@ -20,7 +21,8 @@ export function EditorLayer({ status }: { status: EditorStatus }) {
         <LeftPane status={status} />
         <node style={{ flexGrow: 1, flexDirection: "column", alignItems: "center" }}>
           {status.error !== null && (
-            <node style={{ ...solid, padding: { horizontal: space.m, vertical: space.s }, maxWidth: 700, borderColor: color.danger }}>
+            // hoverStyle: the toast owns the pointer (a placing click on it does not place).
+            <node style={{ ...solid, padding: { horizontal: space.m, vertical: space.s }, maxWidth: 700, borderColor: color.danger }} hoverStyle={{}}>
               <text style={{ ...text.small, color: color.text }}>{status.error}</text>
             </node>
           )}
@@ -70,6 +72,7 @@ function Inspector({ status }: { status: EditorStatus }) {
   return (
     <node style={{ ...panel, width: 520, maxHeight: "100%", overflowY: "scroll" }} hoverStyle={{}}>
       <text style={text.h3}>{sel.title}</text>
+      {sel.asset !== null && <SwapPicker key={JSON.stringify(item)} asset={sel.asset} />}
       {sel.fields.map((f) => (
         <Field
           key={`${kind}.${f.key}`}

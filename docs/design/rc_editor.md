@@ -2,8 +2,8 @@
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
 lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
-editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout), P6 (select & gizmo) and
-P7 (incremental rebuilds) done** (§Editor v2): asset library and lighting editing to come.
+editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout), P6 (select & gizmo),
+P7 (incremental rebuilds) and P8 (asset library) done** (§Editor v2): lighting editing to come.
 Only Toy Town is baked so far (§Irradiance bake).
 
 ```sh
@@ -38,7 +38,10 @@ overrides; v2 reads settings from the game instead, D10). Automation as in the g
 `editor tab <assets|track|lighting>`, `editor gizmo <move|rotate|scale>` and
 `editor move|rotate|scale x y z [hold]` (a gizmo drag of the selection by a translation, a
 (pitch, yaw, roll) turn in degrees or per-axis factors; `hold` leaves it live and uncommitted, so
-the preview can be screenshotted) drives the editor through the real React channel.
+the preview can be screenshotted), `editor place <prop id | decor path | itemRow | battery>
+[x y z]` (with a position: placed there; without: placement mode armed), `editor swap <asset>`
+and `editor search <text>` (the Assets tab's search) drives the editor through the real React
+channel.
 
 ## Decisions
 | # | Decision | Consequence |
@@ -400,6 +403,45 @@ under `--user-data-dir`, `<dir>/settings.ron` — an automation dir, harmless). 
   plan), `placement_changes` and quick-tangent unit tests, the editor session test (an edit, a
   rejected one and undo stay in place; `indoor` reloads).
 
+### P8 as built
+- **Library** (`library.rs`, `editor.library` → `EditorLibrary`, built once in `EditorPlugin::load`):
+  `PropCatalog::files` (kind → file stem, filled by `merge`; no format change) groups the 206
+  kinds; a scan of `assets/models/props/<env>/*.glb` (one level) gives the decor; Gameplay holds
+  Item row and Golden Battery (disabled while one exists). Groups of the track's own environment
+  (`environment == env` or `env_…`: `toy_store` → `toy`) come first and open, then Gameplay
+  (open), `common`, the rest (closed). Names are prettified ids ("Toy block cube"); the search
+  matches every word and opens every group. **Lights are left out until P9.**
+- **Assets** are `EditorAsset::{Prop { id }, Decor { model }, ItemRow, Battery}`; `Doc::place` /
+  `Doc::swap` / `Doc::asset` live in `library.rs`. `EditorAdd` keeps only Ground, Shortcut, Gap
+  (the Track tab's); the P5 Add buttons for prop, decor, item row and battery are gone (all four
+  are library entries). The inspector lost the prop `kind` and decor `model` fields (and
+  `Choices::kinds`): `EditorSelection.asset` feeds a **Swap…** picker (search + list of the same
+  type) at the top of the right pane, and every library entry of the selection's type shows
+  **Replace**. Swaps keep pose, scale and `dir`; prop ↔ prop, decor ↔ decor only.
+- **Placement** (`placement.rs`): an entry's `onPointerDown` (left button) sends `editor.place
+  { asset, at: null }`; `Editor.placing` (shown as `EditorStatus.placing`, the entry turns volt)
+  is a pure `step(armed, Entry | Cancel | Release { over_ui })`. *Deviation:* "over the UI" is
+  not the panes' `ComputedNode` rects but any `ReactInteraction` node in the mouse's `HoverMap`
+  (review 2's alternative): every pane, the toolbar and the toast (given `hoverStyle={{}}` for
+  this) count, with no rect bookkeeping. A left `just_released` off the UI places through
+  `Editor::place` (one edit, in place, selected); Esc, a right click, a tab switch, undo/redo,
+  delete, F5 and a bake disarm. While armed `pointer` returns before the gizmo and picking. The
+  **ghost** loads the glb through `rc_render::load_scene` (now public) and stands upright at the
+  rapier hit of the cursor ray (`view::surface`, shared with the focus point; else y = 0); while
+  the cursor is over the UI or outside the window it waits at the view's focus, so the armed
+  asset is previewed before the click. A yellow drop marker is drawn at the point (the only
+  marker for item rows and the battery). `editor.place` with `at` places at once (automation).
+- **Tint** (investigated): it was applied, after in-place moves and after re-instancing too
+  (`tint_sign_after_inplace.png`, `swap_done.png`); it was only weak — +0.12 emissive barely moves
+  a sunlit bright surface (the bear's muzzle, a lit blue sign). Now the clone also mixes its
+  base colour toward the tint (selected: 50 % toward amber, + (0.16, 0.1, 0) glow; hover: 30 %
+  toward cyan, + (0.03, 0.1, 0.14)), so bright and dark materials both read. A yellow model
+  selected stays yellow-ish (amber on yellow); hover remains cyan.
+- **Not verified with a real mouse** (no input injection): the press-to-arm, drag-release and
+  click-click paths, right-click cancel and the `HoverMap` UI test; the state logic has a unit
+  test, `editor.place`/swap a session test, and the ghost/placement/swap were screenshotted via
+  the verbs. Screenshots: `target/agent-data/p8/`.
+
 ## Editing scope (P4)
 | Item | Handles | Inspector |
 |---|---|---|
@@ -490,7 +532,7 @@ an art call. Other times of day and the mirror layout are not baked.
 | P5 Layout (done) | toolbar, left tabs (Assets placeholder, Track, Lighting = today's bake buttons), right pane; Items window and Notes removed; error toast; lints in the Track tab | everything P4 could edit is still reachable; no item is only reachable through an index chip |
 | P6 Select & gizmo (done) | live drag previews (`DragPreview`, `EnvPreview` once P9 adds lights) applied by rc_track/rc_render, `MeshRayCast` picking, source tags + `PlacedProp::source`, hover/selection tint, markers (incl. dimmed unreachable items), `gizmo.rs` (G/R/C, L, Ctrl snap), Track-tab-only layout handles, Ctrl+press insert, decor rotation/scale data change. Commits still reload (P4 path) | select any object, including `dir: Rev` ones, by clicking it; move/rotate/scale decor, move/yaw props, move points; old decor files still load; a prop or decor drag is real-time (the release still reloads) |
 | P7 Incremental (done) | `TrackPreview` for point drags, track key + per-source diffs, `RoomPiece` rebuild, `TrackSummary` re-insert, no `ChangeTrack` per edit, both equivalence tests | both tests pass; a point drag updates the road visibly while dragging on the Iris Xe; no session reload on any edit outside the reload list |
-| P8 Library | `library.rs`, `editor.library`, categories + search, placement mode with ghost (+ `editor place` verb), swap | build a lap of Toy Town's decor from the library without typing a model path |
+| P8 Library (done) | `library.rs`, `editor.library`, categories + search, placement mode with ghost (+ `editor place` verb), swap | build a lap of Toy Town's decor from the library without typing a model path |
 | P9 Lighting | `environment.ron` in the `Doc` (+ `to_ron`, save, undo), `EnvironmentDraft`, light objects + sun/fill markers, Lighting tab's time look, bake-stale flags; mirrored environment lights (game fix) | add a spot light, aim it, change noon's sun and exposure, undo it all, save, reopen: identical |
 | P10 Settings | `rc_game::read_settings`, inserted before Boot | the editor renders at the player's preset; the file is untouched after an editor run |
 

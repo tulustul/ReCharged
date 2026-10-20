@@ -12,7 +12,7 @@ import { appStrings } from "../strings/app";
 import { word } from "../strings/common";
 import { closeDialog, openDialog, pushToast } from "./overlays";
 import { hmrSingleton } from "./store";
-import { appInfo, appState, bindings, catalog, demoMode, editor, loadingProgress, lobby, profile, records, session, settings } from "./stores";
+import { appInfo, appState, bindings, catalog, demoMode, editor, editorLibrary, loadingProgress, lobby, profile, records, session, settings } from "./stores";
 import { unlockLabel } from "./unlocks";
 import { useStore } from "./useStore";
 
@@ -137,6 +137,7 @@ export function Feeds() {
     bevy.catalog.get().then((c) => catalog.set(c), fail("catalog.get"));
     bevy.lobby.snapshot().then((l) => lobby.set(l), fail("lobby.snapshot"));
     bevy.editor.snapshot().then((e) => editor.set(e), fail("editor.snapshot"));
+    bevy.editor.library().then((l) => editorLibrary.set(l), fail("editor.library"));
     refreshProfile();
     refreshSession();
     refreshSettings();

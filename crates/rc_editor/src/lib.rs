@@ -5,14 +5,16 @@
 //!   own race session on the track ([`TrackDraft`], so unsaved edits are what loads), held in
 //!   `RacePhase::Setup` (no cars) while editing and updated in place after each edit (reloaded
 //!   only for the reload list, [`live`]); test drives (F5);
-//!   saving the layout and decor files (Ctrl+S); the inspector ([`fields`]); the 3D view
+//!   saving the layout and decor files (Ctrl+S); the inspector ([`fields`]); the asset library
+//!   ([`library`]: placing and swapping props, decor and gameplay items); the 3D view
 //!   ([`view`]: fly camera, markers, picking, hover/selection tint; [`gizmo`]: the transform
 //!   gizmo); the [`EditorStatus`] React shows.
 //! - **Inputs:** keyboard and mouse, rc_ui's `editor.*` messages, `Track` (lints, projection),
 //!   `Catalog` (name, allowed times and weather), `RaceConfig` (session layout),
 //!   `LoadingFailed`, `UserPaths::assets_dir`.
 //! - **Outputs:** [`TrackDraft`], `DragPreview` and `TrackPreview` (sole writer), the session's
-//!   `Track` and `TrackSummary` on an in-place commit, [`EditorStatus`] (sole writer),
+//!   `Track` and `TrackSummary` on an in-place commit, [`EditorStatus`] and [`EditorLibrary`]
+//!   (sole writer), a placement ghost while placing,
 //!   `GameCommand`s (start, restart, change track), a `UiNav::Confirm` that skips a test
 //!   drive's intro, the `GameCamera`'s `Transform` while editing, `Overhead` visibility, tint
 //!   materials on the hovered and selected models, gizmos, the track and decor files on save.
@@ -27,7 +29,9 @@ pub mod catalog;
 pub mod doc;
 pub mod fields;
 pub mod gizmo;
+pub mod library;
 mod live;
+mod placement;
 mod tint;
 pub mod view;
 
@@ -46,9 +50,9 @@ use rc_track::{
     DECOR_FILE, PropCatalog, TRACK_FILE, Track, TrackDef, TrackDraft, decor_to_ron, map_dir,
 };
 pub use rc_ui::editor::{
-    EditorAdd, EditorCommand, EditorCommandMsg, EditorGizmo, EditorItem, EditorOptions,
-    EditorSelect, EditorSelection, EditorSet, EditorSetOptions, EditorSetTab, EditorStatus,
-    EditorTab,
+    EditorAdd, EditorAsset, EditorCommand, EditorCommandMsg, EditorGizmo, EditorItem,
+    EditorLibrary, EditorOptions, EditorPlace, EditorSelect, EditorSelection, EditorSet,
+    EditorSetOptions, EditorSetTab, EditorStatus, EditorTab,
 };
 
 pub use crate::doc::Doc;
@@ -76,6 +80,8 @@ pub struct EditorPlugin {
     pub catalog_text: String,
     /// Environment ids.
     pub environments: Vec<String>,
+    /// The asset library.
+    pub library: EditorLibrary,
 }
 
 impl EditorPlugin {
@@ -97,14 +103,16 @@ impl EditorPlugin {
             .collect();
         environments.sort();
         environments.dedup();
+        let props = PropCatalog::load(assets_dir)?;
         Ok(Self {
             track: id,
+            library: library::build(assets_dir, &props, &info.environment),
             doc: Doc {
                 def: TrackDef::load(assets_dir, track)?,
                 decor: rc_track::load_decor(assets_dir, track)?,
                 info,
             },
-            props: PropCatalog::load(assets_dir)?,
+            props,
             catalog_text,
             environments,
         })
@@ -122,7 +130,6 @@ impl Plugin for EditorPlugin {
         .insert_resource(Editor {
             track: self.track.clone(),
             choices: fields::Choices {
-                kinds: self.props.props.keys().cloned().collect(),
                 environments: self.environments.clone(),
             },
             props: self.props.clone(),
@@ -150,7 +157,9 @@ impl Plugin for EditorPlugin {
             applied: 0,
             stale: Vec::new(),
             bake: None,
+            placing: None,
         })
+        .insert_resource(self.library.clone())
         .init_resource::<EditorStatus>()
         .init_resource::<view::ViewFocus>()
         .init_resource::<view::View>()
@@ -164,8 +173,12 @@ impl Plugin for EditorPlugin {
             editor.select(msg.item);
         })
         .add_observer(|msg: On<EditorSetTab>, mut editor: ResMut<Editor>| {
-            editor.tab = msg.tab;
+            if editor.tab != msg.tab {
+                editor.tab = msg.tab;
+                editor.placing = None; // a tab switch cancels placement
+            }
         })
+        .add_observer(placement::on_place)
         .add_observer(on_set)
         .add_observer(on_options)
         .add_systems(Startup, window_title)
@@ -246,6 +259,8 @@ pub(crate) struct Editor {
     stale: Vec<(bool, TimeOfDay)>,
     /// A bake queue is running (editing waits).
     bake: Option<baking::BakeRun>,
+    /// Placement mode is armed with this library asset ([`placement`]).
+    pub(crate) placing: Option<EditorAsset>,
 }
 
 impl Editor {
@@ -348,6 +363,15 @@ impl Editor {
         self.stale.retain(|v| *v != (mirror, time));
     }
 
+    /// Adds library `asset` at `at` as one edit and selects it.
+    pub(crate) fn place(&mut self, asset: &EditorAsset, at: Vec3) {
+        let props = self.props.clone();
+        self.edit(|doc, sel| {
+            *sel = Some(doc.place(asset, at, &props)?);
+            Ok(())
+        });
+    }
+
     pub(crate) fn select(&mut self, item: Option<EditorItem>) {
         self.selection = item.filter(|i| self.doc.exists(*i));
     }
@@ -371,6 +395,7 @@ impl Editor {
         );
         self.bake = Some(run);
         self.selection = None; // no tint material in the baked light
+        self.placing = None; // nor a ghost
         self.error = None;
         self.wanted += 1;
     }
@@ -585,12 +610,15 @@ fn commands(
                     editor.error = Some("look at the floor or the track to add there".into());
                     continue;
                 };
-                let props = editor.props.clone();
                 let track = session.track.as_deref();
                 editor.edit(|doc, sel| {
-                    *sel = Some(doc.add(*what, focus, selection, track, &props)?);
+                    *sel = Some(doc.add(*what, focus, selection, track)?);
                     Ok(())
                 });
+            }
+            EditorCommand::Swap { asset } => {
+                let props = editor.props.clone();
+                editor.edit(|doc, sel| doc.swap(sel.ok_or("nothing is selected")?, asset, &props));
             }
             EditorCommand::TopView => {
                 let target = selection
@@ -804,6 +832,7 @@ fn push_status(
             item,
             title,
             fields,
+            asset: editor.doc.asset(item),
         })
     });
     let lints = match &track {
@@ -829,6 +858,7 @@ fn push_status(
         times: info.allowed_times.iter().map(fields::name).collect(),
         weathers: info.allowed_weather.iter().map(fields::name).collect(),
         tab: editor.tab,
+        placing: editor.placing.clone(),
     });
 }
 
@@ -873,6 +903,7 @@ mod tests {
             applied: 0,
             stale: Vec::new(),
             bake: None,
+            placing: None,
         };
         let (path, catalog_text) = save(&assets, &editor).unwrap();
         assert_eq!(TrackDef::load(&assets, "test_oval").unwrap(), doc.def);

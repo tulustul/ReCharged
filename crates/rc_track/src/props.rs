@@ -129,6 +129,10 @@ pub struct PropDef {
 pub struct PropCatalog {
     /// Prop kinds by id.
     pub props: BTreeMap<String, PropDef>,
+    /// The file each kind comes from, by its stem (`toy`, `common`: the environment it was made
+    /// for); filled by [`Self::merge`] (the track editor's library groups by it).
+    #[serde(skip)]
+    pub files: BTreeMap<String, String>,
 }
 
 impl PropCatalog {
@@ -164,6 +168,8 @@ impl PropCatalog {
                     ));
                 }
                 origin.insert(kind.clone(), file.clone());
+                let stem = Path::new(&file).file_stem().unwrap_or_default();
+                (merged.files).insert(kind.clone(), stem.to_string_lossy().into_owned());
                 merged.props.insert(kind, def);
             }
         }
@@ -237,10 +243,13 @@ mod tests {
     fn files_merge_and_duplicates_name_both_files() {
         let one = |kind: &str| PropCatalog {
             props: BTreeMap::from([(kind.to_owned(), PropDef::default())]),
+            ..Default::default()
         };
-        let merged = PropCatalog::merge([("a.ron".into(), one("x")), ("b.ron".into(), one("y"))])
-            .expect("distinct kinds merge");
+        let merged =
+            PropCatalog::merge([("d/a.ron".into(), one("x")), ("d/b.ron".into(), one("y"))])
+                .expect("distinct kinds merge");
         assert!(merged.get("x").is_some() && merged.get("y").is_some());
+        assert_eq!(merged.files["y"], "b", "each kind remembers its file");
         let err = PropCatalog::merge([("a.ron".into(), one("x")), ("b.ron".into(), one("x"))])
             .expect_err("duplicate kind");
         assert!(

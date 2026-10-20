@@ -36,7 +36,7 @@ use rc_core::prelude::*;
 
 pub use capture::Overhead;
 pub use cars::{CarModel, CarModelReady};
-pub use content::{ContentVisualsPlugin, keep_cpu_copies};
+pub use content::{ContentVisualsPlugin, keep_cpu_copies, load_scene};
 pub use lighting::gi::{BakedGi, BakedLight, FACES, IrradianceGrid, rgb9e5, volume_file};
 pub use lighting::{
     ActiveEnvironment, ENVIRONMENT_FILE, EnvironmentDef, LUMEN_SCALE, LampGrid, PipelineQueue,

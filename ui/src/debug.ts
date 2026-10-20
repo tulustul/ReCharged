@@ -2,10 +2,11 @@
 // `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample data for
 // screens whose data only exists after real races (`demo hud …`: the race HUD, see `hud/demo.ts`),
 // `tab <id>` is handled by tabbed screens, `editor <command>` / `editor select <kind> <index>` /
-// `editor tab <tab>` / `editor move x y z` … drive the track editor.
+// `editor tab <tab>` / `editor move x y z` / `editor place <asset> [x y z]` … drive the track editor.
 // Navigation is scripted through the real input path (`--input-script`,
 // `docs/design/automation.md`).
-import { bevy, type AppStatus, type EditorCommand, type EditorGizmo, type EditorItem, type EditorTab, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
+import { bevy, type AppStatus, type EditorAsset, type EditorCommand, type EditorGizmo, type EditorItem, type EditorTab, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
+import { libraryQuery } from "./editor/search";
 import { useDebug } from "./hooks";
 import { demoHud, endHudDemo } from "./hud/demo";
 import { resetTo, type Route } from "./nav/routes";
@@ -135,7 +136,17 @@ export function useDebugRoutes() {
     else if (verb === "move") bevy.editor.command({ command: { kind: "drag", translate: v, rotate: none, scale: one, hold } });
     else if (verb === "rotate") bevy.editor.command({ command: { kind: "drag", translate: none, rotate: v, scale: one, hold } });
     else if (verb === "scale") bevy.editor.command({ command: { kind: "drag", translate: none, rotate: none, scale: v, hold } });
-    else bevy.editor.command({ command: { kind: verb } as EditorCommand });
+    else if (verb === "search") libraryQuery.set(arg.slice("search ".length));
+    else if (verb === "place" || verb === "swap") {
+      // `editor place prop toy_bear [x y z]`, `editor place decor models/props/toy/sign.glb …`,
+      // `editor place itemRow …`, `editor swap prop toy_duck`: without a position, place arms.
+      const words = arg.split(" ").slice(1);
+      const named = kind === "prop" || kind === "decor";
+      const asset = (kind === "prop" ? { kind, id: words[1] } : kind === "decor" ? { kind, model: words[1] } : { kind }) as EditorAsset;
+      const at = words.slice(named ? 2 : 1).map(Number);
+      if (verb === "swap") bevy.editor.command({ command: { kind: "swap", asset } });
+      else bevy.editor.place({ asset, at: at.length === 3 ? [at[0], at[1], at[2]] : null });
+    } else bevy.editor.command({ command: { kind: verb } as EditorCommand });
   });
   useDebug("go", (arg) => {
     const [route, mode] = arg.split(" ") as [Route, MenuMode | undefined];

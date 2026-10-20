@@ -1,12 +1,13 @@
-// The track editor's left pane: Assets (add props, decor, item rows, the battery until the library
-// exists), Track (track settings, add jump / ground area / shortcut, lints) and Lighting (probes,
-// bake). The open tab lives in Bevy (`editor.tab`): the Track tab shows the layout handles.
+// The track editor's left pane: Assets (the asset library, `Library.tsx`), Track (track settings,
+// add jump / ground area / shortcut, lints) and Lighting (probes, bake). The open tab lives in Bevy
+// (`editor.tab`): the Track tab shows the layout handles.
 import type { EditorAdd, EditorStatus, EditorTab } from "../bevy";
 import { bevy } from "../bevy";
 import { editorStrings as words } from "../strings/editor";
 import { text } from "../theme/styles";
 import { color, space } from "../theme/tokens";
 import { command, panel, select, Tool } from "./controls";
+import { Library } from "./Library";
 
 const TABS: EditorTab[] = ["assets", "track", "lighting"];
 const add = (what: EditorAdd) => command({ kind: "add", what });
@@ -19,7 +20,7 @@ export function LeftPane({ status }: { status: EditorStatus }) {
           <Tool key={tab} label={words.tabs[tab]} hot={status.tab === tab} onPress={() => bevy.editor.tab({ tab })} />
         ))}
       </node>
-      {status.tab === "assets" && <Assets status={status} />}
+      {status.tab === "assets" && <Library status={status} />}
       {status.tab === "track" && <Track status={status} />}
       {status.tab === "lighting" && <Lighting status={status} />}
       <text style={{ ...text.small, color: color.textFaint, margin: { top: space.m } }}>{words.controls}</text>
@@ -29,21 +30,6 @@ export function LeftPane({ status }: { status: EditorStatus }) {
 
 function Header({ label, tone = color.textDim }: { label: string; tone?: string }) {
   return <text style={{ ...text.caps, color: tone, margin: { top: space.s } }}>{label}</text>;
-}
-
-function Assets({ status }: { status: EditorStatus }) {
-  return (
-    <>
-      <text style={text.small}>{words.library}</text>
-      <Header label={words.addHeader} />
-      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.s }}>
-        <Tool label={words.addProp} onPress={() => add("prop")} />
-        <Tool label={words.addDecor} onPress={() => add("decor")} />
-        <Tool label={words.addRow} onPress={() => add("itemRow")} />
-        <Tool label={words.addBattery} onPress={() => add("battery")} disabled={status.counts.battery} />
-      </node>
-    </>
-  );
 }
 
 function Track({ status }: { status: EditorStatus }) {

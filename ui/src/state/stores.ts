@@ -3,6 +3,7 @@
 import type {
   AppInfo,
   AppStatus,
+  EditorLibrary,
   EditorStatus,
   UiBindings,
   UiCatalog,
@@ -34,4 +35,6 @@ export const devices = store<UiDeviceKind[]>("devices", ["keyboardA", "keyboardA
 /** Scripted demo scenes (debug.ts) own the session data: snapshots must not overwrite them. */
 /** The track editor's status (`null` in the game). */
 export const editor = store<EditorStatus | null>("editor", null);
+/** The track editor's asset library (`null` in the game; built once when the editor starts). */
+export const editorLibrary = store<EditorLibrary | null>("editorLibrary", null);
 export const demoMode = store<boolean>("demoMode", false);
