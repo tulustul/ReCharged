@@ -11,11 +11,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
+use bevy::asset::UntypedAssetId;
 use bevy::ecs::system::SystemParam;
 use bevy::mesh::{Indices, VertexAttributeValues};
 use bevy::prelude::*;
 use rc_core::prelude::*;
-use rc_render::{ActiveEnvironment, IrradianceGrid, environment_radiance, volume_file};
+use rc_render::{
+    ActiveEnvironment, IrradianceGrid, SurfaceMaterial, environment_radiance, volume_file,
+};
 use rc_track::Track;
 
 use crate::bake::{GridSpec, Lamp, Scene, SceneBuilder, Sun, bake};
@@ -128,8 +131,19 @@ pub(crate) struct SceneParams<'w, 's> {
             &'static GlobalTransform,
         ),
     >,
+    /// Ground, ribbons, walls and the room shell (a `StandardMaterial` with weather on top).
+    surfaces: Query<
+        'w,
+        's,
+        (
+            &'static Mesh3d,
+            &'static MeshMaterial3d<SurfaceMaterial>,
+            &'static GlobalTransform,
+        ),
+    >,
     mesh_assets: Res<'w, Assets<Mesh>>,
     materials: Res<'w, Assets<StandardMaterial>>,
+    surface_materials: Res<'w, Assets<SurfaceMaterial>>,
     images: Res<'w, Assets<Image>>,
     suns: Query<'w, 's, (&'static DirectionalLight, &'static GlobalTransform)>,
     points: Query<'w, 's, (&'static PointLight, &'static GlobalTransform)>,
@@ -158,17 +172,26 @@ fn texture_mean(image: &Image) -> Option<Vec3> {
     Some(sum / 64.0)
 }
 
-/// The session's opaque meshes, materials and lights as a [`Scene`] (environment map radiance of
-/// `env` for rays that leave it).
+/// The session's opaque meshes (standard and surface materials), materials and lights as a
+/// [`Scene`] (environment map radiance of `env` for rays that leave it).
 pub(crate) fn gather(p: &SceneParams, env: &ActiveEnvironment) -> Result<(Scene, String), String> {
     let mut builder = SceneBuilder::default();
-    let mut materials: HashMap<AssetId<StandardMaterial>, Option<u32>> = HashMap::new();
+    let mut materials: HashMap<UntypedAssetId, Option<u32>> = HashMap::new();
     let mut textures: HashMap<AssetId<Image>, Option<Vec3>> = HashMap::new();
     let (mut skipped, mut no_cpu, mut flat) = (0usize, 0usize, 0usize);
-    for (mesh, material, transform) in &p.meshes {
+    // (mesh, material key, its StandardMaterial part, pose) of both material kinds.
+    let standard = p.meshes.iter().map(|(mesh, material, transform)| {
         let id = material.id();
+        (mesh, id.untyped(), p.materials.get(id), transform)
+    });
+    let surface = p.surfaces.iter().map(|(mesh, material, transform)| {
+        let id = material.id();
+        let base = p.surface_materials.get(id).map(|m| &m.base);
+        (mesh, id.untyped(), base, transform)
+    });
+    for (mesh, id, material, transform) in standard.chain(surface) {
         let index = *materials.entry(id).or_insert_with(|| {
-            let m = p.materials.get(id)?;
+            let m = material?;
             if !matches!(m.alpha_mode, AlphaMode::Opaque | AlphaMode::Mask(_)) {
                 return None; // glass, clouds, decals: light passes
             }
@@ -221,8 +244,11 @@ pub(crate) fn gather(p: &SceneParams, env: &ActiveEnvironment) -> Result<(Scene,
             None => (0..world.len() / 3).for_each(|t| emit([3 * t, 3 * t + 1, 3 * t + 2])),
         }
     }
-    if builder.triangles() == 0 && no_cpu > 0 {
-        return Err("no mesh has a CPU copy (rc_render::keep_cpu_copies was not called)".into());
+    if builder.triangles() == 0 {
+        return Err(format!(
+            "no triangles: {} meshes, {skipped} not opaque, {no_cpu} without a CPU copy (rc_render::keep_cpu_copies)",
+            p.meshes.iter().count() + p.surfaces.iter().count()
+        ));
     }
     let suns = p
         .suns

@@ -2,7 +2,7 @@
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
 lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
-editor-owned; irradiance bake). The shipped tracks are not baked yet (§Irradiance bake: open).
+editor-owned; irradiance bake). Only Toy Town is baked so far (§Irradiance bake).
 
 ```sh
 npm --prefix ui run build                       # the editor uses the game's React bundle
@@ -113,9 +113,10 @@ game's renderer; measured against Bevy's cost per camera view (shadow cascades a
 view) that is hours per track on the Iris Xe. Instead the baker traces the session itself on the
 CPU (`bake.rs`, `baking.rs`):
 - The editor calls `rc_render::keep_cpu_copies()` so meshes, materials and textures stay on the
-  CPU. Every opaque `StandardMaterial` mesh in the session (the ceiling too: editing only hides
-  it) becomes world triangles in a parry `TriMesh` (≈ 0.8 M for Toy Town); albedo = base colour ×
-  the texture's mean colour; double-sided materials are noted.
+  CPU. Every opaque mesh in the session — `StandardMaterial` (props, decor) and `SurfaceMaterial`
+  (ground, ribbons, walls, the room shell; its `StandardMaterial` base), the ceiling too (editing
+  only hides it) — becomes world triangles in a parry `TriMesh` (≈ 0.83 M for Toy Town); albedo =
+  base colour × the texture's mean colour; double-sided materials are noted.
 - Lights as the game has them in clear weather: directional lights (lux × colour; shadow rays for
   the ones that cast shadows — the indoor fill does not), point and spot lights (lumens / 4π,
   Bevy's range fall-off and cone). Rays that leave the scene see `rc_render::environment_radiance`
@@ -127,16 +128,15 @@ CPU (`bake.rs`, `baking.rs`):
   geometry and take their neighbours' values. RGB9E5, ≈ 0.7–1 MB per volume.
 - Each job reloads the session in its layout and time (clear weather), waits 30 frames, gathers on
   the main thread and traces on a background thread (the window keeps running; edits wait).
-- **Measured on the Iris Xe laptop (dev build):** Toy Town 40 k probes, 0.78 M triangles: 8.6 s per
-  volume; Backyard Bash 29 k probes: 9–10 s; all 8 volumes of a track ≈ 1.5 min with reloads.
+- **Measured on the Iris Xe laptop (dev build):** Toy Town 40 k probes, 0.83 M triangles: 21–36 s
+  per volume, all 8 ≈ 4 min with reloads.
 
-**Look (before/after screenshots, `target/agent-data/gi/`):** indoors the overall level matches
-the environment map (units check out) and gains contact occlusion (shelf undersides) and colour
-bleeding (the orange track warms the ceiling; lamp pools glow on the ceiling at night). Outdoors
-shaded surfaces facing away from the open sky (the garden fence) get **darker**: the environment
-map's art-boosted sky fill (≈ 3× physical, so shade reads) used to reach every surface unoccluded.
-**Open (art):** accept, or add a per-environment `baked_light_scale`; the shipped tracks are not
-baked yet (≈ 40 MB compressed for all seven, no LFS in this repo).
+**Look (Toy Town, the one baked track; before/after in `target/agent-data/gi2/`):** at noon the
+level matches the environment map and gains contact occlusion (shelf undersides) and a warm bounce
+off the orange track onto the ceiling. At night the floor under the warm ceiling spots bounces
+orange onto the walls and ceiling, which the old night environment map kept dark navy: plausible,
+but much redder — an art call (a per-environment `baked_light_scale` is the knob if wanted).
+Other tracks are not baked yet (≈ 6–8 MB each, Git LFS); outdoor looks are not reviewed.
 
 ## Phases
 | Phase | Delivers | Done when |
@@ -144,7 +144,7 @@ baked yet (≈ 40 MB compressed for all seven, no LFS in this repo).
 | P1 Shell | shared app assembly, `rc_editor` binary, editor bundle, editing session + fly cam, overrides, open/save, F5/Esc | open Toy Town, save with no edits → identical file except comments; drive and return |
 | P2 Tools | everything in "Editing scope", undo, lints, `rc_editor new`, `label`, catalog entry | build a new track from scratch and race it in the game |
 | P3 Migration (done) | corridor lint; every track moved off `plan.py`; labels | no script writes a track without `--layout`; no lints; CI green |
-| P4 Bake (done) | baker, `.irv` loader, weather scaling | Toy Town and Backyard Bash baked in a scratch copy; occlusion and bleeding visible; runs on the Iris Xe. Not yet: shipped volumes, a 3070 bench run |
+| P4 Bake (done) | baker, `.irv` loader, weather scaling | Toy Town baked and shipped; occlusion and bleeding visible; runs on the Iris Xe. Not yet: the other tracks, a 3070 bench run |
 
 ## Risks / to verify first
 - ~~A session with zero racers~~ — not needed: editing holds `RacePhase::Setup`, where no attempt
