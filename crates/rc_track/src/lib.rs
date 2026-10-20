@@ -4,9 +4,11 @@
 //!   (reverse, mirror) → centreline spline with banked frames → geometry buffers
 //!   ([`TrackGeometry`]) → checkpoints, respawn points, grid, item rows, racing line & speed
 //!   profile, ground areas, props (`assets/data/props/*.ron`, [`PropCatalog`]); the [`Track`]
-//!   query resource; session colliders; resetting dynamic props in `OnEnter(RacePhase::Setup)`.
-//! - **Inputs:** `RaceConfig::variant`, `UserPaths::assets_dir`, [`TrackDraft`] and
-//!   [`DragPreview`] (rc_editor), the session lifecycle states.
+//!   query resource; session colliders; resetting dynamic props in `OnEnter(RacePhase::Setup)`;
+//!   following a `Track` the track editor replaces in a race (colliders rebuilt by
+//!   [`TrackKey`], props diffed per [`PropSource`]).
+//! - **Inputs:** `RaceConfig::variant`, `UserPaths::assets_dir`, [`TrackDraft`],
+//!   [`DragPreview`] and a replaced `Track` (rc_editor), the session lifecycle states.
 //! - **Outputs:** [`Track`], `TrackSummary`, session-scoped collider entities (`TrackPiece`,
 //!   `Surface`, `Prop` + [`PropSource`], + `Interpolated` for dynamic props) on rc_core collision
 //!   layers, `Teleported` (prop resets, editor previews), `LoadingDone("track")` /
@@ -29,6 +31,7 @@ mod mesh;
 mod place;
 mod props;
 mod racing;
+mod rebuild;
 mod spawn;
 mod spline;
 mod track;
@@ -50,6 +53,7 @@ pub use place::{
 };
 pub use props::{MAX_DYNAMIC_PROPS, PROPS_DIR, Primitive, PropCatalog, PropDef};
 pub use racing::{LINE_MARGIN_U, LOCKED_OFFSET_U, SpeedModel};
+pub use rebuild::{PlacementChanges, placement_changes};
 pub use spline::{MIN_UP_Y, SAMPLE_SPACING_U};
 pub use track::*;
 pub use turns::{MERGE_U, MIN_ANGLE_DEG, MIN_TURN_RATE, SMOOTH_U};
@@ -87,6 +91,18 @@ pub enum DragSource {
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq)]
 pub struct DragPreview(pub Option<(DragSource, Transform)>);
 
+/// The track a live control-point drag in the track editor shows (written only by rc_editor; the
+/// game never has one): built from the dragged layout off the main thread, read only by
+/// rc_render's track visuals (which fall back to [`Track`]). Colliders, lints and everything else
+/// wait for the commit, which removes it.
+#[derive(Resource, Debug, Clone)]
+pub struct TrackPreview {
+    /// The dragged layout's track (current variant).
+    pub track: Track,
+    /// The editor's commit count when its build started (older results are dropped).
+    pub generation: u64,
+}
+
 /// Loading-gate key of this crate.
 pub const LOADING_KEY: &str = "track";
 
@@ -100,9 +116,19 @@ impl Plugin for TrackPlugin {
         LoadingTasks::register(app, LOADING_KEY);
         app.add_systems(OnEnter(AppState::Loading), spawn::load_track)
             .add_systems(OnEnter(RacePhase::Setup), spawn::reset_props)
+            // After the editor (before `FlowSet`) wrote the preview or replaced `Track`, before
+            // rc_render dresses new props; a cleared preview restores before a commit moves.
             .add_systems(
                 Update,
-                spawn::preview_prop.run_if(resource_exists_and_changed::<DragPreview>),
+                (
+                    spawn::preview_prop.run_if(resource_exists_and_changed::<DragPreview>),
+                    rebuild::rebuild
+                        .run_if(in_state(AppState::InRace))
+                        .run_if(resource_exists_and_changed::<Track>),
+                )
+                    .chain()
+                    .after(FlowSet)
+                    .before(InterpolateSet),
             )
             .add_systems(OnEnter(AppState::Unloading), spawn::remove_track);
     }

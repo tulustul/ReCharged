@@ -134,6 +134,13 @@ pub(crate) fn load_scene(server: &AssetServer, path: &str) -> Handle<WorldAsset>
 /// A Bevy mesh of rc_track-style buffers (world-unit UVs; tangents for the library's normal
 /// maps). `None` for an empty buffer.
 pub(crate) fn mesh_from_data(data: &MeshData) -> Option<Mesh> {
+    mesh_with_tangents(data, true)
+}
+
+/// [`mesh_from_data`] with mikktspace tangents (`exact`) or [`quick_tangents`] (≈ 10× faster:
+/// the track editor's live previews, replaced on release; same vertex layout, so no new
+/// pipelines).
+pub(crate) fn mesh_with_tangents(data: &MeshData, exact: bool) -> Option<Mesh> {
     if data.is_empty() {
         return None;
     }
@@ -142,10 +149,51 @@ pub(crate) fn mesh_from_data(data: &MeshData) -> Option<Mesh> {
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone())
         .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone())
         .with_inserted_indices(Indices::U32(data.indices.clone()));
-    if let Err(e) = mesh.generate_tangents() {
+    if !exact {
+        mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, quick_tangents(data));
+    } else if let Err(e) = mesh.generate_tangents() {
         warn_once!("content: no tangents for a mesh ({e}); its normal map is ignored");
     }
     Some(mesh)
+}
+
+/// Per-vertex tangents from each triangle's UV gradient, averaged and made orthogonal to the
+/// normal (w: bitangent handedness, signed as Bevy's mikktspace tangents are: −1 when the
+/// bitangent runs along `normal × tangent`).
+fn quick_tangents(data: &MeshData) -> Vec<[f32; 4]> {
+    let n = data.positions.len();
+    let (mut tangents, mut bitangents) = (vec![Vec3::ZERO; n], vec![Vec3::ZERO; n]);
+    for tri in data.indices.as_chunks::<3>().0 {
+        let [a, b, c] = tri.map(|i| i as usize);
+        let p = |i: usize| Vec3::from(data.positions[i]);
+        let uv = |i: usize| Vec2::from(data.uvs[i]);
+        let (e1, e2) = (p(b) - p(a), p(c) - p(a));
+        let (d1, d2) = (uv(b) - uv(a), uv(c) - uv(a));
+        let det = d1.x * d2.y - d2.x * d1.y;
+        if det.abs() < 1e-12 {
+            continue;
+        }
+        let t = (e1 * d2.y - e2 * d1.y) / det;
+        let bt = (e2 * d1.x - e1 * d2.x) / det;
+        for i in [a, b, c] {
+            tangents[i] += t;
+            bitangents[i] += bt;
+        }
+    }
+    (0..n)
+        .map(|i| {
+            let normal = Vec3::from(data.normals[i]);
+            let t = (tangents[i] - normal * normal.dot(tangents[i]))
+                .try_normalize()
+                .unwrap_or_else(|| normal.any_orthonormal_vector());
+            let w = if normal.cross(t).dot(bitangents[i]) < 0.0 {
+                1.0
+            } else {
+                -1.0
+            };
+            [t.x, t.y, t.z, w]
+        })
+        .collect()
 }
 
 /// The environment's time of day is Night (lamps on, headlights full).
@@ -183,6 +231,50 @@ mod tests {
         };
         assert_eq!(uvs[2], [4.0, 4.0], "UVs stay in world units");
         assert!(mesh.attribute(Mesh::ATTRIBUTE_TANGENT).is_some());
+    }
+
+    #[test]
+    fn quick_tangents_agree_with_mikktspace_on_a_flat_quad() {
+        let tangents = |mesh: Mesh| match mesh.attribute(Mesh::ATTRIBUTE_TANGENT) {
+            Some(VertexAttributeValues::Float32x4(t)) => t.clone(),
+            _ => panic!("tangents"),
+        };
+        let exact = tangents(mesh_with_tangents(&quad(), true).expect("a mesh"));
+        let quick = tangents(mesh_with_tangents(&quad(), false).expect("a mesh"));
+        for (e, q) in exact.iter().zip(&quick) {
+            assert!(
+                Vec4::from(*e).distance(Vec4::from(*q)) < 1e-4,
+                "{e:?} vs {q:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn quick_tangents_mostly_agree_with_mikktspace_on_a_ribbon() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let track =
+            rc_track::Track::load(&assets, &TrackVariant::forward("toy_town")).expect("toy_town");
+        let data = &track.geometry().ribbons[0].top;
+        let tangents = |exact| match mesh_with_tangents(data, exact)
+            .expect("a mesh")
+            .attribute(Mesh::ATTRIBUTE_TANGENT)
+        {
+            Some(VertexAttributeValues::Float32x4(t)) => t.clone(),
+            _ => panic!("tangents"),
+        };
+        let (exact, quick) = (tangents(true), tangents(false));
+        let agree = exact
+            .iter()
+            .zip(&quick)
+            .filter(|(e, q)| {
+                Vec3::from_slice(&e[..3]).dot(Vec3::from_slice(&q[..3])) > 0.95 && e[3] == q[3]
+            })
+            .count();
+        assert!(
+            agree * 100 >= exact.len() * 95,
+            "{agree} of {}",
+            exact.len()
+        );
     }
 
     #[test]

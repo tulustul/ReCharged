@@ -685,17 +685,20 @@ pub fn new_track(
 }
 
 /// The layout builds in every variant (what the game will race); the error names the variant.
-pub fn validate(doc: &Doc, props: &PropCatalog, track: &TrackId) -> Result<(), String> {
+/// Returns the forward layout's track (the editing session's).
+pub fn validate(doc: &Doc, props: &PropCatalog, track: &TrackId) -> Result<Track, String> {
+    let mut forward = None;
     for (reverse, mirror) in [(false, false), (true, false), (false, true), (true, true)] {
         let variant = TrackVariant {
             track: track.clone(),
             reverse,
             mirror,
         };
-        Track::build(&doc.def, props, &variant)
+        let built = Track::build(&doc.def, props, &variant)
             .map_err(|e| format!("{} layout: {e}", rc_track::variant_name(&variant)))?;
+        forward.get_or_insert(built);
     }
-    Ok(())
+    Ok(forward.expect("the forward layout is built first"))
 }
 
 #[cfg(test)]

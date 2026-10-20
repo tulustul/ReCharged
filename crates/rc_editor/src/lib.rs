@@ -3,15 +3,17 @@
 //! - **Responsibilities:** the edited document ([`doc`]: layout + decor) with undo/redo; every
 //!   edit is built in all four variants before it is accepted; the editing session — the game's
 //!   own race session on the track ([`TrackDraft`], so unsaved edits are what loads), held in
-//!   `RacePhase::Setup` (no cars) while editing and reloaded after each edit; test drives (F5);
+//!   `RacePhase::Setup` (no cars) while editing and updated in place after each edit (reloaded
+//!   only for the reload list, [`live`]); test drives (F5);
 //!   saving the layout and decor files (Ctrl+S); the inspector ([`fields`]); the 3D view
 //!   ([`view`]: fly camera, markers, picking, hover/selection tint; [`gizmo`]: the transform
 //!   gizmo); the [`EditorStatus`] React shows.
 //! - **Inputs:** keyboard and mouse, rc_ui's `editor.*` messages, `Track` (lints, projection),
 //!   `Catalog` (name, allowed times and weather), `RaceConfig` (session layout),
 //!   `LoadingFailed`, `UserPaths::assets_dir`.
-//! - **Outputs:** [`TrackDraft`] and `DragPreview` (sole writer), [`EditorStatus`] (sole
-//!   writer), `GameCommand`s (start, restart, change track), a `UiNav::Confirm` that skips a test
+//! - **Outputs:** [`TrackDraft`], `DragPreview` and `TrackPreview` (sole writer), the session's
+//!   `Track` and `TrackSummary` on an in-place commit, [`EditorStatus`] (sole writer),
+//!   `GameCommand`s (start, restart, change track), a `UiNav::Confirm` that skips a test
 //!   drive's intro, the `GameCamera`'s `Transform` while editing, `Overhead` visibility, tint
 //!   materials on the hovered and selected models, gizmos, the track and decor files on save.
 //! - **Must never:** run inside the game binary, write a data file except on an explicit save,
@@ -25,6 +27,7 @@ pub mod catalog;
 pub mod doc;
 pub mod fields;
 pub mod gizmo;
+mod live;
 mod tint;
 pub mod view;
 
@@ -38,7 +41,7 @@ use bevy::text::EditableText;
 use bevy::window::PrimaryWindow;
 use rc_core::prelude::*;
 use rc_game::{GameCommand, RaceRequest, TrackPick};
-use rc_render::{BakedGi, BakedLight};
+use rc_render::{BakedGi, BakedLight, volume_file};
 use rc_track::{
     DECOR_FILE, PropCatalog, TRACK_FILE, Track, TrackDef, TrackDraft, decor_to_ron, map_dir,
 };
@@ -142,6 +145,10 @@ impl Plugin for EditorPlugin {
             wanted: 0,
             built: 0,
             sent: false,
+            pending: None,
+            commits: 0,
+            applied: 0,
+            stale: Vec::new(),
             bake: None,
         })
         .init_resource::<EditorStatus>()
@@ -182,6 +189,7 @@ impl Plugin for EditorPlugin {
                 note_failures,
                 sync_draft,
                 sync_catalog,
+                live::apply,
                 push_status,
             )
                 .chain()
@@ -227,6 +235,15 @@ pub(crate) struct Editor {
     built: u32,
     /// A start or reload command is on its way.
     sent: bool,
+    /// The editing variant's track of an accepted change, to commit in place ([`live::apply`]).
+    pending: Option<Track>,
+    /// Accepted changes so far …
+    pub(crate) commits: u64,
+    /// … and how many of them the session has (in place or by a reload being asked for).
+    pub(crate) applied: u64,
+    /// Volumes (mirror, time) edited since they were baked (in memory; shown when the file
+    /// exists).
+    stale: Vec<(bool, TimeOfDay)>,
     /// A bake queue is running (editing waits).
     bake: Option<baking::BakeRun>,
 }
@@ -246,25 +263,26 @@ impl Editor {
         let mut selection = self.selection;
         let result = edit(&mut doc, &mut selection).and_then(|()| {
             if doc == self.doc {
-                return Ok(false);
+                return Ok(None);
             }
             let started = Instant::now();
-            validate(&doc, &self.props, &self.track)?;
+            let track = validate(&doc, &self.props, &self.track)?;
             if doc.info != self.doc.info {
                 catalog::with_entry(&self.catalog_text, &doc.info)?;
             }
-            debug!("editor: edit validated in {:?}", started.elapsed());
-            Ok(true)
+            info!("editor: edit validated in {:?}", started.elapsed());
+            Ok(Some(track))
         });
         match result {
-            Ok(changed) => {
-                if changed {
-                    self.undo.push(std::mem::replace(&mut self.doc, doc));
+            Ok(built) => {
+                if let Some(track) = built {
+                    let old = std::mem::replace(&mut self.doc, doc);
+                    self.changed(&old, Some(track));
+                    self.undo.push(old);
                     if self.undo.len() > UNDO_DEPTH {
                         self.undo.remove(0);
                     }
                     self.redo.clear();
-                    self.changed();
                 }
                 self.selection = selection;
                 self.error = None;
@@ -276,25 +294,58 @@ impl Editor {
         }
     }
 
-    fn changed(&mut self) {
-        self.wanted += 1;
+    /// The document changed from `old` (`track`: its editing variant, if built): reload when a
+    /// reload-list field changed, else commit in place ([`live`]); every volume is stale now.
+    fn changed(&mut self, old: &Doc, track: Option<Track>) {
         self.failed = None;
+        self.commits += 1;
+        let reload = live::reloads(old, &self.doc)
+            | live::fall_back(&mut self.options, &self.doc.info)
+            || track.is_none();
+        if reload {
+            self.wanted += 1;
+            self.pending = None;
+            self.applied = self.commits;
+        } else {
+            self.pending = track;
+        }
+        for mirror in [false, true] {
+            for &time in &self.doc.info.allowed_times {
+                if !self.stale.contains(&(mirror, time)) {
+                    self.stale.push((mirror, time));
+                }
+            }
+        }
         if self.selection.is_some_and(|s| !self.doc.exists(s)) {
             self.selection = None;
         }
     }
 
     fn step(&mut self, back: bool) {
-        let (from, to) = if back {
-            (&mut self.undo, &mut self.redo)
+        let popped = if back {
+            self.undo.pop()
         } else {
-            (&mut self.redo, &mut self.undo)
+            self.redo.pop()
         };
-        if let Some(doc) = from.pop() {
-            to.push(std::mem::replace(&mut self.doc, doc));
-            self.error = None;
-            self.changed();
+        let Some(doc) = popped else {
+            return;
+        };
+        let old = std::mem::replace(&mut self.doc, doc);
+        let track = Track::build(&self.doc.def, &self.props, &live::editing_variant(self))
+            .inspect_err(|e| warn!("editor: undo/redo: {e}; reloading"))
+            .ok();
+        self.changed(&old, track);
+        if back {
+            self.redo.push(old);
+        } else {
+            self.undo.push(old);
         }
+        self.error = None;
+    }
+
+    /// A bake wrote the volume of `mirror` × `time`: it is current again.
+    pub(crate) fn baked(&mut self, mirror: bool, time: TimeOfDay) {
+        self.stale.retain(|v| *v != (mirror, time));
     }
 
     pub(crate) fn select(&mut self, item: Option<EditorItem>) {
@@ -703,6 +754,18 @@ fn sync_catalog(editor: Res<Editor>, catalog: Option<ResMut<Catalog>>) {
     }
 }
 
+/// The stale volumes that exist ("Noon", "Night · mirror").
+fn stale_bake(editor: &Editor, assets_dir: &Path) -> Vec<String> {
+    editor
+        .stale
+        .iter()
+        .filter(|(mirror, time)| {
+            volume_file(assets_dir, editor.track.as_str(), *mirror, *time).is_file()
+        })
+        .map(|(mirror, time)| format!("{time:?}{}", if *mirror { " · mirror" } else { "" }))
+        .collect()
+}
+
 /// Whether the session has a baked volume, and whether it is in use.
 #[derive(SystemParam)]
 struct Probes<'w, 's> {
@@ -723,6 +786,7 @@ impl Probes<'_, '_> {
 
 fn push_status(
     editor: Res<Editor>,
+    paths: Res<UserPaths>,
     state: Res<State<AppState>>,
     track: Option<Res<Track>>,
     probes: Probes,
@@ -754,6 +818,7 @@ fn push_status(
         loading: editor.built != editor.wanted || *state.get() != AppState::InRace,
         baking: editor.bake.as_ref().map(|b| b.status.clone()),
         probes: probes.state(),
+        stale_bake: stale_bake(&editor, &paths.assets_dir),
         error: editor.failed.clone().or_else(|| editor.error.clone()),
         lints,
         can_undo: !editor.undo.is_empty(),
@@ -803,6 +868,10 @@ mod tests {
             wanted: 0,
             built: 0,
             sent: false,
+            pending: None,
+            commits: 0,
+            applied: 0,
+            stale: Vec::new(),
             bake: None,
         };
         let (path, catalog_text) = save(&assets, &editor).unwrap();

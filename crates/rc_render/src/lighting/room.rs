@@ -38,9 +38,14 @@ pub(crate) struct EnvMap {
 /// Overcast change that regenerates the outdoor environment map.
 const OVERCAST_STEP: f32 = 0.12;
 
-/// The room (lamps, windows) is built for this session.
-#[derive(Resource, Debug)]
-struct RoomBuilt;
+/// The floor plan (min x, min z, max x, max z of the bounds) the session's room lamps and window
+/// glass stand in (a track-editor commit can change it: the room is rebuilt then).
+#[derive(Resource, Debug, PartialEq)]
+struct RoomBuilt([f32; 4]);
+
+/// A ceiling lamp or window pane of the room (despawned by tag when the room is rebuilt).
+#[derive(Component, Debug, Clone, Copy)]
+struct RoomPiece;
 
 /// A ceiling lamp; `lumens` = its intensity when on.
 #[derive(Component, Debug, Clone, Copy)]
@@ -59,12 +64,7 @@ struct FixtureMaterial {
 pub(super) fn build(app: &mut App) {
     app.add_systems(
         Update,
-        (
-            make_env_map,
-            build_room.run_if(not(resource_exists::<RoomBuilt>)),
-            switch_lamps.after(LookSet),
-        )
-            .in_set(VisualSet),
+        (make_env_map, build_room, switch_lamps.after(LookSet)).in_set(VisualSet),
     )
     .add_systems(OnEnter(AppState::Unloading), |mut commands: Commands| {
         commands.remove_resource::<RoomBuilt>();
@@ -168,13 +168,16 @@ fn make_env_map(
     });
 }
 
-/// Places lamps and window glass once the session's track (and so the shell) exists.
+/// Places lamps and window glass once the session's track (and so the shell) exists, and again
+/// when its bounds change.
 #[allow(clippy::too_many_arguments)]
 fn build_room(
     mut commands: Commands,
     env: Option<Res<ActiveEnvironment>>,
     track: Option<Res<Track>>,
     session: Option<Res<State<RaceSession>>>,
+    built: Option<Res<RoomBuilt>>,
+    pieces: Query<Entity, With<RoomPiece>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut glass: ResMut<Assets<WindowMaterial>>,
@@ -182,11 +185,18 @@ fn build_room(
     let (Some(env), Some(track), Some(_)) = (env, track, session) else {
         return;
     };
-    commands.insert_resource(RoomBuilt);
+    let (min, max) = track.bounds();
+    let plan = [min.x, min.z, max.x, max.z];
+    if built.is_some_and(|b| b.0 == plan) {
+        return;
+    }
+    commands.insert_resource(RoomBuilt(plan));
+    for entity in &pieces {
+        commands.entity(entity).despawn();
+    }
     let Some(room) = env.def.room.as_ref() else {
         return;
     };
-    let (min, max) = track.bounds();
     if let Some(grid) = &room.lamps {
         spawn_lamps(
             &mut commands,
@@ -217,6 +227,7 @@ fn build_room(
             MeshMaterial3d(material),
             transform,
             WindowGlass { door: window.door },
+            RoomPiece,
             NotShadowCaster,
             NotShadowReceiver,
             DespawnOnExit(RaceSession),
@@ -282,6 +293,7 @@ fn spawn_lamps(
         let mut lamp = commands.spawn((
             Name::new("Ceiling lamp"),
             Lamp { lumens },
+            RoomPiece,
             Transform::from_translation(at),
             Visibility::default(),
             DespawnOnExit(RaceSession),

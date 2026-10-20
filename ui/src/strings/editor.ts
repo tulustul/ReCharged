@@ -7,6 +7,8 @@ export const editorStrings = {
   drive: "Test drive  F5",
   bake: "Bake light",
   bakeAll: "Bake all",
+  bakeStale: "Bake out of date",
+  staleVolumes: (names: string[]) => `Edited since baked: ${names.join(", ")}. Bake again to update the light.`,
   probes: (on: boolean | null) => (on === null ? "No probes" : on ? "Probes: on  P" : "Probes: off  P"),
   save: "Save",
   undo: "Undo",

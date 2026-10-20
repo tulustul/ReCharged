@@ -17,7 +17,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
-use rc_track::{DragPreview, PropDef, PropSource, Track};
+use rc_track::{DragPreview, PropDef, PropSource, Track, TrackDraft};
 
 use crate::content::{ContentLoad, load_scene, mesh_from_data};
 use crate::lighting::ActiveEnvironment;
@@ -54,6 +54,7 @@ pub(crate) fn build(app: &mut App) {
     app.init_resource::<PropAssets>()
         .init_resource::<PropLamps>()
         .init_resource::<lamps::DimmedBulbs>()
+        .init_resource::<decor::BuiltDecor>()
         .add_observer(lamps::dim_bulbs)
         .add_systems(OnEnter(AppState::Loading), lamps::read_lamps)
         .add_systems(
@@ -69,11 +70,17 @@ pub(crate) fn build(app: &mut App) {
                 .in_set(VisualSet)
                 .run_if(in_state(AppState::Loading)),
         )
+        // A cleared preview puts its model back before a commit moves it.
         .add_systems(
             Update,
-            decor::preview_decor
-                .in_set(VisualSet)
-                .run_if(resource_exists_and_changed::<DragPreview>),
+            (
+                decor::preview_decor.run_if(resource_exists_and_changed::<DragPreview>),
+                decor::follow_draft
+                    .run_if(in_state(AppState::InRace))
+                    .run_if(resource_exists_and_changed::<TrackDraft>),
+            )
+                .chain()
+                .in_set(VisualSet),
         )
         .add_systems(
             Update,

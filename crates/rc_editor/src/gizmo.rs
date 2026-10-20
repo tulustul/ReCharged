@@ -6,9 +6,10 @@
 //!
 //! G · R · C pick the mode, L the space (world or the item's own axes; scale is always local).
 //! Ctrl during a drag snaps (0.5 u, 15°, 0.1). A drag writes rc_track's `DragPreview` (props and
-//! decor follow it live; markers and the control polygon are drawn from a copy of the document)
-//! and commits one edit on release. The commit still reloads the session (P6), so the preview
-//! stays until the reloaded session is up: the item never flashes back to where it was.
+//! decor follow it live; markers and the control polygon are drawn from a copy of the document;
+//! layout handles get a `TrackPreview`, [`crate::live`]) and commits one edit on release. The
+//! preview stays until the commit is in the session (in place: the same frame the session's
+//! `Track` is replaced, [`crate::live::apply`]), so the item never flashes back to where it was.
 
 use bevy::gizmos::transform_gizmo::{
     intersect_plane, point_to_ring_screen_dist, point_to_segment_dist, translation_plane_normal,
@@ -97,7 +98,7 @@ pub(crate) struct Gizmo {
     pub(crate) drag: Option<Drag>,
     /// The handle under the cursor.
     pub(crate) hot: Option<Handle>,
-    /// A drag was committed and the session is reloading: the preview stays until it is up.
+    /// A drag was committed: the preview stays until the commit is in the session.
     settling: bool,
 }
 
@@ -108,6 +109,22 @@ impl Gizmo {
         let mut copy = doc.clone();
         copy.set_pose(drag.item, drag.live);
         Some(copy)
+    }
+
+    /// The document as a live drag of a layout handle (control point, ground vertex, shortcut
+    /// point) that has moved shows it: what the road preview is built from.
+    pub(crate) fn layout_preview(&self, doc: &Doc) -> Option<Doc> {
+        let drag = self.drag.as_ref().filter(|d| d.live != d.start)?;
+        let layout = matches!(
+            drag.item,
+            EditorItem::Point { .. } | EditorItem::Vertex { .. } | EditorItem::PathPoint { .. }
+        );
+        layout.then(|| self.preview(doc)).flatten()
+    }
+
+    /// A committed drag's preview waits for the commit to reach the session.
+    pub(crate) fn settling(&self) -> bool {
+        self.settling
     }
 
     fn cancel(&mut self) -> bool {
@@ -397,12 +414,12 @@ fn commit(editor: &mut Editor, gizmo: &mut Gizmo) {
         return;
     };
     if drag.live != drag.start {
-        let wanted = editor.wanted;
+        let commits = editor.commits;
         editor.edit(|doc, _| {
             doc.set_pose(drag.item, drag.live);
             Ok(())
         });
-        gizmo.settling = editor.wanted != wanted; // a reload is coming
+        gizmo.settling = editor.commits != commits; // accepted: it reaches the session soon
     }
     gizmo.drag = None;
 }
@@ -484,7 +501,7 @@ fn scripted(
 }
 
 /// Every frame in a session (editing or not): ends a drag the editor left (mode, tab, selection,
-/// a bake), and writes the `DragPreview` (kept while a committed drag's reload is under way).
+/// a bake), and writes the `DragPreview` (kept until a committed drag is in the session).
 pub(crate) fn sync(
     editor: Res<Editor>,
     state: Res<State<AppState>>,
@@ -501,7 +518,8 @@ pub(crate) fn sync(
         gizmo.drag = None;
     }
     if gizmo.settling {
-        if !(editor.session_current() && *state.get() == AppState::InRace) {
+        let applied = editor.applied == editor.commits;
+        if !(applied && editor.session_current() && *state.get() == AppState::InRace) {
             return;
         }
         gizmo.settling = false;

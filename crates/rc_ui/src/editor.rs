@@ -170,6 +170,8 @@ pub struct EditorStatus {
     pub baking: Option<String>,
     /// The session's baked light probes are in use (`null`: this layout and time have none).
     pub probes: Option<bool>,
+    /// Baked volumes edited since they were baked ("Noon", "Night · mirror"); the bake is stale.
+    pub stale_bake: Vec<String>,
     /// The last failure (an edit that would not build, load, save), if any.
     pub error: Option<String>,
     /// Build warnings of the session's track.

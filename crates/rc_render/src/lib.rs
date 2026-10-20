@@ -8,7 +8,9 @@
 //!   prop and car visuals and captures are T13b's content modules.
 //! - **Inputs:** `Interpolated` + `PoseHistory`, `Settings.graphics` / `.accessibility`,
 //!   `RaceConfig`, `Catalog`, `WeatherState`, `Track` (bounds), `MenuBackdrop`, camera markers
-//!   (`GameCamera`, `MenuCamera`), `LocalPlayer` racers, `UserPaths`.
+//!   (`GameCamera`, `MenuCamera`), `LocalPlayer` racers, `UserPaths`; the track editor's
+//!   `TrackDraft`, `DragPreview`, `TrackPreview` and replaced `Track` (track meshes, room and decor
+//!   rebuilt in place by key).
 //! - **Outputs:** visual entities only (proxies, lights, sky, showroom), camera rendering
 //!   components, the window's mode/size/vsync, [`MaterialLibrary`], [`ActiveEnvironment`],
 //!   [`PipelineQueue`], `ShowroomReady`, `LoadingDone("visuals")` / `LoadingFailed`.

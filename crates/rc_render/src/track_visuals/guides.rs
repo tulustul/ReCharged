@@ -67,7 +67,7 @@ const CROSS_PAST_U: f32 = 1.5;
 const CROSS_HALF_U: f32 = 1.5;
 
 /// The marks of a layout, one mesh per library role.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Guides {
     /// Tape, floor arrows and crosses (`guide_tape`).
     pub tape: MeshData,

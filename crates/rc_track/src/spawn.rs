@@ -9,7 +9,8 @@ use rc_core::prelude::*;
 use crate::build::{KILL_FLOOR_DEPTH_U, variant_name};
 use crate::mesh::MeshData;
 use crate::props::{Primitive, PropDef};
-use crate::track::Track;
+use crate::rebuild::Built;
+use crate::track::{PlacedProp, Track};
 use crate::{DragPreview, DragSource, LOADING_KEY, PropCatalog, PropSource, TrackDraft};
 
 /// Barrier friction (low, combined with `Min`: cars slide along walls, never stick).
@@ -25,7 +26,7 @@ const PROP_ANGULAR_DAMPING: f32 = 0.6;
 
 /// Spawn pose of a dynamic prop (restored on every restart).
 #[derive(Component, Debug, Clone, Copy)]
-pub(crate) struct PropSpawn(Transform);
+pub(crate) struct PropSpawn(pub Transform);
 
 fn groups(layer: u32) -> CollisionGroups {
     CollisionGroups::new(Group::from_bits_truncate(layer), Group::ALL)
@@ -69,7 +70,10 @@ pub(crate) fn load_track(
         );
     }
     spawn_colliders(&mut commands, &track);
-    spawn_props(&mut commands, &track);
+    for p in track.props() {
+        spawn_prop(&mut commands, &track, p);
+    }
+    commands.insert_resource(Built::of(&track));
     info!(
         "track {} ({}): {:.0} u, {} checkpoints, {} props, hash {:016x}",
         variant.track,
@@ -94,7 +98,8 @@ fn trimesh(parts: &[&MeshData]) -> Option<Collider> {
         .ok()
 }
 
-fn spawn_colliders(commands: &mut Commands, track: &Track) {
+/// The track pieces of `track` (ribbons, walls, ground, shell), session-scoped.
+pub(crate) fn spawn_colliders(commands: &mut Commands, track: &Track) {
     let geo = track.geometry();
     let session = || DespawnOnExit(RaceSession);
     let piece = |kind| TrackPiece { kind };
@@ -209,47 +214,46 @@ pub(crate) fn prop_collider(def: &PropDef) -> Option<Collider> {
     Some(Collider::compound(shapes))
 }
 
-fn spawn_props(commands: &mut Commands, track: &Track) {
-    for p in track.props() {
-        let Some(def) = track.prop_def(&p.kind) else {
-            continue;
-        };
-        let Some(collider) = prop_collider(def) else {
-            error!("prop {}: degenerate collider", p.kind);
-            continue;
-        };
-        let mut e = commands.spawn((
-            Name::new(format!("prop {}", p.kind)),
-            Prop {
-                kind: p.kind.clone(),
-                dynamic: def.dynamic,
+/// The collider entity of one placed prop (+ a dynamic body for knockables), session-scoped.
+pub(crate) fn spawn_prop(commands: &mut Commands, track: &Track, p: &PlacedProp) {
+    let Some(def) = track.prop_def(&p.kind) else {
+        return;
+    };
+    let Some(collider) = prop_collider(def) else {
+        error!("prop {}: degenerate collider", p.kind);
+        return;
+    };
+    let mut e = commands.spawn((
+        Name::new(format!("prop {}", p.kind)),
+        Prop {
+            kind: p.kind.clone(),
+            dynamic: def.dynamic,
+        },
+        PropSource(p.source),
+        p.transform,
+        collider,
+        groups(layers::PROP),
+        DespawnOnExit(RaceSession),
+    ));
+    if let Some(surface) = def.surface {
+        e.insert(Surface(surface));
+    }
+    if def.dynamic {
+        e.insert((
+            RigidBody::Dynamic,
+            ColliderMassProperties::Mass(def.mass),
+            Velocity::zero(),
+            Damping {
+                linear_damping: PROP_LINEAR_DAMPING,
+                angular_damping: PROP_ANGULAR_DAMPING,
             },
-            PropSource(p.source),
-            p.transform,
-            collider,
-            groups(layers::PROP),
-            DespawnOnExit(RaceSession),
+            Sleeping {
+                sleeping: true,
+                ..default()
+            },
+            Interpolated,
+            PropSpawn(p.transform),
         ));
-        if let Some(surface) = def.surface {
-            e.insert(Surface(surface));
-        }
-        if def.dynamic {
-            e.insert((
-                RigidBody::Dynamic,
-                ColliderMassProperties::Mass(def.mass),
-                Velocity::zero(),
-                Damping {
-                    linear_damping: PROP_LINEAR_DAMPING,
-                    angular_damping: PROP_ANGULAR_DAMPING,
-                },
-                Sleeping {
-                    sleeping: true,
-                    ..default()
-                },
-                Interpolated,
-                PropSpawn(p.transform),
-            ));
-        }
     }
 }
 
@@ -320,6 +324,7 @@ pub(crate) fn preview_prop(
 
 /// `OnEnter(AppState::Unloading)`: the session's resources go (entities leave with the scope).
 pub(crate) fn remove_track(mut commands: Commands) {
+    commands.remove_resource::<Built>();
     commands.remove_resource::<Track>();
     commands.remove_resource::<TrackSummary>();
 }

@@ -219,7 +219,8 @@ poses proxies in `InterpolateSet` using `Time<Fixed>::overstep_fraction()`. Tele
 respawn, prop reset) send a `Teleported { entity }` message; the snapshot system then sets
 `prev = curr` so nothing streaks across the screen. Models, wheels, VFX attachments,
 cameras and audio emitters use the proxy. Nobody but rc_vehicle, rapier and rc_track (prop
-spawn, reset, and the editor's drag preview) writes a rapier body's `Transform`. Headless apps have no proxies.
+spawn, reset, and the editor's drag preview and in-place prop moves, all with `Teleported`)
+writes a rapier body's `Transform`. Headless apps have no proxies.
 
 ### 3.4 Determinism
 - Stateless keyed RNG: `rc_core::rng::draw(seed, tick, stream: RngStream, key: u64) -> u64`
@@ -351,7 +352,8 @@ Rapier components on the racer are private to rc_vehicle.
 | `Standings(Vec<Entity>)` | race | ui, items (odds), ai |
 | `RaceResults { entries, ghost: Option<GhostData>, geometry_hash }` | race (on finish) | game, ui |
 | `TrackDraft { id, def: TrackDef, decor }` (editor only: the session builds and draws it instead of the track and decor files) | editor | track, render |
-| `TrackSummary { outline_2d, edges_2d, gates_2d, turns: Vec<TrackTurn { start_s, span, right, angle, severity }>, length, checkpoints, geometry_hash }` | track | ui (minimap, turn indicator), game (records) |
+| `TrackPreview { track, generation }`, `DragPreview` (editor only; defined in rc_track: a dragged control point's road / a dragged prop's or decor's pose) | editor | track, render |
+| `TrackSummary { outline_2d, edges_2d, gates_2d, turns: Vec<TrackTurn { start_s, span, right, angle, severity }>, length, checkpoints, geometry_hash }` (also `Track`) | track; the track editor re-inserts both after an in-place edit (editor only) | ui (minimap, turn indicator), game (records) |
 | `WeatherState { kind, time, precipitation, wetness, snow_cover, wind, fog, cloudiness, lightning, outside_only }` | weather | vehicle, render, vfx, audio, ui |
 | `LocalPlayers { slots: Vec<SlotBinding { slot, devices, last_used: DeviceKind }> }` | input | game, ui, camera |
 | `LobbyState { open: bool, max_slots }` | game | input |

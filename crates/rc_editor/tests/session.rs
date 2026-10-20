@@ -1,6 +1,7 @@
 //! The editing session on the real sim and flow: editing holds the race in Setup with no cars,
 //! a test drive runs the race, ending it returns to Setup without reloading, accepted edits
-//! rebuild the session from the draft, rejected ones change nothing, undo restores.
+//! update the session in place (only reload-list fields reload), rejected ones change nothing,
+//! undo restores.
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
@@ -9,7 +10,7 @@ use rc_editor::{
     EditorStatus,
 };
 use rc_testkit::*;
-use rc_track::TrackDraft;
+use rc_track::{Track, TrackDraft};
 use rc_ui::editor::FieldValue;
 
 fn editor_app(name: &str) -> App {
@@ -85,13 +86,19 @@ fn editing_holds_setup_and_test_drives_come_back_to_it() {
     assert!(!app.world().resource::<EditorStatus>().driving);
 }
 
+/// The session's lap length (a moved control point changes it).
+fn length(app: &App) -> f32 {
+    app.world().resource::<Track>().length()
+}
+
 #[test]
-fn an_edit_rebuilds_the_session_a_bad_one_is_rejected_and_undo_restores() {
+fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores() {
     let mut app = editor_app("edit");
     step_until(&mut app, "the editing session", in_race_setup);
     let point = EditorItem::Point { index: 3 };
     app.world_mut().trigger(EditorSelect { item: Some(point) });
     let before = app.world().resource::<TrackDraft>().def.points[3].pos;
+    let length_before = length(&app);
     let moved = before + Vec3::X * 0.5;
     app.world_mut().trigger(EditorSet {
         key: "pos".into(),
@@ -99,12 +106,21 @@ fn an_edit_rebuilds_the_session_a_bad_one_is_rejected_and_undo_restores() {
             value: moved.to_array().to_vec(),
         }),
     });
-    step(&mut app, 1);
-    assert!(app.world().resource::<EditorStatus>().loading, "rebuilding");
-    step_until(&mut app, "the rebuilt session", in_race_setup);
+    for _ in 0..3 {
+        step(&mut app, 1);
+        assert!(
+            in_race_setup(app.world()),
+            "no reload, not even for a frame"
+        );
+    }
     assert_eq!(
         app.world().resource::<TrackDraft>().def.points[3].pos,
         moved
+    );
+    assert_ne!(
+        length(&app),
+        length_before,
+        "the session's track is the edited one"
     );
     let status = app.world().resource::<EditorStatus>();
     assert!(status.dirty && status.can_undo && status.error.is_none());
@@ -126,11 +142,24 @@ fn an_edit_rebuilds_the_session_a_bad_one_is_rejected_and_undo_restores() {
     app.world_mut().trigger(EditorCommandMsg {
         command: EditorCommand::Undo,
     });
-    step(&mut app, 1);
-    step_until(&mut app, "the session after undo", in_race_setup);
+    step(&mut app, 2);
+    assert!(in_race_setup(app.world()), "undo is in place too");
     assert_eq!(
         app.world().resource::<TrackDraft>().def.points[3].pos,
         before
     );
+    assert_eq!(length(&app), length_before);
     assert!(!app.world().resource::<EditorStatus>().dirty);
+
+    // The catalog's `indoor` is on the reload list.
+    app.world_mut().trigger(EditorSelect {
+        item: Some(EditorItem::Track),
+    });
+    app.world_mut().trigger(EditorSet {
+        key: "indoor".into(),
+        value: Some(FieldValue::Toggle { value: true }),
+    });
+    step(&mut app, 2);
+    assert!(app.world().resource::<EditorStatus>().loading, "reloading");
+    step_until(&mut app, "the reloaded session", in_race_setup);
 }

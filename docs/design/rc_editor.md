@@ -2,8 +2,8 @@
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
 lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
-editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout) and P6 (select & gizmo)
-done** (§Editor v2): asset library, lighting editing, incremental rebuilds to come.
+editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout), P6 (select & gizmo) and
+P7 (incremental rebuilds) done** (§Editor v2): asset library and lighting editing to come.
 Only Toy Town is baked so far (§Irradiance bake).
 
 ```sh
@@ -65,6 +65,7 @@ crates/rc_editor   lib.rs   EditorPlugin: Editor state, edit/undo pipeline, sess
                    view.rs  EditorViewPlugin: fly camera, mesh picking, markers, focus point, cutaway
                    tint.rs  hover/selection tint (per-mesh material clones)
                    gizmo.rs the transform gizmo (move / rotate / scale, world / local, snap), DragPreview
+                   live.rs  P7: commit routing (reload list), the in-place commit, TrackPreview builds
                    main.rs  `rc_editor [new] <track>` = recharged::game + both plugins
 crates/rc_ui       editor.rs: editor.status / snapshot / command / select / set / options (+ v2: library, tab, gizmo, place, swap)
 ui/src/editor/     EditorLayer (toolbar, left tabs, right pane), controls.tsx (fields), Library.tsx
@@ -352,6 +353,53 @@ under `--user-data-dir`, `<dir>/settings.ron` — an automation dir, harmless). 
   Ctrl+press insertion, Esc. The maths has unit tests (axis drag, ring angle, scale, nearest
   segment); the preview and commit paths were screenshotted through `editor move|rotate|scale`.
 
+### P7 as built
+- **Routing** (`live.rs`): every accepted edit, undo or redo bumps `commits`; a changed catalog
+  `environment` / `indoor` / `music`, or a previewed time/weather the entry no longer allows
+  (falls back to the first allowed one), bumps `wanted` (reload) instead. Otherwise the forward
+  `Track` that validation already built (undo/redo build it once) is `pending`, and `live::apply`
+  (editor chain, before `FlowSet`) inserts it with its `TrackSummary`, removes `TrackPreview` and
+  clears `DragPreview` in one frame. A session that is not the edited one (loading, test
+  driving) reloads instead, so no edit is lost to a load already under way.
+- **rc_track** (`rebuild.rs`, after `FlowSet`): `Track::key()` (`TrackKey`: the def without props,
+  rows, battery and labels + variant + bounds) against the built one → respawn `TrackPiece`s;
+  props diffed by `rc_track::placement_changes` (also rc_render's decor diff): another kind →
+  respawn, same kind and another pose → **moved in place** (*deviation*: the design says
+  respawn; moving keeps the entity, so its glb never blinks for the frames instancing takes; a
+  dynamic one gets `PropSpawn`, zero velocity and `Teleported`). The cleared `DragPreview`'s
+  restore runs first in the same chain; a test fails if that order flips.
+- **rc_render:** track meshes keyed by `MeshKey` = `TrackKey` + the way-finding marks
+  (*deviation*: chevron boards and crosses step aside for props, so a prop edit can move them;
+  computing them to compare costs ≈ 0.6 ms on Toy Town). They show `TrackPreview` when present,
+  else `Track`. Room lamps and window glass are tagged `RoomPiece` and rebuilt when the bounds'
+  floor plan (x/z) changes (`RoomBuilt` now holds that key instead of being a once-guard). Decor
+  follows `TrackDraft` with the same plan/diff code as its load (a load = the changes from
+  nothing). **Prop models are not in a plan of their own** (*deviation*): since P6 they are
+  children of their `Prop` (static) or of its visual proxy (dynamic), so rc_track's diff moves,
+  despawns and respawns them and `dress_props` dresses new props — the load's code; test (a)
+  covers them through the prop entities.
+- **Previews** use quick tangents (UV gradient per triangle, same vertex layout so no new
+  pipelines; ≥ 95 % agree with mikktspace on a ribbon): mikktspace made each preview rebuild
+  64 ms on the main thread (≈ 12 updates/s); quick ones take 7–9 ms. The meshes are rebuilt with
+  mikktspace once the session's `Track` shows again (commit or cancel). `fit_racing_line` was not
+  the bottleneck (the whole `Track::build` is ≈ 20 ms, off the main thread), so there is no
+  `BuildOptions` flag.
+- **Bake stale:** `Editor.stale` holds (mirror, time) pairs marked by every commit (all allowed
+  times, both layouts) and cleared by that volume's finished bake; `EditorStatus.staleBake` lists
+  those whose file exists. The toolbar shows "Bake out of date", the Lighting tab names them.
+- **Measured** (this machine, Toy Town, dev build): a prop move commits in ≈ 80 ms (validation
+  of the four variants 77 ms, collider diff 0.1 ms, mesh key check 0.6 ms), `AppState` stays
+  `InRace`; a control-point move ≈ 165 ms (validation 78 ms, track colliders 17–19 ms, track
+  meshes 67 ms), against the ≈ 0.7 s reload (P4's figure). A scripted 2 s point drag (60 poses) got 59 previews
+  (≈ 30/s, the script's pace; build 19.5 ms async + 7–9 ms meshes). Not yet measured on the Iris
+  Xe. Screenshots: `target/agent-data/p7/`.
+- **Tests:** rc_track `tests/incremental.rs` (edits incl. a `dir: Rev` prop applied in place vs a
+  fresh load of the same draft: `Track`, `TrackSummary`, colliders by `TrackPiece` / `PropSource`;
+  knockables compared on a 1 cm grid, as they settle while a session loads; plus the
+  preview-restore order), rc_render `incremental_plans_equal_fresh_ones` (mesh key + decor
+  plan), `placement_changes` and quick-tangent unit tests, the editor session test (an edit, a
+  rejected one and undo stay in place; `indoor` reloads).
+
 ## Editing scope (P4)
 | Item | Handles | Inspector |
 |---|---|---|
@@ -441,7 +489,7 @@ an art call. Other times of day and the mirror layout are not baked.
 | P4 Bake (done) | baker, `.irv` loader, weather scaling | Toy Town baked and shipped; occlusion and bleeding visible; runs on the Iris Xe. Not yet: the other tracks, a 3070 bench run |
 | P5 Layout (done) | toolbar, left tabs (Assets placeholder, Track, Lighting = today's bake buttons), right pane; Items window and Notes removed; error toast; lints in the Track tab | everything P4 could edit is still reachable; no item is only reachable through an index chip |
 | P6 Select & gizmo (done) | live drag previews (`DragPreview`, `EnvPreview` once P9 adds lights) applied by rc_track/rc_render, `MeshRayCast` picking, source tags + `PlacedProp::source`, hover/selection tint, markers (incl. dimmed unreachable items), `gizmo.rs` (G/R/C, L, Ctrl snap), Track-tab-only layout handles, Ctrl+press insert, decor rotation/scale data change. Commits still reload (P4 path) | select any object, including `dir: Rev` ones, by clicking it; move/rotate/scale decor, move/yaw props, move points; old decor files still load; a prop or decor drag is real-time (the release still reloads) |
-| P7 Incremental | `TrackPreview` for point drags, track key + per-source diffs, `RoomPiece` rebuild, `TrackSummary` re-insert, no `ChangeTrack` per edit, both equivalence tests | both tests pass; a point drag updates the road visibly while dragging on the Iris Xe; no session reload on any edit outside the reload list |
+| P7 Incremental (done) | `TrackPreview` for point drags, track key + per-source diffs, `RoomPiece` rebuild, `TrackSummary` re-insert, no `ChangeTrack` per edit, both equivalence tests | both tests pass; a point drag updates the road visibly while dragging on the Iris Xe; no session reload on any edit outside the reload list |
 | P8 Library | `library.rs`, `editor.library`, categories + search, placement mode with ghost (+ `editor place` verb), swap | build a lap of Toy Town's decor from the library without typing a model path |
 | P9 Lighting | `environment.ron` in the `Doc` (+ `to_ron`, save, undo), `EnvironmentDraft`, light objects + sun/fill markers, Lighting tab's time look, bake-stale flags; mirrored environment lights (game fix) | add a spot light, aim it, change noon's sun and exposure, undo it all, save, reopen: identical |
 | P10 Settings | `rc_game::read_settings`, inserted before Boot | the editor renders at the player's preset; the file is untouched after an editor run |

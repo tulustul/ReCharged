@@ -7,7 +7,7 @@ use bevy::math::{Mat3, Quat, Vec2, Vec3};
 use bevy::prelude::{Resource, Transform};
 use rc_core::{SurfaceKind, TrackSummary, TrackTurn, TrackVariant};
 
-use crate::def::RibbonStyle;
+use crate::def::{RibbonStyle, TrackDef};
 use crate::geometry::TrackGeometry;
 use crate::props::PropDef;
 
@@ -193,6 +193,38 @@ pub struct Jump {
     pub air_time: f32,
 }
 
+/// What a layout's colliders and meshes are built from: its [`TrackDef`] without props, item
+/// rows, the Golden Battery and control-point labels, plus the variant and the bounds (automatic
+/// bounds grow with the props). A track-editor commit rebuilds them only when this changes
+/// (`geometry_hash` would not do: it hashes props and leaves out style, bounds, shortcuts and the
+/// start; it stays for records).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrackKey {
+    def: TrackDef,
+    variant: TrackVariant,
+    pub(crate) bounds: (Vec3, Vec3),
+}
+
+impl TrackKey {
+    /// The key of `variant` of `def`; the bounds are filled in once known.
+    pub(crate) fn new(def: &TrackDef, variant: &TrackVariant) -> Self {
+        let mut def = TrackDef {
+            props: Vec::new(),
+            item_rows: Vec::new(),
+            golden_battery: None,
+            ..def.clone()
+        };
+        for p in &mut def.points {
+            p.label = None;
+        }
+        Self {
+            def,
+            variant: variant.clone(),
+            bounds: (Vec3::ZERO, Vec3::ZERO),
+        }
+    }
+}
+
 /// Per-sample data (every `ds` u of arc length).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Node {
@@ -230,6 +262,7 @@ pub struct Track {
     pub(crate) bounds: (Vec3, Vec3),
     pub(crate) geometry: TrackGeometry,
     pub(crate) geometry_hash: u64,
+    pub(crate) key: TrackKey,
     pub(crate) lints: Vec<String>,
 }
 
@@ -521,6 +554,11 @@ impl Track {
     /// Stable hash of the built geometry (records/ghosts of another hash are discarded).
     pub fn geometry_hash(&self) -> u64 {
         self.geometry_hash
+    }
+
+    /// What the colliders and meshes are built from (see [`TrackKey`]).
+    pub fn key(&self) -> &TrackKey {
+        &self.key
     }
 
     /// Authoring-guideline warnings (slopes, banks, chokepoints, short jumps); empty for a

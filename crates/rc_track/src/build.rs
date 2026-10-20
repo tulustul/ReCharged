@@ -121,6 +121,7 @@ impl Track {
             wall_height: layout.wall_height,
             bounds: (Vec3::ZERO, Vec3::ZERO),
             geometry_hash: 0,
+            key: TrackKey::new(def, variant),
             lints: Vec::new(),
         };
         let gaps: Vec<(f32, f32)> = layout
@@ -142,6 +143,7 @@ impl Track {
             })
             .collect();
         track.bounds = bounds(&track, &layout)?;
+        track.key.bounds = track.bounds;
         track.lints = lints(&track);
         track.geometry_hash = geometry_hash(&track);
         Ok(track)

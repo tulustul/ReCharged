@@ -413,7 +413,10 @@ fn step(run: &mut BakeRun, editor: &mut Editor, s: &BakeSession) -> bool {
             job.time,
         );
         match write(&path, &grid.to_bytes()) {
-            Ok(()) => info!("editor: baked {} in {seconds:.1} s", path.display()),
+            Ok(()) => {
+                info!("editor: baked {} in {seconds:.1} s", path.display());
+                editor.baked(job.mirror, job.time);
+            }
             Err(e) => {
                 error!("editor: {e}");
                 editor.set_error(e);

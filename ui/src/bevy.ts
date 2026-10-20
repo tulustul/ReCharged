@@ -272,6 +272,10 @@ baking: string | null,
  */
 probes: boolean | null, 
 /**
+ * Baked volumes edited since they were baked ("Noon", "Night · mirror"); the bake is stale.
+ */
+staleBake: Array<string>, 
+/**
  * The last failure (an edit that would not build, load, save), if any.
  */
 error: string | null, 

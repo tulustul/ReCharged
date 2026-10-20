@@ -70,6 +70,7 @@ impl Plugin for EditorViewPlugin {
         app.init_resource::<Gizmo>()
             .init_resource::<Hover>()
             .init_resource::<DragPreview>()
+            .init_resource::<crate::live::PreviewBuild>()
             .add_systems(Startup, gizmo_look)
             .add_systems(Update, cutaway.run_if(in_state(AppState::InRace)))
             .add_systems(
@@ -81,10 +82,15 @@ impl Plugin for EditorViewPlugin {
                     .run_if(editing),
             )
             // Also between sessions: commands may come while one loads, and a committed drag's
-            // preview waits for the reload.
+            // preview waits for the commit to reach the session.
             .add_systems(
                 Update,
-                (gizmo::commands.before(pointer), gizmo::sync.after(draw)),
+                (
+                    gizmo::commands.before(pointer),
+                    (gizmo::sync, crate::live::preview_track)
+                        .chain()
+                        .after(draw),
+                ),
             );
         crate::tint::build(app);
     }

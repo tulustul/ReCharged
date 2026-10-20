@@ -80,6 +80,7 @@ function Lighting({ status }: { status: EditorStatus }) {
         <Tool label={words.bakeAll} onPress={() => command({ kind: "bake", all: true })} disabled={baking} />
       </node>
       {status.baking !== null && <text style={{ ...text.small, color: color.cyan }}>{status.baking}</text>}
+      {status.staleBake.length > 0 && <text style={{ ...text.small, color: color.warning }}>{words.staleVolumes(status.staleBake)}</text>}
     </>
   );
 }

@@ -1,7 +1,7 @@
-// The track editor's screen while editing (rc_editor): the toolbar (name, save state, undo/redo,
-// save, session time and weather, test-drive layout, test drive), the left pane (tabs), the error
-// toast under the toolbar, and the right pane (the selection's fields and actions; none when
-// nothing is selected). Test drives show the game's race UI instead.
+// The track editor's screen while editing (rc_editor): the toolbar (name, a stale bake, save
+// state, undo/redo, save, session time and weather, test-drive layout, test drive), the left pane
+// (tabs), the error toast under the toolbar, and the right pane (the selection's fields and
+// actions; none when nothing is selected). Test drives show the game's race UI instead.
 import { useState } from "react";
 
 import type { EditorStatus } from "../bevy";
@@ -41,6 +41,9 @@ function Toolbar({ status }: { status: EditorStatus }) {
         <text style={text.caps}>{words.title}</text>
         <text style={text.h3}>{status.name}</text>
       </node>
+      {status.staleBake.length > 0 && status.baking === null && (
+        <text style={{ ...text.label, color: color.warning, margin: { right: space.m } }}>{words.bakeStale}</text>
+      )}
       <text style={{ ...text.label, color: status.baking !== null ? color.cyan : status.dirty || status.loading ? color.warning : color.textDim, margin: { right: space.m } }}>{state}</text>
       <Tool label={words.undo} onPress={() => command({ kind: "undo" })} disabled={!status.canUndo} />
       <Tool label={words.redo} onPress={() => command({ kind: "redo" })} disabled={!status.canRedo} />
