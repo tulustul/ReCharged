@@ -148,7 +148,10 @@ forward file), the session gets one `LightProbe + IrradianceVolume` over its bou
 Bevy takes *diffuse* indirect light from the volume instead of the camera's environment map (whose
 specular stays); without a file nothing changes. Values are irradiance / π (cd/m²-like, they
 multiply the diffuse colour directly); `Look::env_light / clear env_light` scales them with the
-weather. Binding arrays are off (upstream U7), so Bevy uses one volume per view — one per session
+weather. The environment's **fill light is off** while a volume is used: it is shadowless sky
+light that lit everything (under decks, under tables) and is baked into the volume instead,
+occluded. `BakedLight { enabled }` switches the volume (and with it the fill) for diagnosis — the
+editor's probes toggle. Binding arrays are off (upstream U7), so Bevy uses one volume per view — one per session
 is all there is. Verified on the Iris Xe (Mesa): no hang, faces where the shader samples them
 (rows `[0, y)` = +axis normals, `[y, 2y)` = −axis — `bevy_pbr`'s module docs say the opposite;
 the shader wins). The editor bakes the files; `keep_cpu_copies()` (editor only) keeps rc_render's

@@ -13,11 +13,13 @@ use std::time::Instant;
 
 use bevy::asset::UntypedAssetId;
 use bevy::ecs::system::SystemParam;
+use bevy::light::NotShadowCaster;
 use bevy::mesh::{Indices, VertexAttributeValues};
 use bevy::prelude::*;
 use rc_core::prelude::*;
 use rc_render::{
-    ActiveEnvironment, IrradianceGrid, SurfaceMaterial, environment_radiance, volume_file,
+    ActiveEnvironment, BakedLight, EnvLight, IrradianceGrid, SurfaceMaterial, environment_radiance,
+    volume_file,
 };
 use rc_track::Track;
 
@@ -129,6 +131,7 @@ pub(crate) struct SceneParams<'w, 's> {
             &'static Mesh3d,
             &'static MeshMaterial3d<StandardMaterial>,
             &'static GlobalTransform,
+            Has<NotShadowCaster>,
         ),
     >,
     /// Ground, ribbons, walls and the room shell (a `StandardMaterial` with weather on top).
@@ -139,13 +142,22 @@ pub(crate) struct SceneParams<'w, 's> {
             &'static Mesh3d,
             &'static MeshMaterial3d<SurfaceMaterial>,
             &'static GlobalTransform,
+            Has<NotShadowCaster>,
         ),
     >,
     mesh_assets: Res<'w, Assets<Mesh>>,
     materials: Res<'w, Assets<StandardMaterial>>,
     surface_materials: Res<'w, Assets<SurfaceMaterial>>,
     images: Res<'w, Assets<Image>>,
-    suns: Query<'w, 's, (&'static DirectionalLight, &'static GlobalTransform)>,
+    suns: Query<
+        'w,
+        's,
+        (
+            &'static DirectionalLight,
+            &'static GlobalTransform,
+            Option<&'static EnvLight>,
+        ),
+    >,
     points: Query<'w, 's, (&'static PointLight, &'static GlobalTransform)>,
     spots: Query<'w, 's, (&'static SpotLight, &'static GlobalTransform)>,
 }
@@ -180,16 +192,28 @@ pub(crate) fn gather(p: &SceneParams, env: &ActiveEnvironment) -> Result<(Scene,
     let mut textures: HashMap<AssetId<Image>, Option<Vec3>> = HashMap::new();
     let (mut skipped, mut no_cpu, mut flat) = (0usize, 0usize, 0usize);
     // (mesh, material key, its StandardMaterial part, pose) of both material kinds.
-    let standard = p.meshes.iter().map(|(mesh, material, transform)| {
-        let id = material.id();
-        (mesh, id.untyped(), p.materials.get(id), transform)
-    });
-    let surface = p.surfaces.iter().map(|(mesh, material, transform)| {
-        let id = material.id();
-        let base = p.surface_materials.get(id).map(|m| &m.base);
-        (mesh, id.untyped(), base, transform)
-    });
-    for (mesh, id, material, transform) in standard.chain(surface) {
+    let standard = p
+        .meshes
+        .iter()
+        .map(|(mesh, material, transform, no_shadow)| {
+            let id = material.id();
+            (
+                mesh,
+                id.untyped(),
+                p.materials.get(id),
+                transform,
+                !no_shadow,
+            )
+        });
+    let surface = p
+        .surfaces
+        .iter()
+        .map(|(mesh, material, transform, no_shadow)| {
+            let id = material.id();
+            let base = p.surface_materials.get(id).map(|m| &m.base);
+            (mesh, id.untyped(), base, transform, !no_shadow)
+        });
+    for (mesh, id, material, transform, casts) in standard.chain(surface) {
         let index = *materials.entry(id).or_insert_with(|| {
             let m = material?;
             if !matches!(m.alpha_mode, AlphaMode::Opaque | AlphaMode::Mask(_)) {
@@ -228,7 +252,7 @@ pub(crate) fn gather(p: &SceneParams, env: &ActiveEnvironment) -> Result<(Scene,
         let flipped = affine.matrix3.determinant() < 0.0;
         let mut emit = |[a, b, c]: [usize; 3]| {
             let (a, b, c) = (world[a], world[b], world[c]);
-            builder.triangle(if flipped { [a, c, b] } else { [a, b, c] }, index);
+            builder.triangle(if flipped { [a, c, b] } else { [a, b, c] }, index, casts);
         };
         match mesh.indices() {
             Some(Indices::U16(i)) => i
@@ -250,14 +274,21 @@ pub(crate) fn gather(p: &SceneParams, env: &ActiveEnvironment) -> Result<(Scene,
             p.meshes.iter().count() + p.surfaces.iter().count()
         ));
     }
-    let suns = p
+    // The environment's fill is sky light without shadows; in sessions with a volume it is off and
+    // the volume carries it, occluded (`Sun::in_volume`). The key always casts shadows here,
+    // whatever the quality tier does on screen.
+    let suns: Vec<Sun> = p
         .suns
         .iter()
-        .filter(|(l, _)| l.illuminance > 0.0)
-        .map(|(l, t)| Sun {
-            toward: -t.forward().as_vec3(),
-            irradiance: linear(l.color) * l.illuminance,
-            shadows: l.shadow_maps_enabled,
+        .filter(|(l, ..)| l.illuminance > 0.0)
+        .map(|(l, t, role)| {
+            let fill = role == Some(&EnvLight::Fill);
+            Sun {
+                toward: -t.forward().as_vec3(),
+                irradiance: linear(l.color) * l.illuminance,
+                shadows: l.shadow_maps_enabled || fill || role == Some(&EnvLight::Key),
+                in_volume: fill,
+            }
         })
         .collect();
     let lamp = |color: Color, lumens: f32, range: f32, pos: Vec3, shadows: bool| Lamp {
@@ -304,7 +335,7 @@ pub(crate) fn gather(p: &SceneParams, env: &ActiveEnvironment) -> Result<(Scene,
         "{} triangles, {} materials ({flat} textures without CPU data), {} suns, {} lamps; {skipped} transparent and {no_cpu} GPU-only meshes left out",
         builder.triangles(),
         materials.values().flatten().count(),
-        p.suns.iter().filter(|(l, _)| l.illuminance > 0.0).count(),
+        suns.len(),
         lamps.len(),
     );
     let def = env.def.clone();
@@ -325,17 +356,22 @@ pub(crate) struct BakeSession<'w, 's> {
 }
 
 /// Drives the bake queue: wait for each job's session, gather, trace, write; restore editing.
+/// Baked light is off meanwhile, so the session shows (and the baker gathers) the unbaked
+/// lights — the fill among them.
 pub(crate) fn run(
     mut editor: ResMut<Editor>,
     session: BakeSession,
+    mut probes: ResMut<BakedLight>,
     mut exit: MessageWriter<AppExit>,
 ) {
     let Some(mut run) = editor.bake.take() else {
         return;
     };
+    probes.set_if_neq(BakedLight { enabled: false });
     let finished = step(&mut run, &mut editor, &session);
     if finished {
         info!("editor: baking done");
+        probes.enabled = true;
         editor.bake_done();
         if run.exit {
             exit.write(AppExit::Success);
@@ -442,18 +478,20 @@ fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .map_err(fail)
 }
 
-/// `--bake`: bake everything once the editing session is up, then quit.
+/// `--bake` (`None`: every allowed time, both layouts) or `--bake-time <t>` (that time, the normal
+/// layout): bake once the editing session is up, then quit.
 #[derive(Resource, Debug)]
-pub(crate) struct BakeOnStart;
+pub(crate) struct BakeOnStart(pub Option<TimeOfDay>);
 
 pub(crate) fn bake_on_start(
     mut commands: Commands,
     state: Res<State<AppState>>,
+    order: Res<BakeOnStart>,
     mut editor: ResMut<Editor>,
 ) {
     if *state.get() == AppState::InRace && editor.mode == Mode::Editing && editor.session_current()
     {
         commands.remove_resource::<BakeOnStart>();
-        editor.start_bake(true, true);
+        editor.start_bake(order.0.is_none(), order.0, true);
     }
 }

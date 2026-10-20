@@ -209,11 +209,26 @@ pub fn from_rgb9e5(bits: u32) -> Vec3 {
     ) * scale
 }
 
-/// The session's baked volume.
+/// Whether a session's baked volume is used (a diagnostic switch: the track editor's probes
+/// toggle). Off = exactly the unbaked look: environment-map diffuse, the fill light on.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BakedLight {
+    /// Use the volume.
+    pub enabled: bool,
+}
+
+impl Default for BakedLight {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+/// The session's baked volume (its `IrradianceVolume` is present while [`BakedLight`] is on).
 #[derive(Component, Debug)]
-pub(crate) struct BakedGi {
+pub struct BakedGi {
     /// `env_light` of the look the bake was made in (clear weather): weather scales by the ratio.
     clear_env_light: f32,
+    voxels: Handle<Image>,
 }
 
 /// `Loading`: spawn the session's volume when its track appears (if one was baked).
@@ -251,16 +266,31 @@ pub(super) fn spawn_volume(
         Name::new("Baked indirect light"),
         BakedGi {
             clear_env_light: env.def.look(env.time).env_light.max(1e-6),
+            voxels: images.add(grid.image()),
         },
         LightProbe::default(),
-        IrradianceVolume {
-            voxels: images.add(grid.image()),
-            intensity: 1.0,
-            affects_lightmapped_meshes: true,
-        },
         Transform::from_translation((grid.min + grid.max) / 2.0).with_scale(grid.max - grid.min),
         DespawnOnExit(RaceSession),
     ));
+}
+
+/// Adds or removes the volume as [`BakedLight`] says.
+pub(super) fn switch_volume(
+    mut commands: Commands,
+    setting: Res<BakedLight>,
+    volumes: Query<(Entity, &BakedGi, Has<IrradianceVolume>)>,
+) {
+    for (entity, baked, on) in &volumes {
+        if setting.enabled && !on {
+            commands.entity(entity).insert(IrradianceVolume {
+                voxels: baked.voxels.clone(),
+                intensity: 1.0,
+                affects_lightmapped_meshes: true,
+            });
+        } else if !setting.enabled && on {
+            commands.entity(entity).remove::<IrradianceVolume>();
+        }
+    }
 }
 
 /// Weather dims or brightens the bounce like it does the environment map.

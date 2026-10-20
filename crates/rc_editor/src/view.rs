@@ -95,6 +95,11 @@ impl View {
         }
     }
 
+    /// Put the camera here.
+    pub fn set(&mut self, pose: Transform) {
+        self.pose = Some(pose);
+    }
+
     /// Look at `target` from behind and above, keeping the heading.
     pub fn look_at(&mut self, target: Vec3) {
         let heading = self

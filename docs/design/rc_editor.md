@@ -102,7 +102,11 @@ with a real mouse by an agent (no input injection on the test machine).
 ## Irradiance bake (D3, P4)
 ```sh
 cargo run -p rc_editor -- toy_town --bake      # every allowed time × {normal, mirror}, then quit
+cargo run -p rc_editor -- toy_town --bake-time noon   # one volume (normal layout), then quit
 ```
+**Probes: on/off** (toolbar, **P**) switches the session's volume — and the fill light it replaces —
+to compare the lighting with and without it. Scripted comparisons: `--window 1600x900` and the
+UI-script verb `editor lookAt x y z tx ty tz` (camera pose), then `editor toggleProbes`.
 or **Bake light** (this time, forward) / **Bake all** in the editor's toolbar. Files:
 `assets/data/lighting/<track>/<normal|mirror>_<time>.irv` (format and runtime: rc_render
 `lighting/gi.rs`, `rc_render.md` §Baked indirect light). Reverse layouts use the forward bake (only
@@ -117,26 +121,30 @@ CPU (`bake.rs`, `baking.rs`):
   (ground, ribbons, walls, the room shell; its `StandardMaterial` base), the ceiling too (editing
   only hides it) — becomes world triangles in a parry `TriMesh` (≈ 0.83 M for Toy Town); albedo =
   base colour × the texture's mean colour; double-sided materials are noted.
-- Lights as the game has them in clear weather: directional lights (lux × colour; shadow rays for
-  the ones that cast shadows — the indoor fill does not), point and spot lights (lumens / 4π,
-  Bevy's range fall-off and cone). Rays that leave the scene see `rc_render::environment_radiance`
-  (the room or sky the environment map shows, × `env_light`).
+- Lights as the game has them in clear weather: the key (always shadowed), point and spot lights
+  (lumens / 4π, Bevy's range fall-off and cone). Shadow rays see only meshes that cast shadows in
+  the game: a room's ceiling does not (the key reaches the room through it like a skylight).
+  **The fill** (shadowless sky light) is off in the game where a volume exists and is baked into
+  it instead: added to each probe where the probe sees its direction, so open floor keeps the
+  fill's light and the floor under a deck or a table loses it; its bounce counts too. Rays that
+  leave the scene see `rc_render::environment_radiance` (the room or sky the environment map
+  shows, × `env_light`). Baked light is off while baking, so the fill is gathered.
 - Probes over the track's bounds (indoors floor to ceiling, so tall walls have no seam; outdoors
   to the highest drivable point + 12 u), 2 u apart horizontally (coarser on large tracks, ≤ 12 k
   columns), ≈ 8 layers. 512 rays per probe (Fibonacci set), two passes: direct light + sky, then
   one more bounce through pass 1's volume. Probes that mostly see back faces are inside solid
-  geometry and take their neighbours' values. RGB9E5, ≈ 0.7–1 MB per volume.
+  geometry and take, per face, the darkest valid neighbour (a probe inside a 0.25 u deck must not
+  borrow the sunlit top's light for the underside). RGB9E5, ≈ 0.7–1 MB per volume.
 - Each job reloads the session in its layout and time (clear weather), waits 30 frames, gathers on
   the main thread and traces on a background thread (the window keeps running; edits wait).
 - **Measured on the Iris Xe laptop (dev build):** Toy Town 40 k probes, 0.83 M triangles: 21–36 s
   per volume, all 8 ≈ 4 min with reloads.
 
-**Look (Toy Town, the one baked track; before/after in `target/agent-data/gi2/`):** at noon the
-level matches the environment map and gains contact occlusion (shelf undersides) and a warm bounce
-off the orange track onto the ceiling. At night the floor under the warm ceiling spots bounces
-orange onto the walls and ceiling, which the old night environment map kept dark navy: plausible,
-but much redder — an art call (a per-environment `baked_light_scale` is the knob if wanted).
-Other tracks are not baked yet (≈ 6–8 MB each, Git LFS); outdoor looks are not reviewed.
+**Look (Toy Town normal/noon, the one baked volume; probes on/off in `target/agent-data/probes/`):**
+with the fill baked in, the floor under the elevated deck and under the low helix ribbon goes
+much darker (≈ 150–230 vs ≈ 600 on open floor, before direct sun) — the occlusion the shadowless
+fill hid. Under a wide deck that reads close to black at noon exposure: physically about right,
+an art call. Other times of day and the mirror layout are not baked.
 
 ## Phases
 | Phase | Delivers | Done when |

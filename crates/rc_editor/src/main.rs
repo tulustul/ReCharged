@@ -23,11 +23,14 @@ const USAGE: &str = "usage: rc_editor <track> [--assets-dir <dir>] [--user-data-
   --user-data-dir <dir>    saves, settings and logs (default: the game's, + /editor)
   --screenshot <png>       save the window to <png> (at --screenshot-at seconds, default 3)
   --exit-after <s>         quit after <s> seconds of wall time
+  --window <W>x<H>         fixed window size (reproducible screenshots)
   --bake                   bake the irradiance volumes (every allowed time, normal and mirror)
                            into assets/data/lighting/<track>/, then quit
+  --bake-time <time>       bake one volume (morning, noon, sunset or night; normal layout), then quit
 
   Keys: F5 test drive / back to editing · Ctrl+S save · Ctrl+Z / Ctrl+Y undo / redo
         Delete · Insert (after the selected point) · Ctrl+D duplicate · T top view · F focus
+        P light probes on/off
   Mouse: left click select · left drag move (Alt: height, Ctrl: snap) · right drag look
         WASD move · Q/E down/up · Shift faster";
 
@@ -45,14 +48,17 @@ struct Args {
     user_data_dir: Option<PathBuf>,
     screenshot: Option<ScreenshotPlan>,
     exit_after: Option<f32>,
-    bake: bool,
+    /// `--bake` (`Some(None)`) or `--bake-time <t>` (`Some(Some(t))`).
+    bake: Option<Option<TimeOfDay>>,
+    window: Option<(u32, u32)>,
 }
 
 fn parse(args: &[String]) -> Result<Args, String> {
     let (mut track, mut assets_dir, mut user_data_dir) = (None, None, None);
     let (mut screenshot, mut screenshot_at, mut exit_after) = (None, None, None);
     let (mut new, mut env, mut name, mut style) = (false, None, None, None);
-    let mut bake = false;
+    let mut bake = None;
+    let mut window = None;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let mut value = || it.next().ok_or(format!("{arg} needs a value"));
@@ -63,10 +69,28 @@ fn parse(args: &[String]) -> Result<Args, String> {
             "--screenshot" => screenshot = Some(PathBuf::from(value()?)),
             "--screenshot-at" => screenshot_at = Some(secs(value()?)?),
             "--exit-after" => exit_after = Some(secs(value()?)?),
+            "--window" => {
+                let v = value()?;
+                let size = v
+                    .split_once('x')
+                    .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)));
+                window = Some(size.ok_or(format!("--window {v}: expected <W>x<H>"))?);
+            }
             "--env" => env = Some(value()?.clone()),
             "--name" => name = Some(value()?.clone()),
             "--style" => style = Some(value()?.clone()),
-            "--bake" => bake = true,
+            "--bake" => bake = Some(None),
+            "--bake-time" => {
+                let t = value()?;
+                let time = match t.to_lowercase().as_str() {
+                    "morning" => TimeOfDay::Morning,
+                    "noon" => TimeOfDay::Noon,
+                    "sunset" => TimeOfDay::Sunset,
+                    "night" => TimeOfDay::Night,
+                    _ => return Err(format!("--bake-time {t}: morning, noon, sunset or night")),
+                };
+                bake = Some(Some(time));
+            }
             "new" if track.is_none() && !new => new = true,
             a if !a.starts_with('-') && track.is_none() => track = Some(a.to_owned()),
             a => return Err(format!("unexpected argument {a}")),
@@ -96,6 +120,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
         }),
         exit_after,
         bake,
+        window,
     })
 }
 
@@ -186,13 +211,14 @@ fn main() -> AppExit {
         user_data_dir: args.user_data_dir,
         screenshot: args.screenshot,
         exit_after: args.exit_after,
+        window: args.window,
         ..default()
     };
     // The light baker reads meshes, materials and textures on the CPU.
     rc_render::keep_cpu_copies();
     let mut app = recharged::game(config, paths, bundle);
-    if args.bake {
-        rc_editor::bake_on_start(&mut app);
+    if let Some(time) = args.bake {
+        rc_editor::bake_on_start(&mut app, time);
     }
     app.add_plugins((editor, rc_editor::EditorViewPlugin));
     app.run()

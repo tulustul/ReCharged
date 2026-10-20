@@ -7,6 +7,7 @@ export const editorStrings = {
   drive: "Test drive  F5",
   bake: "Bake light",
   bakeAll: "Bake all",
+  probes: (on: boolean | null) => (on === null ? "No probes" : on ? "Probes: on  P" : "Probes: off  P"),
   save: "Save",
   undo: "Undo",
   redo: "Redo",

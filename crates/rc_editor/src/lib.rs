@@ -34,7 +34,7 @@ use bevy::text::EditableText;
 use bevy::window::PrimaryWindow;
 use rc_core::prelude::*;
 use rc_game::{GameCommand, RaceRequest, TrackPick};
-use rc_render::{ENVIRONMENTS_DIR, SHOWROOM_ENV};
+use rc_render::{BakedGi, BakedLight, ENVIRONMENTS_DIR, SHOWROOM_ENV};
 use rc_track::{DECOR_DIR, PropCatalog, TRACKS_DIR, Track, TrackDef, TrackDraft, decor_to_ron};
 pub use rc_ui::editor::{
     EditorAdd, EditorCommand, EditorCommandMsg, EditorItem, EditorOptions, EditorSelect,
@@ -45,9 +45,10 @@ pub use crate::doc::Doc;
 use crate::doc::{LAYERS, validate};
 pub use crate::view::EditorViewPlugin;
 
-/// `--bake`: bake every volume once the editing session is up, then quit.
-pub fn bake_on_start(app: &mut App) {
-    app.insert_resource(baking::BakeOnStart);
+/// Bake once the editing session is up, then quit: `time` = only that time of day (normal
+/// layout), `None` = every allowed time in both layouts.
+pub fn bake_on_start(app: &mut App, time: Option<TimeOfDay>) {
+    app.insert_resource(baking::BakeOnStart(time));
 }
 
 /// Undo steps kept.
@@ -290,12 +291,14 @@ impl Editor {
         self.selection = item.filter(|i| self.doc.exists(*i));
     }
 
-    /// Starts baking (see [`EditorCommand::Bake`]); `exit` quits when done.
-    pub(crate) fn start_bake(&mut self, all: bool, exit: bool) {
+    /// Starts baking (see [`EditorCommand::Bake`]; `time` overrides the session's time of day for
+    /// a single bake); `exit` quits when done.
+    pub(crate) fn start_bake(&mut self, all: bool, time: Option<TimeOfDay>, exit: bool) {
         if self.bake.is_some() || self.mode != Mode::Editing {
             return;
         }
-        let time = fields::parse(&self.options.time).unwrap_or(TimeOfDay::Noon);
+        let time =
+            time.unwrap_or_else(|| fields::parse(&self.options.time).unwrap_or(TimeOfDay::Noon));
         let run = baking::BakeRun::new(&self.doc.info.allowed_times, time, all, exit);
         info!(
             "editor: baking ({})",
@@ -361,7 +364,7 @@ impl Editor {
 }
 
 /// A command from a key or a React button.
-#[derive(Message, Debug, Clone, PartialEq, Eq)]
+#[derive(Message, Debug, Clone, PartialEq)]
 struct Cmd(EditorCommand);
 
 fn driving(editor: Res<Editor>) -> bool {
@@ -430,6 +433,8 @@ fn keys(keys: Option<Res<ButtonInput<KeyCode>>>, typing: Typing, mut out: Messag
         EditorCommand::TopView
     } else if !ctrl && pressed(KeyCode::KeyF) {
         EditorCommand::Focus
+    } else if !ctrl && pressed(KeyCode::KeyP) {
+        EditorCommand::ToggleProbes
     } else {
         return;
     };
@@ -445,6 +450,7 @@ struct Session<'w> {
     paths: Res<'w, UserPaths>,
     focus: Res<'w, view::ViewFocus>,
     view: ResMut<'w, view::View>,
+    probes: Option<ResMut<'w, BakedLight>>,
 }
 
 fn commands(
@@ -459,7 +465,16 @@ fn commands(
             continue; // baking: the session is the baker's
         }
         match command {
-            EditorCommand::Bake { all } => editor.start_bake(*all, false),
+            EditorCommand::Bake { all } => editor.start_bake(*all, None, false),
+            EditorCommand::ToggleProbes => {
+                if let Some(probes) = session.probes.as_deref_mut() {
+                    probes.enabled = !probes.enabled;
+                    info!(
+                        "editor: light probes {}",
+                        if probes.enabled { "on" } else { "off" }
+                    );
+                }
+            }
             EditorCommand::Save => match save(&session.paths.assets_dir, &editor) {
                 Ok((path, catalog_text)) => {
                     info!("editor: saved {}", path.display());
@@ -504,6 +519,12 @@ fn commands(
                     .and_then(|s| view::anchor(&editor.doc, s))
                     .or(session.focus.0);
                 session.view.top(target, session.track.as_deref());
+            }
+            EditorCommand::LookAt { from, at } => {
+                session.view.set(
+                    Transform::from_translation(Vec3::from(*from))
+                        .looking_at(Vec3::from(*at), Vec3::Y),
+                );
             }
             EditorCommand::Focus => {
                 if let Some(target) = selection.and_then(|s| view::anchor(&editor.doc, s)) {
@@ -659,14 +680,34 @@ fn sync_catalog(editor: Res<Editor>, catalog: Option<ResMut<Catalog>>) {
     }
 }
 
+/// Whether the session has a baked volume, and whether it is in use.
+#[derive(SystemParam)]
+struct Probes<'w, 's> {
+    setting: Option<Res<'w, BakedLight>>,
+    volumes: Query<'w, 's, Ref<'static, BakedGi>>,
+}
+
+impl Probes<'_, '_> {
+    fn changed(&self) -> bool {
+        self.setting.as_ref().is_some_and(|s| s.is_changed())
+            || self.volumes.iter().any(|v| v.is_added())
+    }
+
+    fn state(&self) -> Option<bool> {
+        (!self.volumes.is_empty()).then(|| self.setting.as_ref().is_none_or(|s| s.enabled))
+    }
+}
+
 fn push_status(
     editor: Res<Editor>,
     state: Res<State<AppState>>,
     track: Option<Res<Track>>,
+    probes: Probes,
     mut status: ResMut<EditorStatus>,
 ) {
     let track_changed = track.as_ref().is_some_and(|t| t.is_changed());
-    if !editor.is_changed() && !state.is_changed() && !track_changed {
+    let probes_changed = probes.changed() || (status.probes.is_some() && probes.volumes.is_empty());
+    if !editor.is_changed() && !state.is_changed() && !track_changed && !probes_changed {
         return;
     }
     let info = &editor.doc.info;
@@ -689,6 +730,7 @@ fn push_status(
         driving: editor.mode == Mode::Driving,
         loading: editor.built != editor.wanted || *state.get() != AppState::InRace,
         baking: editor.bake.as_ref().map(|b| b.status.clone()),
+        probes: probes.state(),
         error: editor.failed.clone().or_else(|| editor.error.clone()),
         lints,
         can_undo: !editor.undo.is_empty(),

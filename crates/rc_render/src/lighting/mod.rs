@@ -15,6 +15,7 @@ mod room;
 mod volumetric;
 mod warmup;
 
+use bevy::light::IrradianceVolume;
 use bevy::light::atmosphere::ScatteringMedium;
 use bevy::light::{CascadeShadowConfigBuilder, DirectionalLightShadowMap};
 use bevy::prelude::*;
@@ -55,10 +56,11 @@ pub struct ActiveEnvironment {
 
 /// Role of one of the environment's directional lights.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum EnvLight {
+pub enum EnvLight {
     /// Sun / window light / moon (casts shadows).
     Key,
-    /// Moon / sky bounce, no shadows.
+    /// Moon / sky bounce, no shadows: a stand-in for indirect light, so it is off where a baked
+    /// irradiance volume provides that (`gi.rs`).
     Fill,
     /// Lightning, no shadows.
     Flash,
@@ -69,7 +71,8 @@ pub(crate) enum EnvLight {
 struct VisualsPending;
 
 pub(crate) fn build(app: &mut App) {
-    app.add_systems(OnEnter(AppState::Menu), enter_menu)
+    app.init_resource::<gi::BakedLight>()
+        .add_systems(OnEnter(AppState::Menu), enter_menu)
         .add_systems(OnEnter(AppState::Loading), enter_session)
         .add_systems(OnExit(AppState::Menu), clear_environment)
         .add_systems(OnEnter(AppState::Unloading), clear_environment)
@@ -92,7 +95,7 @@ pub(crate) fn build(app: &mut App) {
                 )
                     .in_set(VisualSet)
                     .after(LookSet),
-                gi::spawn_volume,
+                (gi::spawn_volume, gi::switch_volume).chain(),
             ),
         );
     camera::build(app);
@@ -329,6 +332,7 @@ fn apply_lights(
     look: Option<Res<Look>>,
     settings: Option<Res<Settings>>,
     game: Query<(), With<GameCamera>>,
+    baked: Query<(), (With<gi::BakedGi>, With<IrradianceVolume>)>,
     mut lights: Query<(&EnvLight, &mut DirectionalLight, &mut Transform)>,
 ) {
     let Some(look) = look else {
@@ -339,7 +343,12 @@ fn apply_lights(
     for (role, mut light, mut transform) in &mut lights {
         match role {
             EnvLight::Key => set_light(&mut light, &mut transform, Some(&look.key), tier.enabled),
-            EnvLight::Fill => set_light(&mut light, &mut transform, look.fill.as_ref(), false),
+            EnvLight::Fill => {
+                // The baked volume carries the sky's bounce, with occlusion; the fill would light
+                // everything again, through decks and under tables.
+                let fill = look.fill.as_ref().filter(|_| baked.is_empty());
+                set_light(&mut light, &mut transform, fill, false);
+            }
             EnvLight::Flash => {
                 let flash = (look.flash.lux > 0.0).then_some(&look.flash);
                 set_light(&mut light, &mut transform, flash, false);

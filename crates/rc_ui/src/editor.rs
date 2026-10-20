@@ -154,6 +154,8 @@ pub struct EditorStatus {
     pub loading: bool,
     /// Baking progress ("Baking Noon · mirror (5/8): 42 %"); editing waits meanwhile.
     pub baking: Option<String>,
+    /// The session's baked light probes are in use (`null`: this layout and time have none).
+    pub probes: Option<bool>,
     /// The last failure (an edit that would not build, load, save), if any.
     pub error: Option<String>,
     /// Build warnings of the session's track.
@@ -197,7 +199,7 @@ pub enum EditorAdd {
 }
 
 /// An editor command (also bound to keys in Rust).
-#[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(tag = "kind", rename_all = "camelCase")]
 pub enum EditorCommand {
@@ -224,12 +226,22 @@ pub enum EditorCommand {
     TopView,
     /// Fly to the selection (F).
     Focus,
+    /// Put the camera at `from` looking at `at` (scripted screenshots).
+    LookAt {
+        #[allow(missing_docs)]
+        from: [f32; 3],
+        #[allow(missing_docs)]
+        at: [f32; 3],
+    },
     /// Bake the irradiance volume of the current time of day (forward layout), or of every allowed
     /// time in both layouts (`all`).
     Bake {
         /// Every allowed time, forward and mirrored.
         all: bool,
     },
+    /// Use the session's baked irradiance volume or not (P): compare the lighting with and
+    /// without it.
+    ToggleProbes,
     /// Show or hide one kind of handle.
     ToggleLayer {
         /// Layer name (see [`EditorStatus::layers`]).

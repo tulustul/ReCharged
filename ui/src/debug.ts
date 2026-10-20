@@ -118,9 +118,12 @@ function setup(mode: "quickRace" | "timeTrial" | "versus" | "championship") {
 
 export function useDebugRoutes() {
   useDebug("editor", (arg) => {
-    // `editor select point 3`, `editor topView`, `editor drive` (simple commands by kind).
+    // `editor select point 3`, `editor lookAt x y z tx ty tz`, `editor topView`, `editor drive`
+    // (simple commands by kind).
     const [verb, kind, index] = arg.split(" ");
+    const n = arg.split(" ").slice(1).map(Number);
     if (verb === "select") bevy.editor.select({ item: { kind, index: Number(index) } as EditorItem });
+    else if (verb === "lookAt") bevy.editor.command({ command: { kind: "lookAt", from: [n[0], n[1], n[2]], at: [n[3], n[4], n[5]] } });
     else bevy.editor.command({ command: { kind: verb } as EditorCommand });
   });
   useDebug("go", (arg) => {

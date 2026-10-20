@@ -46,6 +46,7 @@ function Toolbar({ status }: { status: EditorStatus }) {
       <Tool label={words.save} onPress={() => command({ kind: "save" })} />
       <Tool label={words.bake} onPress={() => command({ kind: "bake", all: false })} disabled={status.baking !== null} />
       <Tool label={words.bakeAll} onPress={() => command({ kind: "bake", all: true })} disabled={status.baking !== null} />
+      <Tool label={words.probes(status.probes)} hot={status.probes === false} onPress={() => command({ kind: "toggleProbes" })} disabled={status.probes === null} />
       <node style={{ width: space.m }} />
       <Cycle label={words.time} value={o.time} options={status.times} onChange={(time) => setOptions({ time })} />
       <Cycle label={words.weather} value={o.weather} options={status.weathers} onChange={(weather) => setOptions({ weather })} />

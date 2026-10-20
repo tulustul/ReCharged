@@ -138,11 +138,11 @@ export type EditorCommand = { "kind": "save" } | { "kind": "drive" } | { "kind":
 /**
  * What.
  */
-what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "bake", 
+what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "lookAt", from: [number, number, number], at: [number, number, number], } | { "kind": "bake", 
 /**
  * Every allowed time, forward and mirrored.
  */
-all: boolean, } | { "kind": "toggleLayer", 
+all: boolean, } | { "kind": "toggleProbes" } | { "kind": "toggleLayer", 
 /**
  * Layer name (see [`EditorStatus::layers`]).
  */
@@ -245,6 +245,10 @@ loading: boolean,
  * Baking progress ("Baking Noon · mirror (5/8): 42 %"); editing waits meanwhile.
  */
 baking: string | null, 
+/**
+ * The session's baked light probes are in use (`null`: this layout and time have none).
+ */
+probes: boolean | null, 
 /**
  * The last failure (an edit that would not build, load, save), if any.
  */
