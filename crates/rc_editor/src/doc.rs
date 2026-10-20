@@ -9,8 +9,6 @@ use rc_track::{
 };
 pub use rc_ui::editor::{EditorAdd, EditorCounts, EditorItem};
 
-/// Layers of handles (see `EditorStatus::layers`).
-pub const LAYERS: [&str; 6] = ["points", "props", "ground", "rows", "shortcuts", "decor"];
 /// Duplicates land this far to the side (u).
 const DUPLICATE_OFFSET_U: f32 = 2.0;
 /// A new ground area is a square this wide (u).
@@ -79,8 +77,8 @@ impl Doc {
         }
     }
 
-    /// Where the item's handle is; `None` for items without one (the track, gaps) and for
-    /// shortcuts and ground areas as a whole (their points carry the handles).
+    /// Where the item's handle is (a gap's: the middle of its jump, it does not move); `None` for
+    /// the track and for shortcuts and ground areas as a whole (their points carry the handles).
     pub fn handle(&self, item: EditorItem) -> Option<Vec3> {
         let d = &self.def;
         match item {
@@ -90,6 +88,10 @@ impl Doc {
                     .get(at(index))
                     .map(|v| Vec3::new(v.x, g.height, v.y))
             }),
+            EditorItem::Gap { index } => d
+                .gaps
+                .get(at(index))
+                .and_then(|g| Some((d.points.get(g.from)?.pos + d.points.get(g.to)?.pos) / 2.0)),
             EditorItem::ItemRow { index } => d.item_rows.get(at(index)).map(|r| r.pos),
             EditorItem::Prop { index } => d.props.get(at(index)).map(|p| p.pos),
             EditorItem::PathPoint { shortcut, index } => d
@@ -98,48 +100,35 @@ impl Doc {
                 .and_then(|s| s.path.get(at(index)).copied()),
             EditorItem::Battery => d.golden_battery.map(|b| b.pos),
             EditorItem::Decor { index } => self.decor.get(at(index)).map(|d| d.pos),
-            EditorItem::Track
-            | EditorItem::Gap { .. }
-            | EditorItem::Ground { .. }
-            | EditorItem::Shortcut { .. } => None,
+            EditorItem::Track | EditorItem::Ground { .. } | EditorItem::Shortcut { .. } => None,
         }
     }
 
-    /// Every handle on the visible `layers`.
-    pub fn handles(&self, layers: &[String]) -> Vec<(EditorItem, Vec3)> {
-        let on = |layer: &str| layers.iter().any(|l| l == layer);
+    /// Every handle: props, item rows, the battery and decor always; with `layout` also
+    /// control points, gaps, ground vertices and shortcut path points (the Track tab's).
+    pub fn handles(&self, layout: bool) -> Vec<(EditorItem, Vec3)> {
         let d = &self.def;
-        let mut items = Vec::new();
-        if on("points") {
+        let mut items: Vec<EditorItem> = (0..d.props.len())
+            .map(|i| EditorItem::Prop { index: idx(i) })
+            .chain((0..d.item_rows.len()).map(|i| EditorItem::ItemRow { index: idx(i) }))
+            .chain((0..self.decor.len()).map(|i| EditorItem::Decor { index: idx(i) }))
+            .chain(d.golden_battery.map(|_| EditorItem::Battery))
+            .collect();
+        if layout {
             items.extend((0..d.points.len()).map(|i| EditorItem::Point { index: idx(i) }));
-        }
-        if on("props") {
-            items.extend((0..d.props.len()).map(|i| EditorItem::Prop { index: idx(i) }));
-            if d.golden_battery.is_some() {
-                items.push(EditorItem::Battery);
-            }
-        }
-        if on("ground") {
+            items.extend((0..d.gaps.len()).map(|i| EditorItem::Gap { index: idx(i) }));
             for (g, area) in d.ground.iter().enumerate() {
                 items.extend((0..area.points.len()).map(|i| EditorItem::Vertex {
                     ground: idx(g),
                     index: idx(i),
                 }));
             }
-        }
-        if on("rows") {
-            items.extend((0..d.item_rows.len()).map(|i| EditorItem::ItemRow { index: idx(i) }));
-        }
-        if on("shortcuts") {
             for (s, cut) in d.shortcuts.iter().enumerate() {
                 items.extend((0..cut.path.len()).map(|i| EditorItem::PathPoint {
                     shortcut: idx(s),
                     index: idx(i),
                 }));
             }
-        }
-        if on("decor") {
-            items.extend((0..self.decor.len()).map(|i| EditorItem::Decor { index: idx(i) }));
         }
         items
             .into_iter()
@@ -692,10 +681,14 @@ mod tests {
     }
 
     #[test]
-    fn handles_follow_layers_and_moves() {
+    fn layout_handles_show_only_with_layout_and_follow_moves() {
         let (mut doc, _) = oval();
-        let points = doc.handles(&["points".into()]);
-        assert_eq!(points.len(), doc.def.points.len());
+        let is_point = |(item, _): &(EditorItem, Vec3)| matches!(item, EditorItem::Point { .. });
+        assert_eq!(doc.handles(false).iter().filter(|h| is_point(h)).count(), 0);
+        let points = doc.handles(true).into_iter().filter(is_point).count();
+        assert_eq!(points, doc.def.points.len());
+        let props = EditorItem::Prop { index: 0 };
+        assert!(doc.handles(false).iter().any(|(item, _)| *item == props));
         let vertex = EditorItem::Vertex {
             ground: 0,
             index: 0,

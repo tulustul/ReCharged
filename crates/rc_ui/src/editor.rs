@@ -120,6 +120,20 @@ pub struct EditorCounts {
     pub battery: bool,
 }
 
+/// The editor's left-pane tab. Bevy needs it: the Track tab shows the layout handles.
+#[derive(
+    serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Copy, Default, PartialEq, Eq,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub enum EditorTab {
+    Assets,
+    #[default]
+    Track,
+    Lighting,
+}
+
 /// Session look and test-drive layout (rc_core names: `Noon`, `Rain`).
 #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -174,9 +188,8 @@ pub struct EditorStatus {
     pub times: Vec<String>,
     /// Allowed weather presets of the track.
     pub weathers: Vec<String>,
-    /// Item kinds with visible (pickable) handles: `points`, `props`, `ground`, `rows`,
-    /// `shortcuts`, `decor`.
-    pub layers: Vec<String>,
+    /// The open left-pane tab.
+    pub tab: EditorTab,
 }
 
 /// React → Bevy request `editor.snapshot`: the [`EditorStatus`], `null` outside the editor.
@@ -242,11 +255,6 @@ pub enum EditorCommand {
     /// Use the session's baked irradiance volume or not (P): compare the lighting with and
     /// without it.
     ToggleProbes,
-    /// Show or hide one kind of handle.
-    ToggleLayer {
-        /// Layer name (see [`EditorStatus::layers`]).
-        layer: String,
-    },
 }
 
 /// React → Bevy message `editor.command`.
@@ -284,12 +292,21 @@ pub struct EditorSetOptions {
     pub options: EditorOptions,
 }
 
+/// React → Bevy message `editor.tab`: the left pane switched tabs.
+#[react_message(name = "editor.tab")]
+#[derive(Debug, Clone)]
+pub struct EditorSetTab {
+    /// The tab now open.
+    pub tab: EditorTab,
+}
+
 pub(crate) fn register(app: &mut App) {
     app.add_react_event::<EditorStatus>()
         .add_react_message::<EditorCommandMsg>()
         .add_react_message::<EditorSelect>()
         .add_react_message::<EditorSet>()
         .add_react_message::<EditorSetOptions>()
+        .add_react_message::<EditorSetTab>()
         .add_react_request_handler(
             |request: On<Request<EditorSnapshot>>, status: Option<Res<EditorStatus>>| {
                 request.respond(status.map(|s| s.clone()));

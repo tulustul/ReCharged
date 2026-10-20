@@ -1,11 +1,11 @@
 // Scripted steps for automated screenshots (`RECHARGED_UI_SCRIPT`, see rc_ui `debug.rs`):
 // `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample data for
 // screens whose data only exists after real races (`demo hud …`: the race HUD, see `hud/demo.ts`),
-// `tab <id>` is handled by tabbed screens, `editor <command>` / `editor select <kind> <index>`
-// drive the track editor.
+// `tab <id>` is handled by tabbed screens, `editor <command>` / `editor select <kind> <index>` /
+// `editor tab <tab>` drive the track editor.
 // Navigation is scripted through the real input path (`--input-script`,
 // `docs/design/automation.md`).
-import { bevy, type AppStatus, type EditorCommand, type EditorItem, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
+import { bevy, type AppStatus, type EditorCommand, type EditorItem, type EditorTab, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
 import { useDebug } from "./hooks";
 import { demoHud, endHudDemo } from "./hud/demo";
 import { resetTo, type Route } from "./nav/routes";
@@ -118,11 +118,12 @@ function setup(mode: "quickRace" | "timeTrial" | "versus" | "championship") {
 
 export function useDebugRoutes() {
   useDebug("editor", (arg) => {
-    // `editor select point 3`, `editor lookAt x y z tx ty tz`, `editor topView`, `editor drive`
-    // (simple commands by kind).
+    // `editor select point 3`, `editor tab lighting`, `editor lookAt x y z tx ty tz`,
+    // `editor topView`, `editor drive` (simple commands by kind).
     const [verb, kind, index] = arg.split(" ");
     const n = arg.split(" ").slice(1).map(Number);
     if (verb === "select") bevy.editor.select({ item: { kind, index: Number(index) } as EditorItem });
+    else if (verb === "tab") bevy.editor.tab({ tab: kind as EditorTab });
     else if (verb === "lookAt") bevy.editor.command({ command: { kind: "lookAt", from: [n[0], n[1], n[2]], at: [n[3], n[4], n[5]] } });
     else bevy.editor.command({ command: { kind: verb } as EditorCommand });
   });

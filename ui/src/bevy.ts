@@ -142,11 +142,7 @@ what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "lo
 /**
  * Every allowed time, forward and mirrored.
  */
-all: boolean, } | { "kind": "toggleProbes" } | { "kind": "toggleLayer", 
-/**
- * Layer name (see [`EditorStatus::layers`]).
- */
-layer: string, };
+all: boolean, } | { "kind": "toggleProbes" };
 export type EditorCommandMsg = { 
 /**
  * The command.
@@ -220,6 +216,11 @@ export type EditorSetOptions = {
  * The options.
  */
 options: EditorOptions, };
+export type EditorSetTab = { 
+/**
+ * The tab now open.
+ */
+tab: EditorTab, };
 export type EditorStatus = { 
 /**
  * Track id (file stem).
@@ -282,10 +283,10 @@ times: Array<string>,
  */
 weathers: Array<string>, 
 /**
- * Item kinds with visible (pickable) handles: `points`, `props`, `ground`, `rows`,
- * `shortcuts`, `decor`.
+ * The open left-pane tab.
  */
-layers: Array<string>, };
+tab: EditorTab, };
+export type EditorTab = "assets" | "track" | "lighting";
 export type FieldValue = { "type": "number", value: number, } | { "type": "integer", value: number, } | { "type": "toggle", value: boolean, } | { "type": "choice", value: string, options: Array<string>, } | { "type": "vector", value: Array<number>, } | { "type": "text", value: string, };
 export type GamepadAxisChange = { gamepad: number, axis: GamepadAxisName, value: number, };
 export type GamepadAxisName = "leftStickX" | "leftStickY" | "leftZ" | "rightStickX" | "rightStickY" | "rightZ" | { "other": number };
@@ -1864,6 +1865,7 @@ export interface ReactMessages {
   "editor.options": EditorSetOptions;
   "editor.select": EditorSelect;
   "editor.set": EditorSet;
+  "editor.tab": EditorSetTab;
   "gamepad.rumble": GamepadRumble;
   "gamepad.stopRumble": GamepadStopRumble;
   "hud.bind": BindHud;
@@ -2195,6 +2197,7 @@ export const bevy = {
     select(value: EditorSelect): void { emit("editor.select", value); },
     set(value: EditorSet): void { emit("editor.set", value); },
     snapshot(): Promise<EditorStatus | null> { return request("editor.snapshot", null); },
+    tab(value: EditorSetTab): void { emit("editor.tab", value); },
   },
   gamepad: {
     getAll(): Promise<Array<GamepadConnectedData>> { return request("gamepad.getAll", null); },

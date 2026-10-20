@@ -40,11 +40,11 @@ use rc_track::{
 };
 pub use rc_ui::editor::{
     EditorAdd, EditorCommand, EditorCommandMsg, EditorItem, EditorOptions, EditorSelect,
-    EditorSelection, EditorSet, EditorSetOptions, EditorStatus,
+    EditorSelection, EditorSet, EditorSetOptions, EditorSetTab, EditorStatus, EditorTab,
 };
 
 pub use crate::doc::Doc;
-use crate::doc::{LAYERS, validate};
+use crate::doc::validate;
 pub use crate::view::EditorViewPlugin;
 
 /// Bake once the editing session is up, then quit: `time` = only that time of day (normal
@@ -131,9 +131,7 @@ impl Plugin for EditorPlugin {
                 reverse: false,
                 mirror: false,
             },
-            layers: ["points", "props", "rows", "shortcuts"]
-                .map(String::from)
-                .to_vec(),
+            tab: EditorTab::default(),
             error: None,
             failed: None,
             wanted: 0,
@@ -152,6 +150,9 @@ impl Plugin for EditorPlugin {
         })
         .add_observer(|msg: On<EditorSelect>, mut editor: ResMut<Editor>| {
             editor.select(msg.item);
+        })
+        .add_observer(|msg: On<EditorSetTab>, mut editor: ResMut<Editor>| {
+            editor.tab = msg.tab;
         })
         .add_observer(on_set)
         .add_observer(on_options)
@@ -209,7 +210,8 @@ pub(crate) struct Editor {
     pub(crate) selection: Option<EditorItem>,
     pub(crate) mode: Mode,
     options: EditorOptions,
-    pub(crate) layers: Vec<String>,
+    /// The open left-pane tab (the Track tab shows the layout handles).
+    pub(crate) tab: EditorTab,
     /// The last rejected edit or failed save.
     error: Option<String>,
     /// Why the session failed to load (no new session starts until the document changes).
@@ -534,15 +536,6 @@ fn commands(
                     session.view.look_at(target);
                 }
             }
-            EditorCommand::ToggleLayer { layer } => {
-                if !LAYERS.contains(&layer.as_str()) {
-                    warn!("editor: no layer {layer}");
-                } else if let Some(i) = editor.layers.iter().position(|l| l == layer) {
-                    editor.layers.remove(i);
-                } else {
-                    editor.layers.push(layer.clone());
-                }
-            }
         }
     }
 }
@@ -743,7 +736,7 @@ fn push_status(
         options: editor.options.clone(),
         times: info.allowed_times.iter().map(fields::name).collect(),
         weathers: info.allowed_weather.iter().map(fields::name).collect(),
-        layers: editor.layers.clone(),
+        tab: editor.tab,
     });
 }
 
@@ -777,7 +770,7 @@ mod tests {
             selection: None,
             mode: Mode::Editing,
             options: EditorOptions::default(),
-            layers: Vec::new(),
+            tab: EditorTab::default(),
             error: None,
             failed: None,
             wanted: 0,

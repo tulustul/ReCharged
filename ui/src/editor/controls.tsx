@@ -2,13 +2,20 @@
 // Text and number fields edit inline: click the value, type, Enter commits, Escape cancels.
 import { useEffect, useState } from "react";
 
-import type { EditorField, FieldValue } from "../bevy";
+import type { EditorCommand, EditorField, EditorItem, FieldValue } from "../bevy";
+import { bevy } from "../bevy";
 import { useEvent } from "../hooks";
 import { editorStrings as words } from "../strings/editor";
-import { text } from "../theme/styles";
+import { glass, text } from "../theme/styles";
 import { color, radius, space } from "../theme/tokens";
 
 const fieldText = { ...text.small, color: color.text };
+
+export const command = (c: EditorCommand) => bevy.editor.command({ command: c });
+export const select = (item: EditorItem | null) => bevy.editor.select({ item });
+// Opaque enough to read over a bright scene.
+export const solid = { ...glass, backgroundColor: "rgba(8, 14, 30, 0.9)" } as const;
+export const panel = { ...solid, padding: space.m, gap: space.s, flexDirection: "column" } as const;
 
 export function Tool({ label, onPress, hot = false, disabled = false }: { label: string; onPress: () => void; hot?: boolean; disabled?: boolean }) {
   return (

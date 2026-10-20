@@ -3,6 +3,8 @@
 //!
 //! Mouse: left click picks the nearest handle (or clears the selection), left drag moves it on
 //! its horizontal plane (Alt: up/down; Ctrl: snap to [`SNAP_U`]); right drag looks around.
+//! The layout (control polygon, gaps, ground areas, shortcuts) and its handles show only while
+//! the Track tab is open; prop, item-row, battery and decor handles always.
 //! Keys: WASD move, Q/E down/up, Shift faster.
 
 use bevy::input::mouse::AccumulatedMouseMotion;
@@ -12,7 +14,7 @@ use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use bevy_react::PointerCapture;
 use rc_core::prelude::*;
 use rc_track::Track;
-use rc_ui::editor::EditorItem;
+use rc_ui::editor::{EditorItem, EditorTab};
 
 use crate::doc::Doc;
 use crate::{Editor, Mode, Typing};
@@ -122,11 +124,6 @@ pub fn anchor(doc: &Doc, item: EditorItem) -> Option<Vec3> {
     let d = &doc.def;
     doc.handle(item).or_else(|| match item {
         EditorItem::Track => d.points.get(d.start).map(|p| p.pos),
-        EditorItem::Gap { index } => d
-            .gaps
-            .get(index as usize)
-            .and_then(|g| d.points.get(g.from))
-            .map(|p| p.pos),
         EditorItem::Ground { index } => d.ground.get(index as usize).map(|g| {
             let c = g.points.iter().sum::<Vec2>() / g.points.len().max(1) as f32;
             Vec3::new(c.x, g.height, c.y)
@@ -229,7 +226,7 @@ fn pick_and_drag(pointer: Pointer, mut dragging: ResMut<Dragging>, mut editor: R
         }
         let hit = editor
             .doc
-            .handles(&editor.layers)
+            .handles(editor.tab == EditorTab::Track)
             .into_iter()
             .filter_map(|(item, pos)| {
                 let screen = camera.world_to_viewport(eye, pos).ok()?;
@@ -374,8 +371,7 @@ fn color(item: EditorItem) -> Color {
     }
 }
 
-/// The control polygon, gaps, ground outlines, shortcuts and the handles (the dragged one where
-/// it would go).
+/// The layout (Track tab) and the handles (the dragged one where it would go).
 fn draw(editor: Res<Editor>, dragging: Res<Dragging>, mut gizmos: Gizmos) {
     let preview;
     let doc = match dragging.0.filter(|d| d.moved) {
@@ -387,9 +383,24 @@ fn draw(editor: Res<Editor>, dragging: Res<Dragging>, mut gizmos: Gizmos) {
         }
         None => &editor.doc,
     };
-    let d = &doc.def;
-    let on = |layer: &str| editor.layers.iter().any(|l| l == layer);
+    let layout = editor.tab == EditorTab::Track;
     let selected = editor.selection;
+    if layout {
+        draw_layout(doc, selected, &mut gizmos);
+    }
+    for (item, pos) in doc.handles(layout) {
+        let (size, color) = if selected == Some(item) {
+            (SELECTED_U, SELECTED)
+        } else {
+            (HANDLE_U, color(item))
+        };
+        gizmos.sphere(Isometry3d::from_translation(pos), size, color);
+    }
+}
+
+/// The control polygon, the start, gaps, ground outlines and shortcuts (the Track tab).
+fn draw_layout(doc: &Doc, selected: Option<EditorItem>, gizmos: &mut Gizmos) {
+    let d = &doc.def;
     let n = d.points.len();
     for i in 0..n {
         gizmos.line(d.points[i].pos, d.points[(i + 1) % n].pos, LINE);
@@ -405,31 +416,19 @@ fn draw(editor: Res<Editor>, dragging: Res<Dragging>, mut gizmos: Gizmos) {
         let lift = Vec3::Y * 0.3;
         gizmos.line(a.pos + lift, b.pos + lift, if hot { SELECTED } else { GAP });
     }
-    if on("ground") {
-        for (i, g) in d.ground.iter().enumerate() {
-            let hot = matches!(selected, Some(EditorItem::Ground { index } | EditorItem::Vertex { ground: index, .. }) if index as usize == i);
-            let ring = g.points.iter().chain(g.points.first());
-            gizmos.linestrip(
-                ring.map(|p| Vec3::new(p.x, g.height + 0.05, p.y)),
-                if hot { SELECTED } else { GROUND },
-            );
-        }
+    for (i, g) in d.ground.iter().enumerate() {
+        let hot = matches!(selected, Some(EditorItem::Ground { index } | EditorItem::Vertex { ground: index, .. }) if index as usize == i);
+        let ring = g.points.iter().chain(g.points.first());
+        gizmos.linestrip(
+            ring.map(|p| Vec3::new(p.x, g.height + 0.05, p.y)),
+            if hot { SELECTED } else { GROUND },
+        );
     }
-    if on("shortcuts") {
-        for (i, s) in d.shortcuts.iter().enumerate() {
-            let hot = matches!(selected, Some(EditorItem::Shortcut { index } | EditorItem::PathPoint { shortcut: index, .. }) if index as usize == i);
-            gizmos.linestrip(
-                s.path.iter().copied(),
-                if hot { SELECTED } else { SHORTCUT },
-            );
-        }
-    }
-    for (item, pos) in doc.handles(&editor.layers) {
-        let (size, color) = if selected == Some(item) {
-            (SELECTED_U, SELECTED)
-        } else {
-            (HANDLE_U, color(item))
-        };
-        gizmos.sphere(Isometry3d::from_translation(pos), size, color);
+    for (i, s) in d.shortcuts.iter().enumerate() {
+        let hot = matches!(selected, Some(EditorItem::Shortcut { index } | EditorItem::PathPoint { shortcut: index, .. }) if index as usize == i);
+        gizmos.linestrip(
+            s.path.iter().copied(),
+            if hot { SELECTED } else { SHORTCUT },
+        );
     }
 }
