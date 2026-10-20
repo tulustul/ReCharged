@@ -32,6 +32,7 @@ mod weather_fx;
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
+pub use capture::Overhead;
 pub use cars::{CarModel, CarModelReady};
 pub use content::ContentVisualsPlugin;
 pub use lighting::{

@@ -5743,17 +5743,21 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy-react",
+ "bevy_rapier3d",
  "rc_ai",
  "rc_core",
  "rc_game",
  "rc_items",
  "rc_race",
+ "rc_render",
  "rc_testkit",
  "rc_track",
  "rc_ui",
  "rc_vehicle",
  "rc_weather",
  "recharged",
+ "ron",
+ "serde",
 ]
 
 [[package]]

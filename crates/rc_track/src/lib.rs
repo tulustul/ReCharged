@@ -20,6 +20,7 @@
 
 mod analysis;
 mod build;
+mod decor;
 mod def;
 mod geometry;
 mod layout;
@@ -37,6 +38,7 @@ use rc_core::prelude::*;
 
 pub use analysis::{MAX_BANK_GUIDE_DEG, MAX_CHOKEPOINTS, MAX_SLOPE_DEG, STACK_CLEARANCE_U};
 pub use build::{KILL_FLOOR_DEPTH_U, WALL_THICKNESS_U, variant_name};
+pub use decor::{DECOR_DIR, DecorItem, decor_to_ron, load_decor, parse_decor};
 pub use def::*;
 pub use geometry::{GroundMesh, RibbonMesh, TrackGeometry};
 pub use mesh::MeshData;
@@ -51,14 +53,17 @@ pub use spline::{MIN_UP_Y, SAMPLE_SPACING_U};
 pub use track::*;
 pub use turns::{MERGE_U, MIN_ANGLE_DEG, MIN_TURN_RATE, SMOOTH_U};
 
-/// A layout the session builds instead of `data/tracks/<id>.ron` when it races track `id`: the
-/// track editor's unsaved edits (written only by rc_editor; the game never has one).
+/// What the session builds and draws instead of `data/tracks/<id>.ron` and `data/decor/<id>.ron`
+/// when it races track `id`: the track editor's unsaved edits (written only by rc_editor; the
+/// game never has one).
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct TrackDraft {
     /// Track it stands in for.
     pub id: TrackId,
     /// The layout.
     pub def: TrackDef,
+    /// The decorative models.
+    pub decor: Vec<DecorItem>,
 }
 
 /// Loading-gate key of this crate.

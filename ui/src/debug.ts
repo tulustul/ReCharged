@@ -1,10 +1,11 @@
 // Scripted steps for automated screenshots (`RECHARGED_UI_SCRIPT`, see rc_ui `debug.rs`):
 // `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample data for
 // screens whose data only exists after real races (`demo hud …`: the race HUD, see `hud/demo.ts`),
-// `tab <id>` is handled by tabbed screens, `editor drive` toggles a track editor test drive.
+// `tab <id>` is handled by tabbed screens, `editor <command>` / `editor select <kind> <index>`
+// drive the track editor.
 // Navigation is scripted through the real input path (`--input-script`,
 // `docs/design/automation.md`).
-import { bevy, type AppStatus, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
+import { bevy, type AppStatus, type EditorCommand, type EditorItem, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
 import { useDebug } from "./hooks";
 import { demoHud, endHudDemo } from "./hud/demo";
 import { resetTo, type Route } from "./nav/routes";
@@ -116,8 +117,11 @@ function setup(mode: "quickRace" | "timeTrial" | "versus" | "championship") {
 }
 
 export function useDebugRoutes() {
-  useDebug("editor", (command) => {
-    if (command === "drive") bevy.editor.drive(null);
+  useDebug("editor", (arg) => {
+    // `editor select point 3`, `editor topView`, `editor drive` (simple commands by kind).
+    const [verb, kind, index] = arg.split(" ");
+    if (verb === "select") bevy.editor.select({ item: { kind, index: Number(index) } as EditorItem });
+    else bevy.editor.command({ command: { kind: verb } as EditorCommand });
   });
   useDebug("go", (arg) => {
     const [route, mode] = arg.split(" ") as [Route, MenuMode | undefined];

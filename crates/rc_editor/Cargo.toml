@@ -13,9 +13,13 @@ rc_core.workspace = true
 rc_track.workspace = true
 rc_game.workspace = true
 rc_ui.workspace = true
+rc_render.workspace = true
 recharged = { path = "../recharged" }
 bevy.workspace = true
 bevy-react.workspace = true
+bevy_rapier3d.workspace = true
+serde.workspace = true
+ron.workspace = true
 
 [dev-dependencies]
 rc_testkit.workspace = true

@@ -1,16 +1,27 @@
-# rc_editor — track editor (design note, proposal)
+# rc_editor — track editor (design note)
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
-lighting. Status: **P1 done** (open, fly, test drive, save); P2–P4 to do.
+lighting. Status: **P1 and P2 done** (open/create, edit everything, undo, test drive, save); P3
+(migration off `plan.py`) and P4 (irradiance bake) to do.
 
 ```sh
-npm --prefix ui run build                 # the editor uses the game's React bundle
-cargo run -p rc_editor -- toy_town        # F5 drive / back · Ctrl+S save · RMB look · WASD · Q/E
+npm --prefix ui run build                       # the editor uses the game's React bundle
+cargo run -p rc_editor -- toy_town              # edit a track
+cargo run -p rc_editor -- new back_lot --env street --name "Back Lot" --style Asphalt
 ```
+| Input | Does |
+|---|---|
+| left click / left drag | select the nearest handle (or clear) / move it on its horizontal plane; **Alt**: up/down; **Ctrl**: snap to 0.5 u |
+| right drag · WASD · Q/E · Shift | look · fly · down/up · faster |
+| F5 | test drive / back to editing |
+| Ctrl+S · Ctrl+Z · Ctrl+Y (Ctrl+Shift+Z) | save · undo · redo |
+| Delete · Insert · Ctrl+D | delete the selection · insert a point/vertex/path point after it · duplicate |
+| T · F | top view (over the selection or the view's focus) · fly to the selection |
+
 Saves, settings and records of test drives go to `<game user data>/editor` (`--user-data-dir`
 overrides). Automation as in the game: `--screenshot <png> [--screenshot-at <s>]`,
-`--exit-after <s>`, and `RECHARGED_UI_SCRIPT="8 editor drive; 20 editor drive"` toggles test drives
-through the real React channel.
+`--exit-after <s>`, and `RECHARGED_UI_SCRIPT` with `editor <command>` (`drive`, `undo`, `topView`,
+…) and `editor select <kind> <index>` drives the editor through the real React channel.
 
 ## Decisions
 | # | Decision | Consequence |
@@ -22,47 +33,57 @@ through the real React channel.
 
 ## Architecture
 ```
-crates/recharged      lib.rs: the game app (`recharged::game`) ── main.rs: the game binary
-crates/rc_editor      lib.rs: EditorPlugin ── main.rs: `rc_editor <track>` = recharged::game + EditorPlugin
-crates/rc_ui          editor.rs: `editor.status` / `editor.snapshot` / `editor.save` / `editor.drive`
-ui/src/editor/        EditorLayer (same bundle as the game)
+crates/recharged   lib.rs: the game app (`recharged::game`) ── main.rs: the game binary
+crates/rc_editor   lib.rs   EditorPlugin: Editor state, edit/undo pipeline, session control, commands, status
+                   doc.rs   Doc (layout + decor + catalog entry): handles, add/insert/delete/duplicate, validate, new_track
+                   fields.rs the inspector: one slot list per item serves reading and setting
+                   catalog.rs rewrites the track's entry in catalog.ron (the rest of the file untouched)
+                   view.rs  EditorViewPlugin: fly camera, picking, dragging, gizmos, focus point, cutaway
+                   main.rs  `rc_editor [new] <track>` = recharged::game + both plugins
+crates/rc_ui       editor.rs: editor.status / snapshot / command / select / set / options
+ui/src/editor/     EditorLayer (toolbar, item list, inspector, notes), controls.tsx (fields)
 ```
-- **The game, unchanged, renders the edited track.** On `OnEnter(Menu)` the editor starts a Quick
-  Race (no AI) on the track; while editing, `SimSet::Race` (rc_race's phase driver) does not run,
-  so the session stays in `RacePhase::Setup`: track, props, lighting, no cars. The editor writes
-  the `GameCamera`'s transform (rc_camera holds its pose without a racer). *(P2: an orthographic
-  top-down toggle.)* The room shell, props, decor, ground, lighting and weather all
-  come from the existing plugins, so nothing is duplicated.
-- **In-memory layout.** rc_track builds the `TrackDraft` resource instead of the file when the
-  session's track has its id, so test drives and rebuilds use unsaved edits; disk is written only
-  on save (temporary file + rename). *(P2: the same for rc_render's decor file once decor is
-  editable.)*
-- **Rebuild on commit, preview while dragging.** A finished edit (mouse release, field change)
-  reloads the session: Unloading → Loading takes about 0.25 s. While dragging, the editor draws
-  the centreline and edges with gizmos from rc_track's pure spline code.
-- **Test drive:** F5 lifts the hold (Setup → Intro → Countdown → Racing with the player's car);
-  F5 again sends `Restart` (→ Setup, no reload) and editing resumes at the same camera position.
-  The pause menu works as in the game; "Quit to menu" reopens the editing session. *(P2: pick the
-  variant, time and weather; skip the intro.)*
-- **Undo:** a stack of `(TrackDef, DecorDef)` snapshots, one per committed edit. The defs are
-  small, so no command pattern.
+- **The game renders the edited track.** From the menu the editor starts a Quick Race (no AI) on
+  the track; while editing, `SimSet::Race` (rc_race's phase driver) does not run, so the session
+  stays in `RacePhase::Setup`: track, props, lighting, no cars. The editor writes the
+  `GameCamera`'s transform (rc_camera holds its pose without a racer) and hides rc_render's
+  `Overhead` entities (ceiling, lamp fixtures; they cast no shadows) so rooms are seen from above.
+- **Every edit is built before it is accepted.** An edit runs on a copy of the `Doc`;
+  `Track::build` must pass in all four variants (≈ 90 ms on the Iris Xe for Toy Town) and a
+  changed catalog entry must leave `catalog.ron` valid (`Catalog::parse` of the rewritten text).
+  A rejected edit changes nothing and shows its error. Accepted: pushed on the undo stack (200
+  snapshots; whole documents, they are small), mirrored to `TrackDraft` (rc_track builds and
+  rc_render draws it instead of the files) and to the game's `Catalog`, and the session rebuilds
+  with `GameCommand::ChangeTrack` (≈ 0.7 s on the Iris Xe; generation counters make an edit during
+  a rebuild trigger another one, never get lost).
+- **Dragging previews with gizmos** (the control polygon follows the dragged point); the release
+  commits one edit.
+- **Test drive:** F5 lifts the hold (the intro is skipped with a `UiNav::Confirm`); F5 again sends
+  `Restart` (→ Setup, no reload). Reverse/mirror drives (toolbar) reload the session in that
+  layout and back to forward afterwards: editing is always forward, unmirrored. Time and weather
+  (the track's allowed presets) apply to editing and drives. "Quit to menu" from the pause menu
+  reopens the editing session.
+- **Saving** writes the track (`TrackDef::to_ron`), decor (`decor_to_ron`) and, if it changed, the
+  catalog entry, each through a temporary file + rename. Comments in those files are lost
+  (`label` keeps per-point notes); `catalog.ron` keeps every comment outside the entry.
 
-## Editing scope ("all track properties")
-| Area | Interaction |
-|---|---|
-| Control points | select, move (3D handles and top-down), insert or delete; panel: width, bank, surface, walls, offroad margin, optional **`label`** (new field: keeps `plan.py`'s `// 2: T1` notes after the switch) |
-| Track settings | style, start, kill height, wall height, bounds |
-| Ground polygons | vertex edit, surface |
-| Props / decor | place from the `PropCatalog` list (filtered by environment + common), move, yaw, `dir` |
-| Gaps, shortcuts, item rows, golden battery | handles on the centreline / in the world + panels, `dir` |
-| Catalog entry | `TrackInfo` for the track (name, environment, difficulty, allowed weather and times, hidden) |
-| Lints | `Track::lints()` + rc_track analysis, live in a panel. Click to focus the problem. |
+## Editing scope
+| Item | Handles | Inspector |
+|---|---|---|
+| Track (+ catalog entry) | — | style, start, kill/wall height, bounds; name, environment, indoor, difficulty, laps, music, allowed times/weather and unlock (RON text), preview, hidden |
+| Control points | yes | pos, width, bank, surface, walls, offroad margin (inherited fields show what they inherit; × unsets), label |
+| Jumps (gaps) | red segment | from, to, dir; "Jump from here" on a point adds one |
+| Ground areas / vertices | vertices (layer off by default) | surface, height, dir; vertex x/z |
+| Item rows, props, Golden Battery, decor | yes (decor layer off by default) | pos, count / kind (all prop kinds) / yaw / model, scale, dir |
+| Shortcuts / path points | path points | width, dir; point pos |
 
-**New track:** a dialog asks for id, name, environment and style. It writes a minimal oval (like
-`test_oval`), an empty decor file and a `hidden: true` catalog entry.
+Add (toolbar of each list) puts the item at the view's focus — the first fixed collider under the
+screen centre (a new shortcut leaves and rejoins the track around it).
 
-**Saving** uses pretty RON in the existing field order, with `implicit_some`. Comments are lost on
-the first save, which is why `label` exists.
+**Not done:** lints are text without a position (no click-to-focus); prop kinds are one long list
+(no filter by environment); a new decor item copies an existing model (the model path is a text
+field); no orthographic view (T is a perspective view from above); dragging has not been tried
+with a real mouse by an agent (no input injection on the test machine).
 
 ## Migration off `plan.py` (D1)
 1. Port `plan.py`'s corridor check (no static obstacle in the racing corridor) to `rc_track::analysis`
@@ -110,7 +131,7 @@ spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 
 | Phase | Delivers | Done when |
 |---|---|---|
 | P1 Shell | shared app assembly, `rc_editor` binary, editor bundle, editing session + fly cam, overrides, open/save, F5/Esc | open Toy Town, save with no edits → identical file except comments; drive and return |
-| P2 Tools | everything in "Editing scope", undo, lints, new-track dialog, `label` | build a new track from scratch and race it in the game |
+| P2 Tools | everything in "Editing scope", undo, lints, `rc_editor new`, `label`, catalog entry | build a new track from scratch and race it in the game |
 | P3 Migration | corridor lint; first track moved off `plan.py` | `plan.py` no longer writes that track; CI green |
 | P4 Bake | baker, `.irv` loader, weather scaling | Sofa Circuit baked; visible occlusion under furniture; bench within budget on the 3070 **and** runs on the Iris Xe |
 
@@ -118,9 +139,8 @@ spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 
 - ~~A session with zero racers~~ — not needed: editing holds `RacePhase::Setup`, where no attempt
   entities exist (`tests/session.rs`).
 - ~~Two bundles~~ — not needed: `bevy-react build` has a fixed entry; one bundle serves both.
-- **A load failure** stops the editor from restarting the session (it would loop through the
-  menu); the error shows in the editor. P2 must build edits with `Track::build` before sending a
-  draft, so a bad edit is rejected in the editor instead.
+- **A load failure** (a missing model, not the layout: that is built before it is accepted)
+  stops the editor from restarting the session until the document changes; the error shows.
 - **Bake time:** ~50 k probes × 6 views. Bevy renders shadow cascades per view, so measure on one
   track before committing to 2 u spacing. The budget is ≤ 10 min per track (8 volumes) on the
   3070.

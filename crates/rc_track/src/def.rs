@@ -88,7 +88,7 @@ impl RibbonStyle {
 
 /// One control point of the closed centreline loop. `pos.y` is the height of the driving
 /// surface; the ribbon body hangs below it.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlPoint {
     /// Centreline position (world u).
@@ -111,6 +111,9 @@ pub struct ControlPoint {
     /// Off-track tolerance beyond the edge from this point to the next (u, GDD §5.4). Inherited.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offroad_margin: Option<f32>,
+    /// Designer's note shown by the track editor ("T1", "jump: lip"). Not inherited; no effect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 /// A jump: no ribbon between control points `from` and `to` (forward order, may wrap). The
@@ -266,6 +269,40 @@ pub struct TrackDef {
     pub bounds: Option<BoundsDef>,
 }
 
+/// One value as single-line RON (`(pos: (1.0, 0.0, 2.0), width: 12.0)`).
+pub(crate) fn ron_value<T: Serialize>(v: &T) -> Result<String, String> {
+    let pretty = ron::ser::PrettyConfig::new()
+        .compact_structs(true)
+        .compact_arrays(true);
+    ron_options()
+        .to_string_pretty(v, pretty)
+        .map_err(|e| e.to_string())
+}
+
+/// Appends `    name: [` + one line per item (with `// <index>` if `index`) + `    ],`; nothing for
+/// an empty list.
+pub(crate) fn ron_list<T: Serialize>(
+    out: &mut String,
+    name: &str,
+    items: &[T],
+    index: bool,
+) -> Result<(), String> {
+    if items.is_empty() {
+        return Ok(());
+    }
+    out.push_str(&format!("    {name}: [\n"));
+    for (i, item) in items.iter().enumerate() {
+        let note = if index {
+            format!(" // {i}")
+        } else {
+            String::new()
+        };
+        out.push_str(&format!("        {},{note}\n", ron_value(item)?));
+    }
+    out.push_str("    ],\n");
+    Ok(())
+}
+
 /// RON options of every rc_track data file: `width: 12` instead of `width: Some(12)`.
 pub(crate) fn ron_options() -> ron::Options {
     ron::Options::default().with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME)
@@ -287,57 +324,28 @@ impl TrackDef {
     /// top-level field and per list entry (control points end with `// <index>`); empty lists and
     /// inherited or default fields are left out. Comments of a hand-written file are not kept.
     pub fn to_ron(&self) -> Result<String, String> {
-        fn value<T: Serialize>(v: &T) -> Result<String, String> {
-            let pretty = ron::ser::PrettyConfig::new()
-                .compact_structs(true)
-                .compact_arrays(true);
-            ron_options()
-                .to_string_pretty(v, pretty)
-                .map_err(|e| e.to_string())
-        }
-        fn list<T: Serialize>(
-            out: &mut String,
-            name: &str,
-            items: &[T],
-            index: bool,
-        ) -> Result<(), String> {
-            if items.is_empty() {
-                return Ok(());
-            }
-            out.push_str(&format!("    {name}: [\n"));
-            for (i, item) in items.iter().enumerate() {
-                let note = if index {
-                    format!(" // {i}")
-                } else {
-                    String::new()
-                };
-                out.push_str(&format!("        {},{note}\n", value(item)?));
-            }
-            out.push_str("    ],\n");
-            Ok(())
-        }
         let mut out = String::from("(\n");
-        out.push_str(&format!("    style: {},\n", value(&self.style)?));
+        out.push_str(&format!("    style: {},\n", ron_value(&self.style)?));
         out.push_str(&format!("    start: {},\n", self.start));
         out.push_str(&format!(
             "    kill_height: {},\n",
-            value(&self.kill_height)?
+            ron_value(&self.kill_height)?
         ));
         out.push_str(&format!(
             "    wall_height: {},\n",
-            value(&self.wall_height)?
+            ron_value(&self.wall_height)?
         ));
         if let Some(bounds) = &self.bounds {
-            out.push_str(&format!("    bounds: {},\n", value(bounds)?));
+            out.push_str(&format!("    bounds: {},\n", ron_value(bounds)?));
         }
-        list(&mut out, "points", &self.points, true)?;
-        list(&mut out, "gaps", &self.gaps, false)?;
-        list(&mut out, "ground", &self.ground, false)?;
-        list(&mut out, "item_rows", &self.item_rows, false)?;
-        list(&mut out, "props", &self.props, false)?;
-        list(&mut out, "shortcuts", &self.shortcuts, false)?;
+        ron_list(&mut out, "points", &self.points, true)?;
+        ron_list(&mut out, "gaps", &self.gaps, false)?;
+        ron_list(&mut out, "ground", &self.ground, false)?;
+        ron_list(&mut out, "item_rows", &self.item_rows, false)?;
+        ron_list(&mut out, "props", &self.props, false)?;
+        ron_list(&mut out, "shortcuts", &self.shortcuts, false)?;
         if let Some(battery) = &self.golden_battery {
-            out.push_str(&format!("    golden_battery: {},\n", value(battery)?));
+            out.push_str(&format!("    golden_battery: {},\n", ron_value(battery)?));
         }
         out.push_str(")\n");
         Ok(out)

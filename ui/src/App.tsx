@@ -64,8 +64,8 @@ export function App() {
 function Main() {
   const status = useStore(appState);
   const editing = useStore(editor);
-  // The track editor has no menus: its own screen everywhere but loading and test drives.
-  if (editing && !editing.driving && status?.state !== "loading") {
+  // The track editor has no menus or loading screen: its own screen everywhere but test drives.
+  if (editing && !editing.driving) {
     return (
       <>
         <ScreenName name="editor" />

@@ -1,27 +1,44 @@
 //! `rc_editor <track> [options]` (see [`USAGE`]): the track editor on
-//! `assets/data/tracks/<track>.ron`. It runs the whole game ([`recharged::game`]) plus
+//! `assets/data/tracks/<track>.ron`; `rc_editor new <id> --env <environment>` creates the track
+//! first. It runs the whole game ([`recharged::game`]) plus
 //! [`rc_editor::EditorPlugin`]; saves, settings and records go to `<user data>/editor`, apart
 //! from the game's.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
-use rc_track::TrackDef;
+use rc_render::EnvironmentDef;
+use rc_track::{PropCatalog, RibbonStyle, TRACKS_DIR};
 
 const USAGE: &str = "usage: rc_editor <track> [--assets-dir <dir>] [--user-data-dir <dir>]
                  [--screenshot <png> [--screenshot-at <s>]] [--exit-after <s>]
+       rc_editor new <id> --env <environment> [--name <name>] [--style <style>] [options]
 
   <track>                  track id: assets/data/tracks/<track>.ron
+  new <id>                 create a hidden track (an oval of <style>: ToyTrack, Asphalt,
+                           CarpetRunner or Invisible; default ToyTrack) in <environment>
+                           (assets/data/environments/<environment>.ron), then edit it
   --assets-dir <dir>       assets root (default: ./assets, then next to the executable)
   --user-data-dir <dir>    saves, settings and logs (default: the game's, + /editor)
   --screenshot <png>       save the window to <png> (at --screenshot-at seconds, default 3)
   --exit-after <s>         quit after <s> seconds of wall time
 
-  F5 test drive / back to editing · Ctrl+S save · right mouse look · WASD move · Q/E down/up";
+  Keys: F5 test drive / back to editing · Ctrl+S save · Ctrl+Z / Ctrl+Y undo / redo
+        Delete · Insert (after the selected point) · Ctrl+D duplicate · T top view · F focus
+  Mouse: left click select · left drag move (Alt: height, Ctrl: snap) · right drag look
+        WASD move · Q/E down/up · Shift faster";
+
+/// `rc_editor new …`.
+struct NewTrack {
+    environment: String,
+    name: Option<String>,
+    style: Option<String>,
+}
 
 struct Args {
     track: String,
+    new: Option<NewTrack>,
     assets_dir: Option<PathBuf>,
     user_data_dir: Option<PathBuf>,
     screenshot: Option<ScreenshotPlan>,
@@ -31,6 +48,7 @@ struct Args {
 fn parse(args: &[String]) -> Result<Args, String> {
     let (mut track, mut assets_dir, mut user_data_dir) = (None, None, None);
     let (mut screenshot, mut screenshot_at, mut exit_after) = (None, None, None);
+    let (mut new, mut env, mut name, mut style) = (false, None, None, None);
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let mut value = || it.next().ok_or(format!("{arg} needs a value"));
@@ -41,12 +59,29 @@ fn parse(args: &[String]) -> Result<Args, String> {
             "--screenshot" => screenshot = Some(PathBuf::from(value()?)),
             "--screenshot-at" => screenshot_at = Some(secs(value()?)?),
             "--exit-after" => exit_after = Some(secs(value()?)?),
+            "--env" => env = Some(value()?.clone()),
+            "--name" => name = Some(value()?.clone()),
+            "--style" => style = Some(value()?.clone()),
+            "new" if track.is_none() && !new => new = true,
             a if !a.starts_with('-') && track.is_none() => track = Some(a.to_owned()),
             a => return Err(format!("unexpected argument {a}")),
         }
     }
+    let new = match (new, env) {
+        (true, Some(environment)) => Some(NewTrack {
+            environment,
+            name,
+            style,
+        }),
+        (true, None) => return Err("new needs --env <environment>".into()),
+        (false, _) if name.is_some() || style.is_some() => {
+            return Err("--name and --style go with new".into());
+        }
+        (false, _) => None,
+    };
     Ok(Args {
         track: track.ok_or("no track given")?,
+        new,
         assets_dir,
         user_data_dir,
         screenshot: screenshot.map(|path| ScreenshotPlan {
@@ -56,6 +91,50 @@ fn parse(args: &[String]) -> Result<Args, String> {
         }),
         exit_after,
     })
+}
+
+/// Writes a new track's layout and catalog entry (refusing to replace an existing track).
+fn create(assets_dir: &Path, id: &str, new: &NewTrack) -> Result<(), String> {
+    let valid = id
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+    if id.is_empty() || !valid {
+        return Err(format!(
+            "track id \"{id}\": use lowercase letters, digits and _"
+        ));
+    }
+    let path = assets_dir.join(TRACKS_DIR).join(format!("{id}.ron"));
+    if path.exists() {
+        return Err(format!(
+            "{} exists: edit it with rc_editor {id}",
+            path.display()
+        ));
+    }
+    let indoor = EnvironmentDef::load(assets_dir, &new.environment)?
+        .room
+        .is_some();
+    let style = match &new.style {
+        Some(s) => rc_editor::fields::parse::<RibbonStyle>(s)?,
+        None => RibbonStyle::ToyTrack,
+    };
+    let track = TrackId::new(id);
+    let name = new.name.clone().unwrap_or_else(|| id.replace('_', " "));
+    let doc = rc_editor::doc::new_track(&track, &name, &new.environment, indoor, style);
+    rc_editor::doc::validate(&doc, &PropCatalog::load(assets_dir)?, &track)?;
+    let catalog_path = assets_dir.join(CATALOG_FILE);
+    let catalog = std::fs::read_to_string(&catalog_path)
+        .map_err(|e| format!("{}: {e}", catalog_path.display()))?;
+    let catalog = rc_editor::catalog::with_entry(&catalog, &doc.info)?;
+    let header = format!("// Written by the track editor: cargo run -p rc_editor -- {id}\n");
+    std::fs::write(&path, format!("{header}{}", doc.def.to_ron()?))
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    std::fs::write(&catalog_path, catalog)
+        .map_err(|e| format!("{}: {e}", catalog_path.display()))?;
+    println!(
+        "created {} and its (hidden) entry in {CATALOG_FILE}",
+        path.display()
+    );
+    Ok(())
 }
 
 fn main() -> AppExit {
@@ -75,8 +154,14 @@ fn main() -> AppExit {
     if args.user_data_dir.is_none() {
         paths.data_dir = paths.data_dir.join("editor");
     }
-    let def = match TrackDef::load(&paths.assets_dir, &args.track) {
-        Ok(def) => def,
+    if let Some(new) = &args.new
+        && let Err(e) = create(&paths.assets_dir, &args.track, new)
+    {
+        eprintln!("error: {e}");
+        return AppExit::from_code(2);
+    }
+    let editor = match rc_editor::EditorPlugin::load(&paths.assets_dir, &args.track) {
+        Ok(editor) => editor,
         Err(e) => {
             eprintln!("error: {e}");
             return AppExit::from_code(2);
@@ -98,9 +183,6 @@ fn main() -> AppExit {
         ..default()
     };
     let mut app = recharged::game(config, paths, bundle);
-    app.add_plugins(rc_editor::EditorPlugin {
-        track: TrackId::new(args.track),
-        def,
-    });
+    app.add_plugins((editor, rc_editor::EditorViewPlugin));
     app.run()
 }

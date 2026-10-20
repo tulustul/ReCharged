@@ -1,15 +1,18 @@
 //! The editing session on the real sim and flow: editing holds the race in Setup with no cars,
-//! a test drive runs the race, ending it returns to Setup without reloading, and unsaved edits
-//! are what the session builds.
+//! a test drive runs the race, ending it returns to Setup without reloading, accepted edits
+//! rebuild the session from the draft, rejected ones change nothing, undo restores.
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
-use rc_editor::{EditorDrive, EditorPlugin, EditorStatus};
+use rc_editor::{
+    EditorCommand, EditorCommandMsg, EditorItem, EditorPlugin, EditorSelect, EditorSet,
+    EditorStatus,
+};
 use rc_testkit::*;
-use rc_track::{Track, TrackDef, TrackDraft};
+use rc_track::TrackDraft;
+use rc_ui::editor::FieldValue;
 
 fn editor_app(name: &str) -> App {
-    let def = TrackDef::load(&assets_dir(), "test_oval").expect("test_oval");
     let data_dir = std::env::temp_dir().join(format!("rc_editor-it-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&data_dir);
     let paths = move |app: &mut App| {
@@ -31,11 +34,21 @@ fn editor_app(name: &str) -> App {
         rc_ai::AiPlugin,
         rc_items::ItemsPlugin,
         rc_game::GameFlowPlugin,
-        EditorPlugin {
-            track: "test_oval".into(),
-            def,
-        },
+        EditorPlugin::load(&assets_dir(), "test_oval").expect("test_oval"),
     ))
+}
+
+fn drive(app: &mut App) {
+    app.world_mut().trigger(EditorCommandMsg {
+        command: EditorCommand::Drive,
+    });
+}
+
+fn in_race_setup(w: &World) -> bool {
+    *w.resource::<State<AppState>>().get() == AppState::InRace
+        && w.get_resource::<State<RacePhase>>()
+            .is_some_and(|p| *p.get() == RacePhase::Setup)
+        && !w.resource::<EditorStatus>().loading
 }
 
 fn racers(app: &mut App) -> usize {
@@ -57,7 +70,7 @@ fn editing_holds_setup_and_test_drives_come_back_to_it() {
     assert_eq!(racers(&mut app), 0);
     assert!(!app.world().resource::<EditorStatus>().driving);
 
-    app.world_mut().trigger(EditorDrive);
+    drive(&mut app);
     step_until(&mut app, "the test drive", |w| {
         w.get_resource::<State<RacePhase>>()
             .is_some_and(|p| *p.get() == RacePhase::Racing)
@@ -65,7 +78,7 @@ fn editing_holds_setup_and_test_drives_come_back_to_it() {
     assert_eq!(racers(&mut app), 1, "only the player's car");
     assert!(app.world().resource::<EditorStatus>().driving);
 
-    app.world_mut().trigger(EditorDrive);
+    drive(&mut app);
     step(&mut app, 120);
     assert_eq!(race_phase(&app), Some(RacePhase::Setup), "back to editing");
     assert_eq!(racers(&mut app), 0);
@@ -73,17 +86,51 @@ fn editing_holds_setup_and_test_drives_come_back_to_it() {
 }
 
 #[test]
-fn the_session_builds_the_draft_and_reports_it_unsaved() {
-    let mut app = editor_app("draft");
-    let lifted = {
-        let mut draft = app.world_mut().resource_mut::<TrackDraft>();
-        draft.def.kill_height -= 1.0;
-        draft.def.kill_height
-    };
-    step_until(&mut app, "the editing session", |w| {
-        w.get_resource::<Track>().is_some()
+fn an_edit_rebuilds_the_session_a_bad_one_is_rejected_and_undo_restores() {
+    let mut app = editor_app("edit");
+    step_until(&mut app, "the editing session", in_race_setup);
+    let point = EditorItem::Point { index: 3 };
+    app.world_mut().trigger(EditorSelect { item: Some(point) });
+    let before = app.world().resource::<TrackDraft>().def.points[3].pos;
+    let moved = before + Vec3::X * 0.5;
+    app.world_mut().trigger(EditorSet {
+        key: "pos".into(),
+        value: Some(FieldValue::Vector {
+            value: moved.to_array().to_vec(),
+        }),
     });
-    assert_eq!(app.world().resource::<Track>().kill_height(), lifted);
     step(&mut app, 1);
-    assert!(app.world().resource::<EditorStatus>().dirty);
+    assert!(app.world().resource::<EditorStatus>().loading, "rebuilding");
+    step_until(&mut app, "the rebuilt session", in_race_setup);
+    assert_eq!(
+        app.world().resource::<TrackDraft>().def.points[3].pos,
+        moved
+    );
+    let status = app.world().resource::<EditorStatus>();
+    assert!(status.dirty && status.can_undo && status.error.is_none());
+    assert_eq!(status.selection.as_ref().map(|s| s.item), Some(point));
+
+    app.world_mut().trigger(EditorSet {
+        key: "width".into(),
+        value: Some(FieldValue::Number { value: 1.0 }),
+    });
+    step(&mut app, 1);
+    let status = app.world().resource::<EditorStatus>();
+    assert!(status.error.is_some(), "a 1 u wide track does not build");
+    assert!(!status.loading);
+    assert_eq!(
+        app.world().resource::<TrackDraft>().def.points[3].width,
+        None
+    );
+
+    app.world_mut().trigger(EditorCommandMsg {
+        command: EditorCommand::Undo,
+    });
+    step(&mut app, 1);
+    step_until(&mut app, "the session after undo", in_race_setup);
+    assert_eq!(
+        app.world().resource::<TrackDraft>().def.points[3].pos,
+        before
+    );
+    assert!(!app.world().resource::<EditorStatus>().dirty);
 }

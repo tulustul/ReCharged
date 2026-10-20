@@ -133,8 +133,89 @@ export type DropPlayer = {
  * Slot 0–3.
  */
 slot: number, };
-export type EditorDrive = null;
-export type EditorSave = null;
+export type EditorAdd = "prop" | "itemRow" | "ground" | "shortcut" | "gap" | "battery" | "decor";
+export type EditorCommand = { "kind": "save" } | { "kind": "drive" } | { "kind": "undo" } | { "kind": "redo" } | { "kind": "delete" } | { "kind": "insert" } | { "kind": "duplicate" } | { "kind": "add", 
+/**
+ * What.
+ */
+what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "toggleLayer", 
+/**
+ * Layer name (see [`EditorStatus::layers`]).
+ */
+layer: string, };
+export type EditorCommandMsg = { 
+/**
+ * The command.
+ */
+command: EditorCommand, };
+export type EditorCounts = { points: number, gaps: number, ground: number, itemRows: number, props: number, shortcuts: number, decor: number, battery: boolean, };
+export type EditorField = { 
+/**
+ * Field name as in the data file (`width`, `wall_left`).
+ */
+key: string, 
+/**
+ * Current value; for an unset optional field, the value it inherits or defaults to.
+ */
+value: FieldValue, 
+/**
+ * May be unset (inherited from the previous control point, or absent).
+ */
+optional: boolean, 
+/**
+ * Set explicitly (always true for non-optional fields).
+ */
+set: boolean, };
+export type EditorItem = { "kind": "track" } | { "kind": "point", index: number, } | { "kind": "gap", index: number, } | { "kind": "ground", index: number, } | { "kind": "vertex", ground: number, index: number, } | { "kind": "itemRow", index: number, } | { "kind": "prop", index: number, } | { "kind": "shortcut", index: number, } | { "kind": "pathPoint", shortcut: number, index: number, } | { "kind": "battery" } | { "kind": "decor", index: number, };
+export type EditorOptions = { 
+/**
+ * Time of day of the session.
+ */
+time: string, 
+/**
+ * Weather preset of the session.
+ */
+weather: string, 
+/**
+ * Test drives run the reverse layout (editing stays forward).
+ */
+reverse: boolean, 
+/**
+ * Test drives run the mirrored layout.
+ */
+mirror: boolean, };
+export type EditorSelect = { 
+/**
+ * The item.
+ */
+item: EditorItem | null, };
+export type EditorSelection = { 
+/**
+ * What it is.
+ */
+item: EditorItem, 
+/**
+ * Heading ("Point 12 · T1").
+ */
+title: string, 
+/**
+ * Its fields, in file order.
+ */
+fields: Array<EditorField>, };
+export type EditorSet = { 
+/**
+ * Field name.
+ */
+key: string, 
+/**
+ * New value.
+ */
+value: FieldValue | null, };
+export type EditorSetOptions = { 
+/**
+ * The options.
+ */
+options: EditorOptions, };
 export type EditorStatus = { 
 /**
  * Track id (file stem).
@@ -145,7 +226,7 @@ track: string,
  */
 name: string, 
 /**
- * The layout differs from the file.
+ * The layout or decor differs from the files.
  */
 dirty: boolean, 
 /**
@@ -153,13 +234,47 @@ dirty: boolean,
  */
 driving: boolean, 
 /**
- * The last failure (load, save), if any.
+ * A session (re)load is pending or running.
+ */
+loading: boolean, 
+/**
+ * The last failure (an edit that would not build, load, save), if any.
  */
 error: string | null, 
 /**
  * Build warnings of the session's track.
  */
-lints: Array<string>, };
+lints: Array<string>, 
+/**
+ * Undo / redo are possible.
+ */
+canUndo: boolean, canRedo: boolean, 
+/**
+ * Item counts.
+ */
+counts: EditorCounts, 
+/**
+ * The selected item.
+ */
+selection: EditorSelection | null, 
+/**
+ * Session options.
+ */
+options: EditorOptions, 
+/**
+ * Allowed times of day of the track.
+ */
+times: Array<string>, 
+/**
+ * Allowed weather presets of the track.
+ */
+weathers: Array<string>, 
+/**
+ * Item kinds with visible (pickable) handles: `points`, `props`, `ground`, `rows`,
+ * `shortcuts`, `decor`.
+ */
+layers: Array<string>, };
+export type FieldValue = { "type": "number", value: number, } | { "type": "integer", value: number, } | { "type": "toggle", value: boolean, } | { "type": "choice", value: string, options: Array<string>, } | { "type": "vector", value: Array<number>, } | { "type": "text", value: string, };
 export type GamepadAxisChange = { gamepad: number, axis: GamepadAxisName, value: number, };
 export type GamepadAxisName = "leftStickX" | "leftStickY" | "leftZ" | "rightStickX" | "rightStickY" | "rightZ" | { "other": number };
 export type GamepadButtonChange = { gamepad: number, button: GamepadButtonName, 
@@ -1728,8 +1843,10 @@ export type WindowSize = { width: number, height: number, };
 /** Every `emit` name and the payload type it carries. */
 export interface ReactMessages {
   "app.quit": AppQuit;
-  "editor.drive": EditorDrive;
-  "editor.save": EditorSave;
+  "editor.command": EditorCommandMsg;
+  "editor.options": EditorSetOptions;
+  "editor.select": EditorSelect;
+  "editor.set": EditorSet;
   "gamepad.rumble": GamepadRumble;
   "gamepad.stopRumble": GamepadStopRumble;
   "hud.bind": BindHud;
@@ -2055,8 +2172,10 @@ export const bevy = {
     get(): Promise<UiCatalog> { return request("catalog.get", null); },
   },
   editor: {
-    drive(value: EditorDrive): void { emit("editor.drive", value); },
-    save(value: EditorSave): void { emit("editor.save", value); },
+    command(value: EditorCommandMsg): void { emit("editor.command", value); },
+    options(value: EditorSetOptions): void { emit("editor.options", value); },
+    select(value: EditorSelect): void { emit("editor.select", value); },
+    set(value: EditorSet): void { emit("editor.set", value); },
     snapshot(): Promise<EditorStatus | null> { return request("editor.snapshot", null); },
   },
   gamepad: {
