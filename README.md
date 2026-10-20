@@ -34,6 +34,9 @@ scripts in `tools/`.
 - Rust (stable, edition 2024) — `cargo`
 - Node.js ≥ 22 and npm (to build the React UI bundle)
 - A Vulkan-capable GPU (developed on an RTX 3070, Linux)
+- [Git LFS](https://git-lfs.com): models, textures, audio and fonts under `assets/` are LFS
+  objects. Run `git lfs install` once before cloning; in an existing clone, `git lfs pull`.
+  Without it those files are small text pointers and the game cannot load them.
 
 ## Build & run
 ```sh

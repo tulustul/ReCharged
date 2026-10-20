@@ -1,0 +1,12 @@
+# Binary assets live in Git LFS (`git lfs install` once per machine, before cloning or pulling).
+# Data (RON), shaders and text stay plain git files: they diff, and tests read them.
+assets/**/*.glb filter=lfs diff=lfs merge=lfs -text
+assets/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+assets/**/*.wav filter=lfs diff=lfs merge=lfs -text
+assets/**/*.ktx2 filter=lfs diff=lfs merge=lfs -text
+assets/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+assets/**/*.ttf filter=lfs diff=lfs merge=lfs -text
+assets/**/*.otf filter=lfs diff=lfs merge=lfs -text
+# Baked irradiance volumes (the track editor's light baker).
+assets/**/*.irv filter=lfs diff=lfs merge=lfs -text
