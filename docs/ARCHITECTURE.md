@@ -218,8 +218,8 @@ them with a one-to-one Bevy relationship (`VisualOf(sim)` on the proxy, relation
 poses proxies in `InterpolateSet` using `Time<Fixed>::overstep_fraction()`. Teleports (spawn,
 respawn, prop reset) send a `Teleported { entity }` message; the snapshot system then sets
 `prev = curr` so nothing streaks across the screen. Models, wheels, VFX attachments,
-cameras and audio emitters use the proxy. Nobody but rc_vehicle (and rapier) writes a rapier
-body's `Transform`. Headless apps have no proxies.
+cameras and audio emitters use the proxy. Nobody but rc_vehicle, rapier and rc_track (prop
+spawn, reset, and the editor's drag preview) writes a rapier body's `Transform`. Headless apps have no proxies.
 
 ### 3.4 Determinism
 - Stateless keyed RNG: `rc_core::rng::draw(seed, tick, stream: RngStream, key: u64) -> u64`
