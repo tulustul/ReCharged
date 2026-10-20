@@ -1,5 +1,5 @@
 // Toy Town decor (rc_render, physics-free, out of reach): pennant bunting strung under the
-// ceiling and hanging aisle signs over the wall shelves. Format: crates/rc_render/src/props/
+// ceiling and hanging aisle signs over the wall shelves. Format: crates/rc_track/src/
 // decor.rs. Models: tools/blender/props/toy/{bunting,sign}.py; both have their origin at the
 // ceiling attachment (the room is 16 u high) and hang below it. Touchable dressing lives in the
 // track's prop list (assets/data/tracks/toy_town.ron) with colliders.

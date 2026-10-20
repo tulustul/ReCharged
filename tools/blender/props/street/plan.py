@@ -9,9 +9,13 @@ this plan needs) to assets/data/props/street.ron.
 World axes (Bevy): x east, z south (plots: north up), y up; 1 u = 22.5 cm. Heights: road 0,
 lawns 0.6, sidewalks 0.62, driveways 0.64, kerb tops 0.65, raised yard 3.0, drain bottom -2.
 Angles of arcs: degrees from +x toward +z (clockwise in the plots).
+
+Since the track editor (docs/design/rc_editor.md) the track and decor files are editor-owned: this
+script writes them only with --layout, which replaces every edit made in the editor.
 """
 import math
 import os
+import sys
 
 import catalog as C
 
@@ -64,6 +68,15 @@ BULB_HOUSE = ('street_house_a', XC + 110 * math.cos(math.radians(APRON_BULB)),
               math.degrees(math.atan2(math.cos(math.radians(APRON_BULB)),
                                       math.sin(math.radians(APRON_BULB)))))
 BIRCH_HOUSE = ('street_house_a', 98.0, 172.0, 90.0)     # faces Birch Lane (west)
+
+
+def editor_owned(path):
+    """Track and decor files are editor-owned (docs/design/rc_editor.md): this script writes them
+    only with --layout, which replaces every edit made in the editor with its own layout."""
+    if '--layout' in sys.argv:
+        return False
+    print(f'skipped {path}: editor-owned (cargo run -p rc_editor); --layout overwrites it')
+    return True
 
 
 def rad(a):
@@ -470,6 +483,8 @@ def write_decor():
         lines.append(f'        (model: "models/props/street/{model}.glb", pos: ({fmt(x)}, {fmt(LAWN)}, '
                      f'{fmt(z)}), yaw: {fmt(((yaw + 180) % 360) - 180)}, scale: {fmt(scale)}),')
     lines += ['    ],', ')', '']
+    if editor_owned(path):
+        return
     with open(path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     print(f'wrote {path} ({len(DECOR)} items)')
@@ -656,6 +671,8 @@ def write_track(pl):
         s += '),'
         lines.append(s + (f' // {note}' if note else ''))
     lines += ['    ],', ')', '']
+    if editor_owned(OUT):
+        return
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     print(f'wrote {OUT} ({len(pts)} points, {len(pl.props)} props, {len(pl.ground)} ground)')

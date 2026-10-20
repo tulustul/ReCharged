@@ -62,7 +62,14 @@ impl Track {
                 ));
             }
         }
-        let layout = Layout::new(def, variant.reverse, variant.mirror);
+        let mut layout = Layout::new(def, variant.reverse, variant.mirror);
+        if variant.mirror {
+            for prop in &mut layout.props {
+                if catalog.get(&prop.kind).is_some_and(|d| d.mirror_turn) {
+                    prop.yaw += std::f32::consts::PI;
+                }
+            }
+        }
         let line = centreline(&layout.points, &layout.gaps)?;
         if line.length < MIN_LENGTH_U {
             return Err(format!(

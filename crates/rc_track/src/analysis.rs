@@ -2,12 +2,14 @@
 //! lints and the geometry hash.
 
 use bevy::math::{Vec2, Vec3};
+use bevy::transform::components::Transform;
 use rc_core::SurfaceKind;
 
 use crate::def::CHOKE_WIDTH_U;
 use crate::geometry::runs;
 use crate::mesh::style_profile;
 use crate::place::{LINE_LOCK_AFTER_U, LINE_LOCK_BEFORE_U};
+use crate::props::Primitive;
 use crate::racing::{LineInput, SpeedInput, SpeedModel, curvature, racing_line, speed_profile};
 use crate::track::*;
 
@@ -26,6 +28,11 @@ pub const STACK_CLEARANCE_U: f32 = 3.5;
 /// which leaves room for the spline between them. A ribbon lying flat whose edge rises less (a
 /// carpet runner) needs only its own rise.
 pub const EDGE_CLEARANCE_U: f32 = 0.1;
+/// Lint: a static prop (no drivable surface) must stay out of the racing width between this
+/// height above the driving surface (u; lower is a bump the wheels, r ≈ 0.23 u, roll over)…
+pub const CORRIDOR_STEP_U: f32 = 0.25;
+/// …and this one (u): the car's body and a little more.
+pub const CORRIDOR_HEIGHT_U: f32 = 1.5;
 /// Samples either side used for the racing line's curvature (2 u apart).
 const CURVATURE_SPAN: usize = 4;
 
@@ -198,6 +205,172 @@ pub(crate) fn lints(track: &Track) -> Vec<String> {
         }
     }
     out.extend(self_overlaps(track));
+    out.extend(corridor_intrusions(track));
+    out
+}
+
+/// A collider primitive seen from above: its outline (convex polygon, or a circle as one point
+/// and a radius) and its height range.
+struct Footprint {
+    outline: Vec<Vec2>,
+    radius: f32,
+    low: f32,
+    high: f32,
+}
+
+impl Footprint {
+    fn of(prop: &Transform, primitive: &Primitive) -> Self {
+        let (offset, rot) = primitive.pose();
+        let at = |local: Vec3| prop.transform_point(offset + rot * local);
+        let boxed = |half: Vec3| {
+            let corners: Vec<Vec3> = (0..8)
+                .map(|i| {
+                    let sign = |bit: usize| if i & bit == 0 { -1.0 } else { 1.0 };
+                    at(half * Vec3::new(sign(1), sign(2), sign(4)))
+                })
+                .collect();
+            let low = corners.iter().map(|c| c.y).fold(f32::MAX, f32::min);
+            let high = corners.iter().map(|c| c.y).fold(f32::MIN, f32::max);
+            let plan: Vec<Vec2> = corners.iter().map(|c| Vec2::new(c.x, c.z)).collect();
+            Self {
+                outline: hull(plan),
+                radius: 0.0,
+                low,
+                high,
+            }
+        };
+        let round = |radius: f32, half_height: f32| {
+            let c = at(Vec3::ZERO);
+            Self {
+                outline: vec![Vec2::new(c.x, c.z)],
+                radius,
+                low: c.y - half_height,
+                high: c.y + half_height,
+            }
+        };
+        match *primitive {
+            Primitive::Box { half, .. } | Primitive::Wedge { half, .. } => boxed(half),
+            // Upright: a circle; tilted (a wheel on its side): its bounding box.
+            Primitive::Cylinder {
+                radius,
+                half_height,
+                rot,
+                ..
+            } => {
+                if rot.x.abs() < 1e-3 && rot.z.abs() < 1e-3 {
+                    round(radius, half_height)
+                } else {
+                    boxed(Vec3::new(radius, half_height, radius))
+                }
+            }
+            Primitive::Ball { radius, .. } => round(radius, radius),
+        }
+    }
+
+    /// Plan distance from `p` (0 inside).
+    fn distance(&self, p: Vec2) -> f32 {
+        let o = &self.outline;
+        if o.len() == 1 {
+            return (o[0].distance(p) - self.radius).max(0.0);
+        }
+        let mut inside = true;
+        let mut best = f32::MAX;
+        for (i, &a) in o.iter().enumerate() {
+            let b = o[(i + 1) % o.len()];
+            let ab = b - a;
+            inside &= ab.perp_dot(p - a) >= 0.0; // counter-clockwise hull
+            let t = ((p - a).dot(ab) / ab.length_squared().max(1e-12)).clamp(0.0, 1.0);
+            best = best.min((a + ab * t).distance(p));
+        }
+        if inside { 0.0 } else { best }
+    }
+}
+
+/// Convex hull, counter-clockwise (monotone chain).
+fn hull(mut points: Vec<Vec2>) -> Vec<Vec2> {
+    points.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+    points.dedup_by(|a, b| a.distance(*b) < 1e-5);
+    if points.len() < 3 {
+        return points;
+    }
+    let mut out: Vec<Vec2> = Vec::with_capacity(points.len() * 2);
+    for pass in [false, true] {
+        let start = out.len();
+        let iter: Box<dyn Iterator<Item = &Vec2>> = if pass {
+            Box::new(points.iter().rev())
+        } else {
+            Box::new(points.iter())
+        };
+        for &p in iter {
+            while out.len() >= start + 2 {
+                let (a, b) = (out[out.len() - 2], out[out.len() - 1]);
+                if (b - a).perp_dot(p - a) > 0.0 {
+                    break;
+                }
+                out.pop();
+            }
+            out.push(p);
+        }
+        out.pop();
+    }
+    out
+}
+
+/// Static props without a drivable surface whose colliders reach into the racing width between
+/// [`CORRIDOR_STEP_U`] and [`CORRIDOR_HEIGHT_U`] above the surface: one line per prop, at its
+/// deepest point. Ramps and box jumps (drivable surface), knockables, bumps (a cable), props
+/// above the car (a table top, a bench seat) and placements marked `on_line` are fine.
+fn corridor_intrusions(track: &Track) -> Vec<String> {
+    let nodes: Vec<&TrackFrame> = track
+        .nodes
+        .iter()
+        .step_by(2)
+        .map(|n| &n.frame)
+        .filter(|f| !f.in_gap)
+        .collect();
+    let mut out = Vec::new();
+    for prop in &track.props {
+        let Some(def) = track.prop_def(&prop.kind) else {
+            continue;
+        };
+        if def.dynamic || def.surface.is_some() || prop.on_line {
+            continue;
+        }
+        let mut worst: Option<(f32, f32)> = None; // (depth, s)
+        for footprint in def
+            .colliders
+            .iter()
+            .map(|c| Footprint::of(&prop.transform, c))
+        {
+            let centre = footprint.outline.iter().sum::<Vec2>() / footprint.outline.len() as f32;
+            let reach = footprint
+                .outline
+                .iter()
+                .map(|p| p.distance(centre))
+                .fold(footprint.radius, f32::max);
+            for f in &nodes {
+                let p = Vec2::new(f.position.x, f.position.z);
+                let allowed = f.half_width;
+                if p.distance(centre) > reach + allowed
+                    || footprint.high <= f.position.y + CORRIDOR_STEP_U
+                    || footprint.low >= f.position.y + CORRIDOR_HEIGHT_U
+                {
+                    continue;
+                }
+                let depth = allowed - footprint.distance(p);
+                if depth > 0.0 && worst.is_none_or(|(d, _)| depth > d) {
+                    worst = Some((depth, f.s));
+                }
+            }
+        }
+        if let Some((depth, s)) = worst {
+            let at = prop.transform.translation;
+            out.push(format!(
+                "s = {s:.0} u: prop {} at ({:.1}, {:.1}) reaches {depth:.2} u into the racing width; move it out or make it knockable",
+                prop.kind, at.x, at.z
+            ));
+        }
+    }
     out
 }
 

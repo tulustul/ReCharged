@@ -14,6 +14,9 @@ back aisle east -> aisle A south (box hump) -> U-turn around two endcaps -> aisl
 jump) -> back aisle east -> produce south (S-bends around the water pallets: Golden Battery on
 top, up a narrow box ramp) -> promenade west -> checkout lane 2 south -> lobby. Lanes 1 and 3
 are alternative routes. Reverse: the same loop backwards, the box jump in aisle A.
+
+Since the track editor (docs/design/rc_editor.md) the track and decor files are editor-owned: this
+script writes them only with --layout, which replaces every edit made in the editor.
 """
 import math
 import os
@@ -53,6 +56,15 @@ LANE_W = {1: 6.0, 2: 2 * HW_L + 0.6, 3: 6.0}  # open lanes; closed ones are 6 u 
 
 # --- control points -----------------------------------------------------------------------------
 P = []  # dicts: x, y, z, + optional width, walls (left, right), margin, note
+
+
+def editor_owned(path):
+    """Track and decor files are editor-owned (docs/design/rc_editor.md): this script writes them
+    only with --layout, which replaces every edit made in the editor with its own layout."""
+    if '--layout' in sys.argv:
+        return False
+    print(f'skipped {path}: editor-owned (cargo run -p rc_editor); --layout overwrites it')
+    return True
 
 
 def pt(x, z, y=0.0, **kw):
@@ -680,6 +692,8 @@ def main():
     place_decor()
     for name, text in (('tracks', track_ron(gaps)), ('decor', decor_ron())):
         path = os.path.join(assets, 'data', name, 'aisle_rush.ron')
+        if editor_owned(path):
+            continue
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             f.write(text)

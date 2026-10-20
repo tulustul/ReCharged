@@ -15,9 +15,13 @@ M lane runs west over the workbench island (plywood ramp up, kicker, jump onto t
 U-turn; the S lane runs east through the tyre-stack chicane; U-turn; the S3 lane runs west
 along the south wall through the wash bay (water) and the paint booth; the W lane runs north
 along the west wall over rubber mats back to the start. Oil stains sit on the U-turn lines.
+
+Since the track editor (docs/design/rc_editor.md) the track and decor files are editor-owned: this
+script writes them only with --layout, which replaces every edit made in the editor.
 """
 import math
 import os
+import sys
 
 import catalog as C
 
@@ -47,6 +51,15 @@ WASH_X = 27.0                                       # wash bay centre on the S3 
 BOOTH_X = -24.0                                     # paint booth centre on the S3 lane
 WALLS = dict(wall_left=True, wall_right=True)
 OPEN = dict(wall_left=False, wall_right=False)
+
+
+def editor_owned(path):
+    """Track and decor files are editor-owned (docs/design/rc_editor.md): this script writes them
+    only with --layout, which replaces every edit made in the editor with its own layout."""
+    if '--layout' in sys.argv:
+        return False
+    print(f'skipped {path}: editor-owned (cargo run -p rc_editor); --layout overwrites it')
+    return True
 
 
 def rad(a):
@@ -549,6 +562,8 @@ def write_track(pts, ix, ground, rows, props, gaps, battery, shortcuts):
         pos = tuple(round(float(c), 3) for c in p['pos'])
         lines.append(f'        (kind: "{p["kind"]}", pos: {fmt(pos)}{yaw}{d}),')
     lines += ['    ],', ')', '']
+    if editor_owned(TRACK_OUT):
+        return
     with open(TRACK_OUT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -568,6 +583,8 @@ def write_decor(items):
         lines.append(f'        (model: "models/props/workshop/{d["model"]}.glb", '
                      f'pos: {fmt(pos)}{yaw}{sc}{dd}),')
     lines += ['    ],', ')', '']
+    if editor_owned(DECOR_OUT):
+        return
     with open(DECOR_OUT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
@@ -589,7 +606,6 @@ def main():
     write_track(pts, ix, ground(), rows, props(pts, ix), gaps, battery, [])
     write_decor(decor())
     C.write_catalog()
-    print(f'wrote {TRACK_OUT} ({len(pts)} points)')
 
 
 if __name__ == '__main__':

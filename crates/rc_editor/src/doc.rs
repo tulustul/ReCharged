@@ -405,6 +405,7 @@ impl Doc {
                     pos: focus,
                     yaw: 0.0,
                     dir: Dir::Both,
+                    on_line: false,
                 });
                 Ok(EditorItem::Prop {
                     index: idx(d.props.len() - 1),

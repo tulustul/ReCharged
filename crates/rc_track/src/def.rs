@@ -44,6 +44,10 @@ fn is_both(dir: &Dir) -> bool {
     *dir == Dir::Both
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 fn is_zero(value: &f32) -> bool {
     *value == 0.0
 }
@@ -179,6 +183,10 @@ pub struct PropPlacement {
     /// Layouts with the prop.
     #[serde(default, skip_serializing_if = "is_both")]
     pub dir: Dir,
+    /// The racing line drives over, under or through it on purpose (a sandbox jump, a parked
+    /// car's underside): the corridor lint leaves it alone.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub on_line: bool,
 }
 
 fn default_shortcut_width() -> f32 {

@@ -5,6 +5,11 @@ Suburban street & front lawns in autumn: a residential street with a cul-de-sac,
 with a median (Birch Lane), front yards, parked full-size cars, maples. 940 u lap (GDD ~900),
 3 laps, outdoor ★★★, surfaces Asphalt / Grass / Stone (+ Wood ramps), all six weathers.
 
+> **Editor-owned layout.** Since the track editor (`docs/design/rc_editor.md`), the track and decor
+> files are edited with `cargo run -p rc_editor -- maple_street`; the layout script below writes them only
+> with `--layout`, which replaces every edit made in the editor. Its constants still feed the prop
+> builds.
+
 ## Regenerate / verify
 
 ```sh

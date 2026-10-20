@@ -117,6 +117,11 @@ pub struct PropDef {
     /// Drivable surface (ramps, box tops): wheel rays report it.
     #[serde(default)]
     pub surface: Option<SurfaceKind>,
+    /// Mirrored layouts turn it 180° on top of mirroring its yaw: a flat prop whose left–right
+    /// layout matters (a wall with off-centre doorways) — meshes are never mirrored, but a thin
+    /// prop turned around is its own mirror image.
+    #[serde(default)]
+    pub mirror_turn: bool,
 }
 
 /// One `props/*.ron` file, or all of them merged.

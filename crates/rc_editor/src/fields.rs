@@ -348,6 +348,7 @@ fn slots<'a>(
                     ("pos", Slot::V3(&mut p.pos)),
                     ("yaw", Slot::Num(&mut p.yaw)),
                     ("dir", pick(&mut p.dir, &DIRS)),
+                    ("on_line", Slot::Bool(&mut p.on_line)),
                 ],
             )
         }

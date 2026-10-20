@@ -10,9 +10,13 @@ assets/data/decor/backyard_bash.ron (decor.py).
 World axes (Bevy): x east, z south (plots: north up), y up; 1 u = 22.5 cm. Heights: lawn 0,
 dirt path 0.03, puddles 0.06, patio 0.05, raised beds and sand 1.0, deck 2.0.
 Headings: degrees, 0 = north (-z), positive turns left (counter-clockwise from above).
+
+Since the track editor (docs/design/rc_editor.md) the track and decor files are editor-owned: this
+script writes them only with --layout, which replaces every edit made in the editor.
 """
 import math
 import os
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..'))
@@ -50,6 +54,15 @@ WALL_T = 0.6                                      # rc_track barrier thickness
 BED_END_Z = 22.0                                  # the west border bed ends here (behind the wall)
 SW_R = 14.0                                       # SW corner radius
 KERB_END_X = -15.0                                # the wall along the dirt path ends here
+
+
+def editor_owned(path):
+    """Track and decor files are editor-owned (docs/design/rc_editor.md): this script writes them
+    only with --layout, which replaces every edit made in the editor with its own layout."""
+    if '--layout' in sys.argv:
+        return False
+    print(f'skipped {path}: editor-owned (cargo run -p rc_editor); --layout overwrites it')
+    return True
 
 
 def rad(a):
@@ -497,6 +510,8 @@ def write_track(p, i):
         ')',
         '',
     ]
+    if editor_owned(TRACK_OUT):
+        return
     with open(TRACK_OUT, 'w', encoding='utf-8') as fh:
         fh.write('\n'.join(out))
 
@@ -508,7 +523,6 @@ def main():
     print(f'spiral veer {i["alpha"]:.2f} deg; closure {gap:.2f} u (straight); path ~{length:.0f} u;'
           f' {len(p.pts)} points')
     write_track(p, i)
-    print(f'wrote {os.path.relpath(TRACK_OUT, ROOT)}')
 
 
 if __name__ == '__main__':

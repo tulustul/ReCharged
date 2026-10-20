@@ -104,6 +104,8 @@ pub struct PlacedProp {
     pub kind: String,
     /// Spawn pose (ground-contact centre).
     pub transform: Transform,
+    /// The racing line drives over, under or through it on purpose (no corridor lint).
+    pub on_line: bool,
 }
 
 /// A flat drivable polygon.

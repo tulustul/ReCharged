@@ -6,15 +6,28 @@ the reel, stepping stones, pebbles and fallen leaves. Everything a car can bump 
 catalog prop instead (plan.py).
 
     python3 tools/blender/props/garden/decor.py      (after plan.py; deterministic)
+
+Since the track editor (docs/design/rc_editor.md) the track and decor files are editor-owned: this
+script writes them only with --layout, which replaces every edit made in the editor.
 """
 import math
 import os
+import sys
 import random
 
 import plan as P
 
 OUT = os.path.join(P.ROOT, 'assets', 'data', 'decor', 'backyard_bash.ron')
 M = 'models/props/garden'
+
+
+def editor_owned(path):
+    """Track and decor files are editor-owned (docs/design/rc_editor.md): this script writes them
+    only with --layout, which replaces every edit made in the editor with its own layout."""
+    if '--layout' in sys.argv:
+        return False
+    print(f'skipped {path}: editor-owned (cargo run -p rc_editor); --layout overwrites it')
+    return True
 
 
 def inside(pt, poly):
@@ -54,6 +67,8 @@ class Decor:
             lines.append(f'        (model: "{M}/{model}.glb", pos: ({P.fmt(x)}, {P.fmt(y)}, '
                          f'{P.fmt(z)}), yaw: {P.fmt(yaw)}),' + (f' // {note}' if note else ''))
         lines += ['    ],', ')', '']
+        if editor_owned(OUT):
+            return
         os.makedirs(os.path.dirname(OUT), exist_ok=True)
         with open(OUT, 'w', encoding='utf-8') as fh:
             fh.write('\n'.join(lines))
@@ -191,7 +206,7 @@ def main():
         d.add('leaves', x, y, z, rng.uniform(0, 360), 'fallen leaves' if n == 0 else '')
         n += 1
     d.write()
-    print(f'wrote {os.path.relpath(OUT, P.ROOT)}: {len(d.items)} decor items')
+    print(f'{len(d.items)} decor items')
 
 
 if __name__ == '__main__':

@@ -609,3 +609,61 @@ fn every_track_file_survives_a_save() {
         assert_eq!(back, def, "{id}");
     }
 }
+
+#[test]
+fn static_props_in_the_racing_width_are_linted_unless_on_line() {
+    let props = PropCatalog::load(&assets()).expect("props");
+    let mut def = TrackDef::load(&assets(), "test_oval").expect("loads");
+    let blocker = |on_line| PropPlacement {
+        kind: "tyre_stack".into(),
+        pos: Vec3::new(0.0, 0.0, -20.0), // on the main straight's centreline
+        on_line,
+        ..PropPlacement::default()
+    };
+    let corridor = |def: &TrackDef| {
+        let t = Track::build(def, &props, &TrackVariant::forward("test_oval")).expect("builds");
+        t.lints()
+            .iter()
+            .filter(|l| l.contains("racing width"))
+            .count()
+    };
+    assert_eq!(corridor(&def), 0);
+    def.props.push(blocker(false));
+    assert_eq!(corridor(&def), 1);
+    *def.props.last_mut().unwrap() = blocker(true);
+    assert_eq!(corridor(&def), 0, "on_line props are meant to be there");
+}
+
+#[test]
+fn mirror_turn_props_turn_around_in_mirrored_layouts() {
+    let props = PropCatalog::load(&assets()).expect("props");
+    assert!(props.get("house_wall_hall").is_some_and(|d| d.mirror_turn));
+    let mut def = TrackDef::load(&assets(), "test_oval").expect("loads");
+    def.props.push(PropPlacement {
+        kind: "house_wall_hall".into(),
+        pos: Vec3::new(120.0, 0.0, 0.0),
+        yaw: 30.0,
+        ..PropPlacement::default()
+    });
+    let yaw = |mirror| {
+        let v = TrackVariant {
+            track: "test_oval".into(),
+            reverse: false,
+            mirror,
+        };
+        let t = Track::build(&def, &props, &v).expect("builds");
+        let wall = t
+            .props()
+            .iter()
+            .find(|p| p.kind == "house_wall_hall")
+            .unwrap();
+        wall.transform
+            .rotation
+            .to_euler(EulerRot::YXZ)
+            .0
+            .to_degrees()
+    };
+    assert!((yaw(false) - 30.0).abs() < 1e-3);
+    // -30° mirrored, turned by 180°: 150°.
+    assert!((yaw(true) - 150.0).abs() < 1e-3, "{}", yaw(true));
+}

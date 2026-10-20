@@ -168,6 +168,7 @@
         // Hall wall, 32 u long (x -16..16) with two 9 x 9.3 u openings (x -12.5..-3.5, 1.5..10.5).
         "house_wall_hall": (
             model: "models/props/house/wall_hall.glb",
+            mirror_turn: true, // off-centre doorways: mirrored layouts turn the wall around
             colliders: [
                 Box(half: (1.75, 5.75, 0.3), offset: (-14.25, 5.75, 0)),
                 Box(half: (2.5, 5.75, 0.3), offset: (-1, 5.75, 0)),

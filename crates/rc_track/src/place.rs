@@ -84,6 +84,7 @@ impl Track {
                 kind: p.kind.clone(),
                 transform: Transform::from_translation(p.pos)
                     .with_rotation(Quat::from_rotation_y(p.yaw)),
+                on_line: p.on_line,
             })
             .collect();
         Ok(())

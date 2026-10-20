@@ -4,6 +4,11 @@ Back garden at RC scale (art bible §3.4; GDD §7.1: ~450 u, 5 laps, outdoor ★
 A suburban brick house with a raised timber deck and a slab patio, a lawn with brick-edged raised
 beds, a vegetable patch along the south fence and a shed in the corner.
 
+> **Editor-owned layout.** Since the track editor (`docs/design/rc_editor.md`), the track and decor
+> files are edited with `cargo run -p rc_editor -- backyard_bash`; the layout script below writes them only
+> with `--layout`, which replaces every edit made in the editor. Its constants still feed the prop
+> builds.
+
 ## Files and how to rebuild
 | What | Path |
 |---|---|

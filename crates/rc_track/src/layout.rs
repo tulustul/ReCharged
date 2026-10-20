@@ -32,6 +32,7 @@ pub(crate) struct LayoutProp {
     pub kind: String,
     pub pos: Vec3,
     pub yaw: f32,
+    pub on_line: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,6 +92,7 @@ impl Layout {
                     kind: p.kind.clone(),
                     pos: p.pos,
                     yaw: p.yaw.to_radians(),
+                    on_line: p.on_line,
                 })
                 .collect(),
             shortcuts: def
@@ -246,6 +248,7 @@ mod tests {
             pos: Vec3::new(5.0, 0.0, 1.0),
             yaw: 30.0,
             dir: Dir::Both,
+            on_line: false,
         }];
         def
     }

@@ -13,7 +13,7 @@
     points: [
         // Main straight, heading −Z. Outside wall on the left, open infield on the right.
         (pos: (0, 0.3, 28.5), width: 12, surface: Asphalt, wall_left: true, wall_right: false, offroad_margin: 6),
-        (pos: (0, 0.3, 10)), // start / finish
+        (pos: (0, 0.3, 10), label: "start / finish"),
         (pos: (0, 0.3, -10)),
         (pos: (0, 0.3, -28.5)),
         // Turn 1 around (22, -40), flat.
@@ -26,8 +26,8 @@
         (pos: (44, 0.3, -40)),
         // Back straight, heading +Z: wooden ramp (8°), 8 u gap (forward only), landing slope.
         (pos: (44, 0.3, -28.5), surface: Wood),
-        (pos: (44, 2.6, -12)), // lip
-        (pos: (44, 1.6, -4)), // landing
+        (pos: (44, 2.6, -12), label: "lip"),
+        (pos: (44, 1.6, -4), label: "landing"),
         (pos: (44, 0.3, 8), surface: Asphalt),
         (pos: (44, 0.3, 28.5)),
         // Turn 2 around (22, 40); wider off-road margin for the grass shortcut.

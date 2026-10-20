@@ -3,6 +3,11 @@
 T16 environment note (art bible §3.5, GDD §7.1). Track `aisle_rush`, props directory
 `supermarket`, lighting file `assets/data/environments/supermarket.ron` (rendering agent).
 
+> **Editor-owned layout.** Since the track editor (`docs/design/rc_editor.md`), the track and decor
+> files are edited with `cargo run -p rc_editor -- aisle_rush`; the layout script below writes them only
+> with `--layout`, which replaces every edit made in the editor. Its constants still feed the prop
+> builds.
+
 ## Files and how to rebuild
 | What | Where |
 |---|---|
@@ -115,7 +120,7 @@ dividers = gondola uprights/strips.
 - The intro fly-by (radius 18 u) swings through the shopfront wall: the grid stands in the lobby,
   10 u from the glazing (camera-side clamp requested).
 - The ceiling rows glow at Night too (decor has no time-of-day switch; "security lighting").
-- AI drivers ignore static props; the corridor is kept clear by `plan.py`, but the alternative
+- AI drivers ignore static props; the corridor is kept clear by rc_track's corridor lint, but the alternative
   checkout lanes and the Golden Battery line are for humans (and AI if it reads `shortcuts()`).
 - The freezer island's back row (facing a closed aisle) uses the full freezer model (7.3 k tris
   each); a cheap back variant would save ≈ 80 k triangles if profiles ask for it.

@@ -4,6 +4,11 @@ Owner: environment artist (T16 workshop). Look: art bible §3.6. Track: GDD §7.
 indoor ★★★, ~700 u, 3 laps). Lighting file `assets/data/environments/workshop.ron` belongs to
 rendering (wishes below).
 
+> **Editor-owned layout.** Since the track editor (`docs/design/rc_editor.md`), the track and decor
+> files are edited with `cargo run -p rc_editor -- wrench_works`; the layout script below writes them only
+> with `--layout`, which replaces every edit made in the editor. Its constants still feed the prop
+> builds.
+
 ## Files and regeneration
 | What | Path |
 |---|---|

@@ -3,14 +3,17 @@
 assets/data/tracks/sofa_circuit.ron and assets/data/decor/sofa_circuit.ron.
 
 The centreline is built from straights and arcs (points every 20-30 deg), the chair slalom from
-R = 8 arcs; every prop placement lives here, so edit this file and re-run it rather than the
-RON. Check the result with the plot tool in all four variants:
+R = 8 arcs; every original prop placement lives here. Check the result with the plot tool in all
+four variants:
 
     python3 tools/blender/props/house/layout.py [--out-dir DIR]
     cargo run -p rc_track --example plot -- sofa_circuit [--rev] [--mirror]
 
 Coordinates: x east, z south (plots: -Z up), y up. Forward = the order of the points. Yaw:
 positive turns a prop's front (-Z) towards -X (0 = facing north, 180 = south, 90 = west).
+
+Since the track editor (docs/design/rc_editor.md) the track and decor files are editor-owned: this
+script writes them only with --layout, which replaces every edit made in the editor.
 """
 import math
 import os
@@ -25,6 +28,15 @@ W = 9               # standard racing width
 STEP20 = math.radians(20)
 
 pts = []  # control points: dict(pos, optional fields, c = comment)
+
+
+def editor_owned(path):
+    """Track and decor files are editor-owned (docs/design/rc_editor.md): this script writes them
+    only with --layout, which replaces every edit made in the editor with its own layout."""
+    if '--layout' in sys.argv:
+        return False
+    print(f'skipped {path}: editor-owned (cargo run -p rc_editor); --layout overwrites it')
+    return True
 
 
 def P(x, y, z, c=None, **kw):
@@ -313,6 +325,8 @@ def main():
     for rel, text in (('data/tracks/sofa_circuit.ron', track_ron()),
                       ('data/decor/sofa_circuit.ron', decor_ron())):
         path = os.path.join(out, rel)
+        if editor_owned(path):
+            continue
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             f.write(text)

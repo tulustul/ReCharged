@@ -82,6 +82,7 @@ complete, commented examples.
 | `surface` | style's (point 0) | segment, inherited | ribbon surface from this point to the next |
 | `wall_left` / `wall_right` | false (point 0) | segment, inherited | barrier on that edge from this point to the next |
 | `offroad_margin` | 6 (point 0) | segment, inherited | off-track tolerance beyond the edge (GDD §5.4) |
+| `label` | none | point, **not** inherited | a note for people ("T1", "jump: lip"); the editor shows it, the game ignores it |
 
 - *Inherited* = a point without the field keeps the previous point's value (file order).
   *Segment* fields apply from this point to the next; *point* fields are interpolated between
@@ -124,9 +125,12 @@ the row spans the width (1.5 u margins) with cubes 0.8 u above the surface. Neve
 GDD §6.1: 4–6 rows per lap.
 
 ### Props
-`(kind, pos, yaw = 0, dir = Both)` — `pos` is the prop's ground-contact centre (put it exactly on
-the floor height); `yaw` in degrees turns its front (−Z) towards −X for positive values. Mirror
-layouts mirror the position and yaw but never the mesh (text stays readable).
+`(kind, pos, yaw = 0, dir = Both, on_line = false)` — `pos` is the prop's ground-contact centre
+(put it exactly on the floor height); `yaw` in degrees turns its front (−Z) towards −X for positive
+values. Mirror layouts mirror the position and yaw but never the mesh (text stays readable); a
+kind with `mirror_turn: true` (§A9) is also turned 180°. `on_line: true` marks a static prop the
+racing line drives over, under or through on purpose (a sandbox jump, a parked car's underside, a
+bench passage): the corridor lint (§A5) leaves it alone.
 
 ### Shortcuts
 `(path: [entry, …, exit], width = 6, dir)` — an alternative route (forward order). It has **no
@@ -156,6 +160,7 @@ you how much); no checkpoint is placed inside a shortcut span (+ 2 u); it must g
 | Points | one every 20–30° in turns; on a straight, a point one turn-step (≈ R·30° in radians) before and after each turn; change heights and widths on straights | plot (speed ripple, edge bulges) |
 | Jumps | land at 0.8× and 1.0× the target speed; 0.6–1.2 s air (GDD §5.1) | lint + plot |
 | Items | 4–6 rows; never over gaps | tests / load error |
+| Corridor | no static prop without a drivable `surface` reaches into the racing width between 0.25 u (a bump the wheels roll over) and 1.5 u (above the car) over the driving surface; jumps' flights are skipped; mark deliberate drive-over/under props `on_line` | lint naming the prop, its position and `s` |
 | Banked turns on a floor | banking tilts around the centreline, so the inner lip and barrier sink: keep the ribbon at y ≥ floor + (hw + 0.35)·sin(bank) − 0.25·cos(bank) + 0.15 (hw = half width; Asphalt: hw + 0.9 and 0.08 for the curb); change heights on the straights | lint: an edge top (lip/curb) less than 0.1 u above a ground polygon it lies on (the rule's 0.15 leaves room for the spline between points); plot (side view: inner edge) |
 | Dynamic props | ≤ 40 per layout | load error |
 
@@ -223,6 +228,9 @@ yaw → pitch → roll (`EulerRot::YXZ`). So a half turn is `rot: (0, 180, 0)`, 
 flips the shape upside down). One compound collider per prop.
 - Static props are obstacles or (with `surface`) drivable; dynamic props are rigid bodies that
   start asleep, settle with light damping and are restored on every restart.
+- `mirror_turn: true` (default false): mirrored layouts also turn the prop 180°. Meshes are never
+  mirrored, so a prop whose left–right layout matters (a wall with off-centre doorways) would block
+  the mirrored track; a thin prop turned around is its own mirror image (`house_wall_hall`).
 - Mass is in vehicle units (cars weigh ≈ 1.5–4): blocks 0.35, crates 0.6.
 - Stack dynamic props exactly (block height = level spacing) so towers start at rest.
 
@@ -354,6 +362,7 @@ usable without an `App`: `Track::load(assets_dir, &variant)` (e.g. from tools an
   feature `dir` filtering; projection continuity on a helix and across the start line; checkpoint
   and respawn wrap-around and clamping; racing line, speed, respawn, grid rules on real tracks;
   drivable area (ribbon, ground, outside, over a gap, Invisible); precise load errors; overlap lint;
+  corridor lint (a tyre stack on the straight is linted, `on_line` silences it); `mirror_turn`;
   determinism.
 - Headless (`tests/headless.rs`, rc_testkit): colliders for both tracks; downward rays hit
   Asphalt/Wood ribbons, Grass ground, a wall, a prop ramp, the kill floor, and fall through gaps;

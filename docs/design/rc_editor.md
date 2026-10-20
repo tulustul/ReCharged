@@ -1,8 +1,8 @@
 # rc_editor — track editor (design note)
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
-lighting. Status: **P1 and P2 done** (open/create, edit everything, undo, test drive, save); P3
-(migration off `plan.py`) and P4 (irradiance bake) to do.
+lighting. Status: **P1–P3 done** (open/create, edit everything, undo, test drive, save; every track
+editor-owned); P4 (irradiance bake) to do.
 
 ```sh
 npm --prefix ui run build                       # the editor uses the game's React bundle
@@ -85,12 +85,19 @@ screen centre (a new shortcut leaves and rejoins the track around it).
 field); no orthographic view (T is a perspective view from above); dragging has not been tried
 with a real mouse by an agent (no input injection on the test machine).
 
-## Migration off `plan.py` (D1)
-1. Port `plan.py`'s corridor check (no static obstacle in the racing corridor) to `rc_track::analysis`
-   as a lint, so every track gets it, not just generated ones.
-2. Per track, when it is next touched: open it in the editor and move the comment labels into
-   `label`. Save, then delete the layout and decor writer from that environment's `plan.py`.
-   Remove the `GENERATED` header.
+## Migration off `plan.py` (D1, done)
+- **Corridor lint** (`rc_track::analysis`, every track): no static prop without a drivable
+  `surface` may reach into the racing width between 0.25 u (bumps: a cable) and 1.5 u (above the
+  car) over the driving surface. It replaces `plan.py`'s supermarket-only check and found, on
+  the shipped tracks: a mirrored Sofa Circuit doorway blocked by 2 u of wall (meshes are never
+  mirrored: new prop flag `mirror_turn` turns such a prop around in mirror layouts), a Maple
+  Street sign 0.13 u into the road (moved), and three deliberate drive-under/over spots (bench,
+  sandbox jump, parked SUV), now marked with the new placement flag `on_line`.
+- **Labels:** the per-point comments of every track (`// 7: freezer aisle`) became `label`s, so an
+  editor save keeps them.
+- **Scripts:** `plan.py` / `layout.py` / `garden/decor.py` write the track and decor files only
+  with `--layout` (which drops every editor edit); they still build the prop catalogs, kerb arcs
+  and model inputs. The files' headers and the environment notes say they are editor-owned.
 
 ## Irradiance bake (D3)
 **Constraints found in the code:**
@@ -132,7 +139,7 @@ spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 
 |---|---|---|
 | P1 Shell | shared app assembly, `rc_editor` binary, editor bundle, editing session + fly cam, overrides, open/save, F5/Esc | open Toy Town, save with no edits → identical file except comments; drive and return |
 | P2 Tools | everything in "Editing scope", undo, lints, `rc_editor new`, `label`, catalog entry | build a new track from scratch and race it in the game |
-| P3 Migration | corridor lint; first track moved off `plan.py` | `plan.py` no longer writes that track; CI green |
+| P3 Migration (done) | corridor lint; every track moved off `plan.py`; labels | no script writes a track without `--layout`; no lints; CI green |
 | P4 Bake | baker, `.irv` loader, weather scaling | Sofa Circuit baked; visible occlusion under furniture; bench within budget on the 3070 **and** runs on the Iris Xe |
 
 ## Risks / to verify first
