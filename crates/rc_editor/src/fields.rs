@@ -391,8 +391,8 @@ fn slots<'a>(
                 vec![
                     ("model", Slot::Text(&mut d.model)),
                     ("pos", Slot::V3(&mut d.pos)),
-                    ("yaw", Slot::Num(&mut d.yaw)),
-                    ("scale", Slot::Num(&mut d.scale)),
+                    ("rot", Slot::V3(&mut d.rot)),
+                    ("scale", Slot::V3(&mut d.scale)),
                     ("dir", pick(&mut d.dir, &DIRS)),
                 ],
             )

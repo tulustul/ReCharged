@@ -45,6 +45,7 @@ pub use materials::{
     CarPaint, MaterialDef, MaterialLibrary, SurfaceExtension, SurfaceMaterial, TEXTURE_SETS,
     builtin_materials, default_surface, paint_material, with_world_uvs,
 };
+pub use props::DecorSource;
 pub use quality::{AaMode, ShadowTier, ViewQuality, shadow_tier, view_quality};
 
 /// Loading-gate key of this crate.

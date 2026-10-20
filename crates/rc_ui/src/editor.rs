@@ -211,6 +211,20 @@ pub enum EditorAdd {
     Decor,
 }
 
+/// What the transform gizmo does to the selection.
+#[derive(
+    serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Copy, Default, PartialEq, Eq,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub enum EditorGizmo {
+    #[default]
+    Move,
+    Rotate,
+    Scale,
+}
+
 /// An editor command (also bound to keys in Rust).
 #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -255,6 +269,28 @@ pub enum EditorCommand {
     /// Use the session's baked irradiance volume or not (P): compare the lighting with and
     /// without it.
     ToggleProbes,
+    /// Gizmo mode (G · R · C).
+    Gizmo {
+        /// The mode.
+        mode: EditorGizmo,
+    },
+    /// Gizmo space for move and rotate: world ↔ the selection's own axes (L).
+    GizmoSpace,
+    /// Cancel a live gizmo drag, else clear the selection (Esc).
+    Cancel,
+    /// Move, turn and scale the selection as a gizmo drag would (automation): `hold` leaves the
+    /// drag live (previewed, uncommitted), else it is committed as one undo step. Only what the
+    /// selection's data stores applies (props turn about Y only, points only move).
+    Drag {
+        /// Added to the position (u, world axes).
+        translate: [f32; 3],
+        /// Turned by (pitch, yaw, roll) degrees, applied after its rotation.
+        rotate: [f32; 3],
+        /// Multiplies the scale per axis.
+        scale: [f32; 3],
+        /// Keep the drag live.
+        hold: bool,
+    },
 }
 
 /// React → Bevy message `editor.command`.

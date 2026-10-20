@@ -1,11 +1,15 @@
-//! The 3D view while editing: the fly camera, the handles drawn as gizmos, picking and dragging
-//! them, and the view's focus (the point under the screen centre, where additions land).
+//! The 3D view while editing: the fly camera, picking, markers, the view's focus (the point
+//! under the screen centre, where additions land) and the cutaway.
 //!
-//! Mouse: left click picks the nearest handle (or clears the selection), left drag moves it on
-//! its horizontal plane (Alt: up/down; Ctrl: snap to [`SNAP_U`]); right drag looks around.
-//! The layout (control polygon, gaps, ground areas, shortcuts) and its handles show only while
-//! the Track tab is open; prop, item-row, battery and decor handles always.
-//! Keys: WASD move, Q/E down/up, Shift faster.
+//! Picking runs on demand, on pointer moves and presses only, and never while bevy-react's
+//! `PointerCapture` holds the pointer: a left press takes the selection's gizmo handle
+//! ([`gizmo`]), else the marker or model under the cursor (or clears the selection); with Ctrl in
+//! the Track tab, a press on the road inserts a control point there. Models are hit with
+//! `MeshRayCast` against meshes under a `PropSource` / `DecorSource` (the road and ground carry
+//! none); items without a mesh in the editing session (item rows, the battery, the Track tab's
+//! points and vertices, reverse-only props and decor, dimmed) are screen-sized markers picked in
+//! screen space. A model wins over a marker only when the marker is farther away.
+//! Right drag looks around; WASD move, Q/E down/up, Shift faster.
 
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
@@ -13,10 +17,12 @@ use bevy::window::PrimaryWindow;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use bevy_react::PointerCapture;
 use rc_core::prelude::*;
-use rc_track::Track;
+use rc_render::DecorSource;
+use rc_track::{DragPreview, PropSource, Track};
 use rc_ui::editor::{EditorItem, EditorTab};
 
 use crate::doc::Doc;
+use crate::gizmo::{self, Eye, Gizmo};
 use crate::{Editor, Mode, Typing};
 
 /// Fly speed (u/s; ×[`FAST`] with Shift).
@@ -33,17 +39,16 @@ const FOCUS_BACK_U: f32 = 14.0;
 const FOCUS_UP_U: f32 = 9.0;
 /// The top view (T) is this high above its target (u).
 const TOP_VIEW_U: f32 = 70.0;
-/// A click picks handles within this distance of the cursor (logical px).
-const PICK_RADIUS_PX: f32 = 16.0;
-/// The cursor must move this far before a press becomes a drag (logical px).
-const DRAG_START_PX: f32 = 4.0;
-/// Ctrl-drag snaps to this grid (u).
-pub const SNAP_U: f32 = 0.5;
-/// The focus ray reaches this far (u).
+/// A press picks markers within this distance of the cursor (logical px).
+const PICK_RADIUS_PX: f32 = 12.0;
+/// The focus ray (and Ctrl+press on the road) reaches this far (u).
 const FOCUS_REACH_U: f32 = 400.0;
-/// Handle sizes (u).
-const HANDLE_U: f32 = 0.45;
-const SELECTED_U: f32 = 0.8;
+/// Marker radius per unit of distance from the camera (constant on screen); the selected one
+/// is this much bigger.
+const MARKER_PER_U: f32 = 0.012;
+const SELECTED_GROWTH: f32 = 1.6;
+/// Markers of items the editing session does not show (reverse-only) are this opaque.
+const DIM_ALPHA: f32 = 0.45;
 
 const LINE: Color = Color::srgb(0.1, 0.85, 1.0);
 const GAP: Color = Color::srgb(1.0, 0.25, 0.3);
@@ -54,6 +59,7 @@ const ROW: Color = Color::srgb(0.4, 0.6, 1.0);
 const BATTERY: Color = Color::srgb(1.0, 0.82, 0.3);
 const DECOR: Color = Color::srgb(0.9, 0.3, 0.9);
 const SELECTED: Color = Color::srgb(0.95, 0.88, 0.06);
+const HOVERED: Color = Color::WHITE;
 const START: Color = Color::WHITE;
 
 /// The 3D view of the editor (needs a window, gizmos and rapier; [`crate::EditorPlugin`] first).
@@ -61,19 +67,32 @@ pub struct EditorViewPlugin;
 
 impl Plugin for EditorViewPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Dragging>()
+        app.init_resource::<Gizmo>()
+            .init_resource::<Hover>()
+            .init_resource::<DragPreview>()
             .add_systems(Startup, gizmo_look)
             .add_systems(Update, cutaway.run_if(in_state(AppState::InRace)))
             .add_systems(
                 Update,
-                (focus_point, pick_and_drag, fly, draw)
+                (focus_point, pointer, fly, draw)
                     .chain()
                     .after(CameraSet)
                     .run_if(in_state(AppState::InRace))
                     .run_if(editing),
+            )
+            // Also between sessions: commands may come while one loads, and a committed drag's
+            // preview waits for the reload.
+            .add_systems(
+                Update,
+                (gizmo::commands.before(pointer), gizmo::sync.after(draw)),
             );
+        crate::tint::build(app);
     }
 }
+
+/// The prop, decor item or marked item under the cursor.
+#[derive(Resource, Debug, Default, PartialEq)]
+pub(crate) struct Hover(pub Option<EditorItem>);
 
 fn editing(editor: Res<Editor>) -> bool {
     editor.mode == Mode::Editing
@@ -136,24 +155,6 @@ pub fn anchor(doc: &Doc, item: EditorItem) -> Option<Vec3> {
     })
 }
 
-/// A handle being dragged.
-#[derive(Debug, Clone, Copy)]
-struct Drag {
-    item: EditorItem,
-    /// The handle where the press began.
-    from: Vec3,
-    /// Where it would go now.
-    to: Vec3,
-    /// Handle minus the cursor's ground point at the press (keeps the grab point under the
-    /// cursor).
-    offset: Vec3,
-    press: Vec2,
-    moved: bool,
-}
-
-#[derive(Resource, Debug, Default)]
-struct Dragging(Option<Drag>);
-
 /// Editing looks into rooms from above: the ceiling and lamp fixtures hide (they cast no shadows,
 /// so the lighting stays the same); test drives show them.
 fn cutaway(editor: Res<Editor>, mut overhead: Query<&mut Visibility, With<rc_render::Overhead>>) {
@@ -193,9 +194,9 @@ fn focus_point(
     focus.set_if_neq(ViewFocus(hit));
 }
 
-/// What [`pick_and_drag`] reads.
+/// What [`pointer`] reads of the input.
 #[derive(bevy::ecs::system::SystemParam)]
-struct Pointer<'w, 's> {
+pub(crate) struct Pointer<'w, 's> {
     buttons: Option<Res<'w, ButtonInput<MouseButton>>>,
     keys: Option<Res<'w, ButtonInput<KeyCode>>>,
     capture: Option<Res<'w, PointerCapture>>,
@@ -203,92 +204,166 @@ struct Pointer<'w, 's> {
     cameras: Query<'w, 's, (&'static Camera, &'static GlobalTransform), With<GameCamera>>,
 }
 
-fn pick_and_drag(pointer: Pointer, mut dragging: ResMut<Dragging>, mut editor: ResMut<Editor>) {
+/// What [`pointer`] hits in the scene.
+#[derive(bevy::ecs::system::SystemParam)]
+pub(crate) struct Scene<'w, 's> {
+    meshes: MeshRayCast<'w, 's>,
+    tags: Query<'w, 's, AnyOf<(&'static PropSource, &'static DecorSource)>>,
+    parents: Query<'w, 's, &'static ChildOf>,
+    rapier: ReadRapierContext<'w, 's>,
+    pieces: Query<'w, 's, &'static TrackPiece>,
+}
+
+/// The item a model entity (or one of its ancestors) shows.
+fn source(
+    tags: &Query<AnyOf<(&PropSource, &DecorSource)>>,
+    parents: &Query<&ChildOf>,
+    mut e: Entity,
+) -> Option<EditorItem> {
+    loop {
+        match tags.get(e) {
+            Ok((Some(p), _)) => return Some(EditorItem::Prop { index: p.0 as u32 }),
+            Ok((_, Some(d))) => return Some(EditorItem::Decor { index: d.0 as u32 }),
+            _ => e = parents.get(e).ok()?.parent(),
+        }
+    }
+}
+
+impl Scene<'_, '_> {
+    /// The model under the ray and its distance, if the nearest visible mesh is one (the road,
+    /// a deck or a wall in front of a prop hides it).
+    fn model(&mut self, ray: Ray3d) -> Option<(EditorItem, f32)> {
+        let settings = MeshRayCastSettings::default().always_early_exit();
+        let &(e, ref hit) = self.meshes.cast_ray(ray, &settings).first()?;
+        Some((source(&self.tags, &self.parents, e)?, hit.distance))
+    }
+
+    /// Where the ray meets the road (rapier, as the view's focus), if the road is what it meets.
+    fn road(&self, ray: Ray3d) -> Option<Vec3> {
+        let filter = QueryFilter::only_fixed().exclude_sensors();
+        let (e, toi) = (self.rapier.single().ok()?).cast_ray(
+            ray.origin,
+            *ray.direction,
+            FOCUS_REACH_U,
+            true,
+            filter,
+        )?;
+        let ribbon = self.pieces.get(e).ok()?.kind == TrackPieceKind::Ribbon;
+        ribbon.then(|| ray.get_point(toi))
+    }
+}
+
+/// Hover and left presses: the gizmo, picking, Ctrl+press insertion (see the module docs).
+pub(crate) fn pointer(
+    pointer: Pointer,
+    mut scene: Scene,
+    mut editor: ResMut<Editor>,
+    mut gizmo: ResMut<Gizmo>,
+    mut hover: ResMut<Hover>,
+    mut last: Local<Option<Vec2>>,
+) {
     let (Some(buttons), Some(keys)) = (pointer.buttons.as_deref(), pointer.keys.as_deref()) else {
         return;
     };
-    let cursor = pointer
-        .windows
-        .single()
-        .ok()
-        .and_then(Window::cursor_position);
-    let (Some(cursor), Ok((camera, eye))) = (cursor, pointer.cameras.single()) else {
+    let cursor = (pointer.windows.single().ok()).and_then(Window::cursor_position);
+    let (Some(cursor), Ok((camera, at))) = (cursor, pointer.cameras.single()) else {
+        hover.set_if_neq(Hover(None));
         return;
     };
-    let ground_hit = |at: Vec2, height: f32| {
-        let ray = camera.viewport_to_world(eye, at).ok()?;
-        let t = ray.intersect_plane(Vec3::Y * height, InfinitePlane3d::new(Vec3::Y))?;
-        Some(ray.get_point(t))
+    let Ok(ray) = camera.viewport_to_world(at, cursor) else {
+        return;
     };
-    if buttons.just_pressed(MouseButton::Left) {
-        if pointer.capture.as_ref().is_some_and(|c| c.is_captured()) {
-            return;
-        }
-        let hit = editor
-            .doc
-            .handles(editor.tab == EditorTab::Track)
-            .into_iter()
-            .filter_map(|(item, pos)| {
-                let screen = camera.world_to_viewport(eye, pos).ok()?;
-                Some((item, pos, screen.distance(cursor)))
-            })
-            .filter(|(.., d)| *d <= PICK_RADIUS_PX)
-            .min_by(|a, b| a.2.total_cmp(&b.2));
-        match hit {
-            Some((item, pos, _)) => {
-                editor.select(Some(item));
-                let offset = ground_hit(cursor, pos.y).map_or(Vec3::ZERO, |g| pos - g);
-                dragging.0 = Some(Drag {
-                    item,
-                    from: pos,
-                    to: pos,
-                    offset: offset.with_y(0.0),
-                    press: cursor,
-                    moved: false,
-                });
-            }
-            None => editor.select(None),
+    let eye = Eye { camera, at };
+    let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    if gizmo.drag.is_some() {
+        // A drag owns the mouse until the release, over the UI too.
+        if buttons.pressed(MouseButton::Left) {
+            gizmo::follow(&editor, &mut gizmo, ray, cursor, ctrl);
+        } else {
+            gizmo::release(&mut editor, &mut gizmo);
         }
         return;
     }
-    let Some(drag) = &mut dragging.0 else {
+    let captured = pointer.capture.as_ref().is_some_and(|c| c.is_captured());
+    if captured || editor.bake.is_some() {
+        hover.set_if_neq(Hover(None));
+        gizmo.hot = None;
         return;
-    };
-    if buttons.pressed(MouseButton::Left) {
-        drag.moved |= cursor.distance(drag.press) > DRAG_START_PX;
-        if !drag.moved {
-            return;
+    }
+    let press = buttons.just_pressed(MouseButton::Left);
+    if !press && *last == Some(cursor) {
+        return;
+    }
+    *last = Some(cursor);
+    gizmo.hot = gizmo::handle_at(&editor, &gizmo, &eye, cursor);
+    if let Some(handle) = gizmo.hot {
+        hover.set_if_neq(Hover(None));
+        if press {
+            gizmo::press(&editor, &mut gizmo, handle, ray, cursor);
         }
-        let snap = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-        let snapped = |v: f32| {
-            if snap {
-                (v / SNAP_U).round() * SNAP_U
-            } else {
-                v
-            }
-        };
-        if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
-            // Up/down on the vertical plane through the handle, facing the camera.
-            let normal = eye.forward().as_vec3().with_y(0.0).normalize_or(Vec3::Z);
-            let Ok(ray) = camera.viewport_to_world(eye, cursor) else {
-                return;
-            };
-            if let Some(t) = ray.intersect_plane(drag.from, InfinitePlane3d::new(normal)) {
-                drag.to = drag.from.with_y(snapped(ray.get_point(t).y));
-            }
-        } else if let Some(hit) = ground_hit(cursor, drag.from.y) {
-            let p = hit + drag.offset;
-            drag.to = Vec3::new(snapped(p.x), drag.from.y, snapped(p.z));
-        }
-    } else {
-        let drag = dragging.0.take().expect("checked above");
-        if drag.moved && drag.to != drag.from {
-            editor.edit(|doc, _| {
-                doc.set_handle(drag.item, drag.to);
+        return;
+    }
+    let target = pick(&editor.doc, editor.tab, &eye, &mut scene, ray, cursor);
+    hover.set_if_neq(Hover(target));
+    if !press {
+        return;
+    }
+    let road = (ctrl && target.is_none() && editor.tab == EditorTab::Track)
+        .then(|| scene.road(ray))
+        .flatten();
+    match (target, road) {
+        (Some(item), _) => editor.select(Some(item)),
+        (None, Some(at)) => {
+            let points: Vec<Vec3> = editor.doc.def.points.iter().map(|p| p.pos).collect();
+            let after = nearest_segment(&points, at) as u32;
+            editor.edit(|doc, sel| {
+                let new = doc.insert_after(EditorItem::Point { index: after })?;
+                doc.set_handle(new, at);
+                *sel = Some(new);
                 Ok(())
             });
         }
+        (None, None) => editor.select(None),
     }
+}
+
+/// The marker or model under the cursor.
+fn pick(
+    doc: &Doc,
+    tab: EditorTab,
+    eye: &Eye,
+    scene: &mut Scene,
+    ray: Ray3d,
+    cursor: Vec2,
+) -> Option<EditorItem> {
+    let marker = (doc.markers(tab == EditorTab::Track).into_iter())
+        .filter_map(|(item, pos, _)| {
+            let px = eye
+                .camera
+                .world_to_viewport(eye.at, pos)
+                .ok()?
+                .distance(cursor);
+            (px <= PICK_RADIUS_PX).then(|| (item, px, eye.at.translation().distance(pos)))
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1));
+    match (marker, scene.model(ray)) {
+        (Some((item, _, far)), Some((_, near))) if far <= near => Some(item),
+        (_, Some((item, _))) => Some(item),
+        (marker, None) => marker.map(|m| m.0),
+    }
+}
+
+/// The control polygon's segment (by its first point) nearest to `p`.
+pub(crate) fn nearest_segment(points: &[Vec3], p: Vec3) -> usize {
+    let n = points.len();
+    let dist = |i: usize| {
+        let (a, b) = (points[i], points[(i + 1) % n]);
+        let t = ((p - a).dot(b - a) / (b - a).length_squared().max(1e-6)).clamp(0.0, 1.0);
+        p.distance(a + (b - a) * t)
+    };
+    (0..n)
+        .min_by(|&i, &j| dist(i).total_cmp(&dist(j)))
+        .unwrap_or(0)
 }
 
 /// What [`fly`] reads.
@@ -371,31 +446,42 @@ fn color(item: EditorItem) -> Color {
     }
 }
 
-/// The layout (Track tab) and the handles (the dragged one where it would go).
-fn draw(editor: Res<Editor>, dragging: Res<Dragging>, mut gizmos: Gizmos) {
-    let preview;
-    let doc = match dragging.0.filter(|d| d.moved) {
-        Some(drag) => {
-            let mut copy = editor.doc.clone();
-            copy.set_handle(drag.item, drag.to);
-            preview = copy;
-            &preview
-        }
-        None => &editor.doc,
-    };
+/// The layout (Track tab), the markers and the gizmo, as a live drag has them.
+fn draw(
+    editor: Res<Editor>,
+    gizmo: Res<Gizmo>,
+    hover: Res<Hover>,
+    cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    mut gizmos: Gizmos,
+) {
+    let preview = gizmo.preview(&editor.doc);
+    let doc = preview.as_ref().unwrap_or(&editor.doc);
     let layout = editor.tab == EditorTab::Track;
     let selected = editor.selection;
     if layout {
         draw_layout(doc, selected, &mut gizmos);
     }
-    for (item, pos) in doc.handles(layout) {
-        let (size, color) = if selected == Some(item) {
-            (SELECTED_U, SELECTED)
+    let Ok((camera, at)) = cameras.single() else {
+        return;
+    };
+    for (item, pos, dim) in doc.markers(layout) {
+        let mut size = at.translation().distance(pos) * MARKER_PER_U;
+        let color = if selected == Some(item) {
+            size *= SELECTED_GROWTH;
+            SELECTED
+        } else if hover.0 == Some(item) {
+            HOVERED
         } else {
-            (HANDLE_U, color(item))
+            color(item)
+        };
+        let color = if dim && selected != Some(item) {
+            color.with_alpha(DIM_ALPHA)
+        } else {
+            color
         };
         gizmos.sphere(Isometry3d::from_translation(pos), size, color);
     }
+    gizmo::draw(&editor, &gizmo, &Eye { camera, at }, &mut gizmos);
 }
 
 /// The control polygon, the start, gaps, ground outlines and shortcuts (the Track tab).
@@ -430,5 +516,35 @@ fn draw_layout(doc: &Doc, selected: Option<EditorItem>, gizmos: &mut Gizmos) {
             s.path.iter().copied(),
             if hot { SELECTED } else { SHORTCUT },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ctrl_press_inserts_on_the_nearest_segment() {
+        let square = [
+            Vec3::ZERO,
+            Vec3::X * 10.0,
+            Vec3::new(10.0, 0.0, 10.0),
+            Vec3::Z * 10.0,
+        ];
+        assert_eq!(nearest_segment(&square, Vec3::new(5.0, 0.0, -1.0)), 0);
+        assert_eq!(nearest_segment(&square, Vec3::new(11.0, 0.0, 5.0)), 1);
+        assert_eq!(
+            nearest_segment(&square, Vec3::new(-1.0, 0.0, 4.0)),
+            3,
+            "the closing one"
+        );
+        // A helix: the level the point is on, not the one above it.
+        let stacked = [
+            Vec3::ZERO,
+            Vec3::X * 10.0,
+            Vec3::new(10.0, 4.0, 0.1),
+            Vec3::new(0.0, 4.0, 0.1),
+        ];
+        assert_eq!(nearest_segment(&stacked, Vec3::new(5.0, 3.9, 0.0)), 2);
     }
 }

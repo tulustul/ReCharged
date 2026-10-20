@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use rc_core::prelude::*;
 use rc_testkit::*;
-use rc_track::{LOADING_KEY, Track, TrackPlugin};
+use rc_track::{DragPreview, DragSource, LOADING_KEY, PropSource, Track, TrackPlugin};
 
 fn config(track: &str) -> RaceConfig {
     RaceConfig {
@@ -164,6 +164,31 @@ fn dynamic_props_reset_on_restart() {
             "no streak"
         );
     }
+}
+
+#[test]
+fn a_drag_preview_holds_a_prop_in_the_air_and_puts_it_back() {
+    let mut app = headless_app(TrackPlugin);
+    app.init_resource::<DragPreview>();
+    start_race(&mut app, config("test_oval")).expect("loads");
+    step(&mut app, 30);
+    let (entity, spawn) = dynamic_props(&mut app)[0];
+    let source = app.world().get::<PropSource>(entity).expect("tagged").0;
+    let up = Transform::from_translation(spawn.translation + Vec3::new(3.0, 5.0, 0.0));
+    app.insert_resource(DragPreview(Some((DragSource::Prop(source), up))));
+    step(&mut app, 30);
+    let now = *app.world().get::<Transform>(entity).expect("prop");
+    assert!(
+        now.translation.distance(up.translation) < 1e-3,
+        "held: {now:?}"
+    );
+    app.insert_resource(DragPreview(None));
+    step(&mut app, 30);
+    let back = *app.world().get::<Transform>(entity).expect("prop");
+    assert!(
+        back.translation.distance(spawn.translation) < 0.05,
+        "back: {back:?}"
+    );
 }
 
 #[test]

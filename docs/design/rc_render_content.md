@@ -107,8 +107,10 @@ on which cars a session showed).
   test loads every shipped `props/*.ron`.
 - **Decor** (`decor.rs`): decorative-only models without colliders (backdrops, furniture beyond
   the barriers) from the optional `assets/maps/<track>/decor.ron`:
-  `(decor: [(model: "models/...glb", pos: (x, y, z), yaw: 90, scale: 1.0, dir: Both)])` —
-  placed like track props (mirror negates X and yaw, `dir` filters by direction).
+  `(decor: [(model: "models/...glb", pos: (x, y, z), rot: (0, 90, 0), scale: (1, 1, 1), dir: Both)])`
+  (rc_track `decor.rs`; mirror negates X, yaw and roll, `dir` filters by direction). Each model
+  carries `DecorSource(i)` (its index in the file); static prop models are children of their
+  `Prop` and carry its `PropSource`. The editor's `DragPreview` moves decor models live.
 
 ## Cars (`cars/`)
 - `CarModel { car, paint }` (pub) on any entity instances `CarInfo::model` as children; racer

@@ -5,11 +5,12 @@
 //!   ([`TrackGeometry`]) → checkpoints, respawn points, grid, item rows, racing line & speed
 //!   profile, ground areas, props (`assets/data/props/*.ron`, [`PropCatalog`]); the [`Track`]
 //!   query resource; session colliders; resetting dynamic props in `OnEnter(RacePhase::Setup)`.
-//! - **Inputs:** `RaceConfig::variant`, `UserPaths::assets_dir`, [`TrackDraft`] (rc_editor), the
-//!   session lifecycle states.
+//! - **Inputs:** `RaceConfig::variant`, `UserPaths::assets_dir`, [`TrackDraft`] and
+//!   [`DragPreview`] (rc_editor), the session lifecycle states.
 //! - **Outputs:** [`Track`], `TrackSummary`, session-scoped collider entities (`TrackPiece`,
-//!   `Surface`, `Prop` + `Interpolated` for dynamic props) on rc_core collision layers,
-//!   `Teleported` (prop resets), `LoadingDone("track")` / `LoadingFailed`.
+//!   `Surface`, `Prop` + [`PropSource`], + `Interpolated` for dynamic props) on rc_core collision
+//!   layers, `Teleported` (prop resets, editor previews), `LoadingDone("track")` /
+//!   `LoadingFailed`.
 //! - **Must never:** depend on presentation or flow crates, spawn visuals (rc_render builds
 //!   meshes from [`Track::geometry`]), touch car bodies, or keep session state past
 //!   `OnEnter(Unloading)`.
@@ -66,6 +67,26 @@ pub struct TrackDraft {
     pub decor: Vec<DecorItem>,
 }
 
+/// Which `TrackDef::props` entry a `Prop` collider entity was placed from (rc_render copies it to
+/// the prop's model; the track editor picks by it).
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PropSource(pub usize);
+
+/// What a live editor drag moves: a prop or a decor item, by document index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DragSource {
+    /// Index into `TrackDef::props`.
+    Prop(usize),
+    /// Index into `TrackDraft::decor`.
+    Decor(usize),
+}
+
+/// The pose a track-editor gizmo drag shows before it is committed (written only by rc_editor;
+/// the game never has one). rc_track moves the prop's collider to it, rc_render the decor item;
+/// `None` puts them back. Kept apart from [`TrackDraft`] so a drag does not rebuild anything.
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq)]
+pub struct DragPreview(pub Option<(DragSource, Transform)>);
+
 /// Loading-gate key of this crate.
 pub const LOADING_KEY: &str = "track";
 
@@ -79,6 +100,10 @@ impl Plugin for TrackPlugin {
         LoadingTasks::register(app, LOADING_KEY);
         app.add_systems(OnEnter(AppState::Loading), spawn::load_track)
             .add_systems(OnEnter(RacePhase::Setup), spawn::reset_props)
+            .add_systems(
+                Update,
+                spawn::preview_prop.run_if(resource_exists_and_changed::<DragPreview>),
+            )
             .add_systems(OnEnter(AppState::Unloading), spawn::remove_track);
     }
 }

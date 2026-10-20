@@ -1,12 +1,14 @@
 //! Prop visuals (ARCHITECTURE §4.4, §5.9): every `Prop` gets its glb (`PropDef::model`, an
 //! environment artist's file in `assets/models/props/<env>/`) or, while that file does not exist
 //! yet, tidy fallback meshes of its collider primitives ([`shapes`]) in library materials.
-//! Knockable props wear the model on their visual proxy; static props get a session-scoped model
-//! entity at their pose. Lamp props add real lights at Night (`lights` in `props/*.ron`, which
+//! Knockable props wear the model on their visual proxy; static props carry it as a child (it
+//! follows the collider and despawns with it). Both model roots copy the prop's `PropSource`. Lamp props add real lights at Night (`lights` in `props/*.ron`, which
 //! rc_track ignores) and dim their `lamp*` bulb materials by day. Decorative-only models without
 //! colliders come from `assets/maps/<track>/decor.ron` ([`decor`]).
 
 mod decor;
+
+pub use decor::DecorSource;
 mod lamps;
 pub(crate) mod shapes;
 
@@ -15,7 +17,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
-use rc_track::{PropDef, Track};
+use rc_track::{DragPreview, PropDef, PropSource, Track};
 
 use crate::content::{ContentLoad, load_scene, mesh_from_data};
 use crate::lighting::ActiveEnvironment;
@@ -69,6 +71,12 @@ pub(crate) fn build(app: &mut App) {
         )
         .add_systems(
             Update,
+            decor::preview_decor
+                .in_set(VisualSet)
+                .run_if(resource_exists_and_changed::<DragPreview>),
+        )
+        .add_systems(
+            Update,
             dress_props
                 .in_set(VisualSet)
                 .run_if(in_state(AppState::Loading).or_else(in_state(AppState::InRace))),
@@ -99,7 +107,7 @@ fn fallback_material(
 }
 
 /// Gives every undressed `Prop` its visuals once the track and the environment's materials exist.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn dress_props(
     mut commands: Commands,
     mut load: ResMut<ContentLoad>,
@@ -111,7 +119,7 @@ fn dress_props(
     server: Res<AssetServer>,
     mut assets: ResMut<PropAssets>,
     mut meshes: ResMut<Assets<Mesh>>,
-    props: Query<(Entity, &Prop, &Transform, Option<&Visual>), Without<PropDressed>>,
+    props: Query<(Entity, &Prop, Option<&PropSource>, Option<&Visual>), Without<PropDressed>>,
     mut instance: Local<usize>,
 ) {
     let (Some(track), Some(env)) = (track, env) else {
@@ -122,7 +130,7 @@ fn dress_props(
     }
     let practicals = env.def.practicals(env.time);
     let (mut waiting, mut dressed, mut lit) = (false, 0, 0);
-    for (entity, prop, transform, visual) in &props {
+    for (entity, prop, source, visual) in &props {
         let Some(def) = track.prop_def(&prop.kind) else {
             commands.entity(entity).insert(PropDressed);
             continue;
@@ -141,16 +149,22 @@ fn dress_props(
                 waiting = true;
                 continue;
             }
-            (false, _) => commands
-                .spawn((
-                    Name::new("prop model"),
-                    PropModel,
-                    *transform,
-                    Visibility::default(),
-                    DespawnOnExit(RaceSession),
-                ))
-                .id(),
+            (false, _) => {
+                commands.entity(entity).insert(Visibility::default());
+                commands
+                    .spawn((
+                        Name::new("prop model"),
+                        PropModel,
+                        Transform::IDENTITY,
+                        Visibility::default(),
+                        ChildOf(entity),
+                    ))
+                    .id()
+            }
         };
+        if let Some(source) = source {
+            commands.entity(root).insert(*source);
+        }
         commands.entity(entity).insert(PropDressed);
         dressed += 1;
         let has_model = paths

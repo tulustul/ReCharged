@@ -2,8 +2,8 @@
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
 lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
-editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout) done** (§Editor v2):
-click-to-select with a transform gizmo, asset library, lighting editing, incremental rebuilds to come.
+editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout) and P6 (select & gizmo)
+done** (§Editor v2): asset library, lighting editing, incremental rebuilds to come.
 Only Toy Town is baked so far (§Irradiance bake).
 
 ```sh
@@ -11,24 +11,34 @@ npm --prefix ui run build                       # the editor uses the game's Rea
 cargo run -p rc_editor -- toy_town              # edit a track
 cargo run -p rc_editor -- new back_lot --env street --name "Back Lot" --style Asphalt
 ```
-Inputs as of P5 (v2's are in §Editor v2 → Interaction). Prop, decor, item-row and battery handles
-show in every tab; the layout and its handles (control points, jump mid-points, ground vertices,
-shortcut path points) only in the Track tab:
+Inputs as of P6 (§Editor v2 → Interaction has the rest of v2). Props and decor are picked by
+their models; item rows, the battery and reverse-only props and decor (dimmed) have markers in
+every tab; the layout and its markers (control points, jump mid-points, ground vertices, shortcut
+path points) show only in the Track tab:
 
 | Input | Does |
 |---|---|
-| left click / left drag | select the nearest handle (or clear) / move it on its horizontal plane; **Alt**: up/down; **Ctrl**: snap to 0.5 u |
+| hover | tints the prop or decor model under the pointer (markers turn white) |
+| left press | gizmo handle > marker/model (select, or clear on nothing) > **Ctrl** on the road in the Track tab: insert a control point there (on the nearest segment) |
+| left drag on the gizmo | moves / rotates / scales the selection, live; **Ctrl**: snap 0.5 u · 15° · 0.1 |
+| G · R · C · L | gizmo move · rotate · scale · world/local axes (scale is always local); Ctrl up |
+| Esc | cancel a live drag, else deselect |
 | right drag · WASD · Q/E · Shift | look · fly · down/up · faster |
 | F5 | test drive / back to editing |
 | Ctrl+S · Ctrl+Z · Ctrl+Y (Ctrl+Shift+Z) | save · undo · redo |
 | Delete · Insert · Ctrl+D | delete the selection · insert a point/vertex/path point after it · duplicate |
-| T · F | top view (over the selection or the view's focus) · fly to the selection |
+| T · F · P | top view (over the selection or the view's focus) · fly to the selection · probes on/off |
+
+While a drag is live, Ctrl+Z/Y, Delete, F5 and a tab switch cancel it first.
 
 Saves, settings and records of test drives go to `<game user data>/editor` (`--user-data-dir`
 overrides; v2 reads settings from the game instead, D10). Automation as in the game:
 `--screenshot <png> [--screenshot-at <s>]`, `--exit-after <s>`, and `RECHARGED_UI_SCRIPT` with
-`editor <command>` (`drive`, `undo`, `topView`, …), `editor select <kind> <index>` and
-`editor tab <assets|track|lighting>` drives the editor through the real React channel.
+`editor <command>` (`drive`, `undo`, `topView`, `cancel`, …), `editor select <kind> <index>`,
+`editor tab <assets|track|lighting>`, `editor gizmo <move|rotate|scale>` and
+`editor move|rotate|scale x y z [hold]` (a gizmo drag of the selection by a translation, a
+(pitch, yaw, roll) turn in degrees or per-axis factors; `hold` leaves it live and uncommitted, so
+the preview can be screenshotted) drives the editor through the real React channel.
 
 ## Decisions
 | # | Decision | Consequence |
@@ -52,8 +62,9 @@ crates/rc_editor   lib.rs   EditorPlugin: Editor state, edit/undo pipeline, sess
                    fields.rs the right pane: one slot list per item serves reading and setting
                    catalog.rs rewrites the track's entry in catalog.ron (the rest of the file untouched)
                    library.rs v2: the asset library (prop kinds, decor models, lights, gameplay items)
-                   view.rs  EditorViewPlugin: fly camera, mesh picking, hover/selection tint, markers, focus point, cutaway
-                   gizmo.rs v2: the transform gizmo (move / rotate / scale, world / local, snap)
+                   view.rs  EditorViewPlugin: fly camera, mesh picking, markers, focus point, cutaway
+                   tint.rs  hover/selection tint (per-mesh material clones)
+                   gizmo.rs the transform gizmo (move / rotate / scale, world / local, snap), DragPreview
                    main.rs  `rc_editor [new] <track>` = recharged::game + both plugins
 crates/rc_ui       editor.rs: editor.status / snapshot / command / select / set / options (+ v2: library, tab, gizmo, place, swap)
 ui/src/editor/     EditorLayer (toolbar, left tabs, right pane), controls.tsx (fields), Library.tsx
@@ -142,8 +153,9 @@ F5 and tab switches cancel it first (the item snaps back), then act.
 - **Picking:** on demand with Bevy's `MeshRayCast` system param, only while editing and only on
   pointer move or press (no `MeshPickingPlugin`: it would ray-cast every frame, test drives
   included, against ≈ 0.83 M triangles, and feed the `HoverMap` bevy-react reads). Ignored while
-  bevy-react's `PointerCapture` is set. The filter accepts meshes with a source-tagged ancestor
-  (§Incremental rebuilds); a hit walks up `ChildOf` to it. Road and ground carry no tag, so they
+  bevy-react's `PointerCapture` is set. The nearest visible mesh wins; it selects only if it
+  has a source-tagged ancestor (§Incremental rebuilds; walk up `ChildOf`), so a deck or wall in
+  front of a prop hides it. Road and ground carry no tag, so they
   are never selected; Ctrl+press on the road uses the rapier ray as `focus_point` does. Mesh
   ray casts need the CPU copies `keep_cpu_copies()` already keeps.
 - **Markers:** objects with no mesh — point and spot lights, sun, fill, item rows, the Golden
@@ -313,6 +325,33 @@ same read-only way from `<dir>/settings.ron`. A test drive's pause-menu `ApplySe
 write goes to the editor's data dir (`editor/settings.ron`, which the editor never reads;
 under `--user-data-dir`, `<dir>/settings.ron` — an automation dir, harmless). Graphics quality therefore matches what the player configured.
 
+### P6 as built
+- **Source tags:** `rc_track::PropSource(i)` on `Prop` colliders and `PlacedProp::source` /
+  `LayoutProp::source` (the document index; `Layout::new` drops direction-limited props); `rc_render::DecorSource(i)` on
+  decor models (`load_decor` keeps the index). *Deviation:* a static prop's model is now a
+  **child of its `Prop`** (with `Visibility` added to the collider entity) instead of a stored
+  entity + `On<Remove, Prop>` observer: it despawns with the prop and follows its collider, so a
+  preview moves it for free. Both model roots copy `PropSource`.
+- **Live preview:** `rc_track::DragPreview(Option<(DragSource, Transform)>)` (`DragSource::{Prop,
+  Decor}`; the design's `Source`). rc_track moves the collider (a dynamic one also gets
+  `RigidBodyDisabled` while previewed, so a prop held in the air does not fall, and `Teleported`);
+  rc_render moves decor; both put the last one back when the preview moves on or clears. The
+  editor clears it once the reloaded session is in `InRace` (a committed drag never flashes back;
+  checked by logging the restore against the reload). The control polygon and markers are drawn
+  from a copy of the document with the live pose, as P4 did.
+- **Gizmo:** a mode the selected item lacks (rotate on a point, scale on a prop) shows the move
+  gizmo. Size is 0.2 × its distance from the camera. Commits round positions and scales to
+  0.001 and angles to 0.01°; angles are rewritten only when the rotation changed (a move keeps a
+  file's `yaw: 270`). Drags of the gizmo own the mouse until release, over the UI too.
+- **Tint:** emissive is not scaled by the exposure in Bevy (`emissive_exposure_weight` 0), so the
+  boosts are plain values (hover (0.02, 0.08, 0.12), selected (0.12, 0.09, 0)).
+- **Picking:** markers are screen-sized spheres (dimmed: alpha 0.45, not when selected), picked
+  within 12 px. The pick filter accepts only tagged meshes, so a hit passes through the road (a
+  prop under a deck is pickable through it), as designed.
+- **Not verified with a real mouse** (no input injection): hover, handle picking and dragging,
+  Ctrl+press insertion, Esc. The maths has unit tests (axis drag, ring angle, scale, nearest
+  segment); the preview and commit paths were screenshotted through `editor move|rotate|scale`.
+
 ## Editing scope (P4)
 | Item | Handles | Inspector |
 |---|---|---|
@@ -320,7 +359,7 @@ under `--user-data-dir`, `<dir>/settings.ron` — an automation dir, harmless). 
 | Control points | yes | pos, width, bank, surface, walls, offroad margin (inherited fields show what they inherit; × unsets), label |
 | Jumps (gaps) | red segment, handle at its middle (does not move) | from, to, dir; "Jump from here" on a point adds one |
 | Ground areas / vertices | vertices; a vertex's "Whole area" selects the area | surface, height, dir; vertex x/z |
-| Item rows, props, Golden Battery, decor | yes | pos, count / kind (all prop kinds) / yaw / model, scale, dir |
+| Item rows, props, Golden Battery, decor | yes | pos, count / kind (all prop kinds) / yaw / model, rot, scale (P6: per axis), dir |
 | Shortcuts / path points | path points; a path point's "Whole shortcut" selects the shortcut | width, dir; point pos |
 
 Add (Assets tab: prop, decor, item row, battery; Track tab: jump, ground area, shortcut) puts the
@@ -329,8 +368,8 @@ screen centre (a new shortcut leaves and rejoins the track around it).
 
 **Not done:** lints are text without a position (no click-to-focus); prop kinds are one long list
 (no filter by environment); a new decor item copies an existing model (the model path is a text
-field); no orthographic view (T is a perspective view from above); dragging has not been tried
-with a real mouse by an agent (no input injection on the test machine).
+field); no orthographic view (T is a perspective view from above). P6 replaced handle dragging
+with the gizmo (§P6 as built).
 
 ## Migration off `plan.py` (D1, done)
 - **Corridor lint** (`rc_track::analysis`, every track): no static prop without a drivable
@@ -401,7 +440,7 @@ an art call. Other times of day and the mirror layout are not baked.
 | P3 Migration (done) | corridor lint; every track moved off `plan.py`; labels | no script writes a track without `--layout`; no lints; CI green |
 | P4 Bake (done) | baker, `.irv` loader, weather scaling | Toy Town baked and shipped; occlusion and bleeding visible; runs on the Iris Xe. Not yet: the other tracks, a 3070 bench run |
 | P5 Layout (done) | toolbar, left tabs (Assets placeholder, Track, Lighting = today's bake buttons), right pane; Items window and Notes removed; error toast; lints in the Track tab | everything P4 could edit is still reachable; no item is only reachable through an index chip |
-| P6 Select & gizmo | live drag previews (`DragPreview`, `EnvPreview` once P9 adds lights) applied by rc_track/rc_render, `MeshRayCast` picking, source tags + `PlacedProp::source`, hover/selection tint, markers (incl. dimmed unreachable items), `gizmo.rs` (G/R/C, L, Ctrl snap), Track-tab-only layout handles, Ctrl+press insert, decor rotation/scale data change. Commits still reload (P4 path) | select any object, including `dir: Rev` ones, by clicking it; move/rotate/scale decor, move/yaw props, move points; old decor files still load; a prop or decor drag is real-time (the release still reloads) |
+| P6 Select & gizmo (done) | live drag previews (`DragPreview`, `EnvPreview` once P9 adds lights) applied by rc_track/rc_render, `MeshRayCast` picking, source tags + `PlacedProp::source`, hover/selection tint, markers (incl. dimmed unreachable items), `gizmo.rs` (G/R/C, L, Ctrl snap), Track-tab-only layout handles, Ctrl+press insert, decor rotation/scale data change. Commits still reload (P4 path) | select any object, including `dir: Rev` ones, by clicking it; move/rotate/scale decor, move/yaw props, move points; old decor files still load; a prop or decor drag is real-time (the release still reloads) |
 | P7 Incremental | `TrackPreview` for point drags, track key + per-source diffs, `RoomPiece` rebuild, `TrackSummary` re-insert, no `ChangeTrack` per edit, both equivalence tests | both tests pass; a point drag updates the road visibly while dragging on the Iris Xe; no session reload on any edit outside the reload list |
 | P8 Library | `library.rs`, `editor.library`, categories + search, placement mode with ghost (+ `editor place` verb), swap | build a lap of Toy Town's decor from the library without typing a model path |
 | P9 Lighting | `environment.ron` in the `Doc` (+ `to_ron`, save, undo), `EnvironmentDraft`, light objects + sun/fill markers, Lighting tab's time look, bake-stale flags; mirrored environment lights (game fix) | add a spot light, aim it, change noon's sun and exposure, undo it all, save, reopen: identical |

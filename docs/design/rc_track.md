@@ -42,8 +42,9 @@ The track editor (`cargo run -p rc_editor -- <id>`, `docs/design/rc_editor.md`) 
 point, inherited and default fields left out, floats written as `12.0`. **Comments in a
 hand-written file are not kept** — a control point's optional `label: "T1"` is the place for
 per-point notes (the editor shows it; the game ignores it). Tests round-trip every shipped track
-and decor file. The decor format (`assets/maps/<id>/decor.ron`: model, pos, yaw, scale, dir) lives
-in rc_track (`decor.rs`); rc_render draws it.
+and decor file. The decor format (`assets/maps/<id>/decor.ron`: model, pos, `rot: (pitch, yaw, roll)`
+degrees applied YXZ, per-axis `scale`, dir; the older `yaw` / uniform `scale` still load) lives in
+rc_track (`decor.rs`); rc_render draws it.
 
 ## A3. A minimal track, annotated
 ```ron

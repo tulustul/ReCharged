@@ -10,7 +10,7 @@ use crate::build::{KILL_FLOOR_DEPTH_U, variant_name};
 use crate::mesh::MeshData;
 use crate::props::{Primitive, PropDef};
 use crate::track::Track;
-use crate::{LOADING_KEY, PropCatalog, TrackDraft};
+use crate::{DragPreview, DragSource, LOADING_KEY, PropCatalog, PropSource, TrackDraft};
 
 /// Barrier friction (low, combined with `Min`: cars slide along walls, never stick).
 const WALL_FRICTION: f32 = 0.1;
@@ -224,6 +224,7 @@ fn spawn_props(commands: &mut Commands, track: &Track) {
                 kind: p.kind.clone(),
                 dynamic: def.dynamic,
             },
+            PropSource(p.source),
             p.transform,
             collider,
             groups(layers::PROP),
@@ -261,6 +262,59 @@ pub(crate) fn reset_props(
         *transform = spawn.0;
         *velocity = Velocity::zero();
         teleported.write(Teleported { entity });
+    }
+}
+
+/// The editor's [`DragPreview`] changed: the previewed prop's collider goes to the preview pose,
+/// the one previewed before back to where it was. A dynamic body sits out the simulation while
+/// previewed (it would fall from a pose in the air) and is teleported (its visual proxy snaps).
+pub(crate) fn preview_prop(
+    preview: Res<DragPreview>,
+    mut props: Query<(Entity, &PropSource, &mut Transform, Has<PropSpawn>), With<Prop>>,
+    mut moved: Local<Option<(Entity, Transform)>>,
+    mut teleported: MessageWriter<Teleported>,
+    mut commands: Commands,
+) {
+    let target = match preview.0 {
+        Some((DragSource::Prop(i), pose)) => Some((i, pose)),
+        _ => None,
+    };
+    let mut place = |entity: Entity, transform: &mut Transform, pose: Transform, dynamic: bool| {
+        *transform = pose;
+        if dynamic {
+            teleported.write(Teleported { entity });
+        }
+    };
+    if let Some((entity, original)) = *moved {
+        match props.get_mut(entity) {
+            Ok((_, source, mut transform, dynamic))
+                if target.is_none_or(|(i, _)| source.0 != i) =>
+            {
+                place(entity, &mut transform, original, dynamic);
+                if dynamic {
+                    commands.entity(entity).remove::<RigidBodyDisabled>();
+                }
+                *moved = None;
+            }
+            Ok(_) => {}
+            Err(_) => *moved = None, // despawned by a session reload
+        }
+    }
+    let Some((i, pose)) = target else {
+        *moved = None;
+        return;
+    };
+    for (entity, source, mut transform, dynamic) in &mut props {
+        if source.0 != i {
+            continue;
+        }
+        if moved.is_none() {
+            *moved = Some((entity, *transform));
+            if dynamic {
+                commands.entity(entity).insert(RigidBodyDisabled);
+            }
+        }
+        place(entity, &mut transform, pose, dynamic);
     }
 }
 

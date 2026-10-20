@@ -27,7 +27,7 @@ export const editorStrings = {
   addGap: "+ Jump",
   addGround: "+ Ground area",
   addShortcut: "+ Shortcut",
-  trackHint: "Jumps start at the selected control point; new control points come from Insert after.",
+  trackHint: "Jumps start at the selected control point. New control points: Ctrl+click the road, or Insert after.",
   noLints: "No warnings",
   previewing: (time: string) => `Time of day: ${time}`,
   inherited: "inherited",
@@ -43,5 +43,5 @@ export const editorStrings = {
   off: "Off",
   lints: (n: number) => `${n} warning${n === 1 ? "" : "s"}`,
   controls:
-    "Click select · drag move (Alt height, Ctrl snap) · right drag look · WASD Q/E fly (Shift fast) · T top · Ctrl+Z/Y undo/redo",
+    "Click select · drag the gizmo (Ctrl snap) · G move · R rotate · C scale · L world/local · Esc cancel/deselect · right drag look · WASD Q/E fly (Shift fast) · T top · Ctrl+click road: new point · Ctrl+Z/Y undo/redo",
 };

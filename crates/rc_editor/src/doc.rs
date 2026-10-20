@@ -1,7 +1,7 @@
 //! The edited document (layout + decor): handles of the items, structural edits (add, insert,
 //! delete, duplicate) with index fix-ups, and validation. Pure; the ECS side is in `lib.rs`.
 
-use bevy::math::{Vec2, Vec3};
+use bevy::math::{EulerRot, Quat, Vec2, Vec3};
 use rc_core::prelude::*;
 use rc_track::{
     ControlPoint, DecorItem, Dir, Gap, GoldenBatteryDef, Ground, ItemRowDef, PropCatalog,
@@ -17,6 +17,33 @@ const NEW_GROUND_U: f32 = 10.0;
 const NEW_SHORTCUT_REACH_U: f32 = 12.0;
 /// The Golden Battery floats this high above the focus (u).
 const BATTERY_LIFT_U: f32 = 1.0;
+
+/// Where an item is, as the gizmo moves it (scale is along the item's own axes).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pose {
+    /// Position (u).
+    pub pos: Vec3,
+    /// Rotation.
+    pub rot: Quat,
+    /// Scale.
+    pub scale: Vec3,
+}
+
+/// How an item may turn (D9: props stay upright).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Turn {
+    /// Not at all (points, rows, the battery).
+    No,
+    /// About the vertical (props).
+    Yaw,
+    /// Any way (decor).
+    Free,
+}
+
+/// Rounds to the millimetre-ish grid saved files use (dragging makes long fractions).
+fn tidy(v: f32) -> f32 {
+    (v * 1000.0).round() / 1000.0 + 0.0 // + 0.0: no "-0.0" in the file
+}
 
 /// Layout, decor and catalog entry of one track.
 #[derive(Debug, Clone, PartialEq)]
@@ -104,15 +131,25 @@ impl Doc {
         }
     }
 
-    /// Every handle: props, item rows, the battery and decor always; with `layout` also
-    /// control points, gaps, ground vertices and shortcut path points (the Track tab's).
-    pub fn handles(&self, layout: bool) -> Vec<(EditorItem, Vec3)> {
+    /// Items without a mesh in the (forward) editing session, which the view marks with an icon:
+    /// item rows, the battery, props and decor of reverse layouts only (`true`: shown dimmed);
+    /// with `layout` also control points, gaps, ground vertices and shortcut path points (the
+    /// Track tab's).
+    pub fn markers(&self, layout: bool) -> Vec<(EditorItem, Vec3, bool)> {
         let d = &self.def;
-        let mut items: Vec<EditorItem> = (0..d.props.len())
-            .map(|i| EditorItem::Prop { index: idx(i) })
-            .chain((0..d.item_rows.len()).map(|i| EditorItem::ItemRow { index: idx(i) }))
-            .chain((0..self.decor.len()).map(|i| EditorItem::Decor { index: idx(i) }))
+        let reverse_only = |dir: Dir| !dir.active(false);
+        let mut items: Vec<EditorItem> = (0..d.item_rows.len())
+            .map(|i| EditorItem::ItemRow { index: idx(i) })
             .chain(d.golden_battery.map(|_| EditorItem::Battery))
+            .collect();
+        let dimmed: Vec<EditorItem> = (d.props.iter().enumerate())
+            .filter(|(_, p)| reverse_only(p.dir))
+            .map(|(i, _)| EditorItem::Prop { index: idx(i) })
+            .chain(
+                (self.decor.iter().enumerate())
+                    .filter(|(_, p)| reverse_only(p.dir))
+                    .map(|(i, _)| EditorItem::Decor { index: idx(i) }),
+            )
             .collect();
         if layout {
             items.extend((0..d.points.len()).map(|i| EditorItem::Point { index: idx(i) }));
@@ -130,10 +167,67 @@ impl Doc {
                 }));
             }
         }
-        items
-            .into_iter()
-            .filter_map(|item| self.handle(item).map(|pos| (item, pos)))
-            .collect()
+        let marker = |dim| move |item| self.handle(item).map(|pos| (item, pos, dim));
+        let mut out: Vec<_> = items.into_iter().filter_map(marker(false)).collect();
+        out.extend(dimmed.into_iter().filter_map(marker(true)));
+        out
+    }
+
+    /// The item's pose and how it may turn and scale; `None` for items the gizmo does not move
+    /// (the track, gaps, whole ground areas and shortcuts).
+    pub fn pose(&self, item: EditorItem) -> Option<(Pose, Turn, bool)> {
+        let pos = self.handle(item)?;
+        let plain = Pose {
+            pos,
+            rot: Quat::IDENTITY,
+            scale: Vec3::ONE,
+        };
+        Some(match item {
+            EditorItem::Gap { .. } => return None,
+            EditorItem::Prop { index } => {
+                let yaw = self.def.props[at(index)].yaw.to_radians();
+                let rot = Quat::from_rotation_y(yaw);
+                (Pose { rot, ..plain }, Turn::Yaw, false)
+            }
+            EditorItem::Decor { index } => {
+                let d = &self.decor[at(index)];
+                let r = d.rot * std::f32::consts::PI / 180.0;
+                let rot = Quat::from_euler(EulerRot::YXZ, r.y, r.x, r.z);
+                (
+                    Pose {
+                        pos,
+                        rot,
+                        scale: d.scale,
+                    },
+                    Turn::Free,
+                    true,
+                )
+            }
+            _ => (plain, Turn::No, false),
+        })
+    }
+
+    /// Moves, turns and scales the item as far as its data allows. Angles are rewritten only
+    /// when the rotation changed (a move keeps a file's `yaw: 270`).
+    pub fn set_pose(&mut self, item: EditorItem, pose: Pose) {
+        let Some((old, ..)) = self.pose(item) else {
+            return;
+        };
+        self.set_handle(item, pose.pos.map(tidy));
+        let turned = !old.rot.abs_diff_eq(pose.rot, 1e-6);
+        let (yaw, pitch, roll) = pose.rot.to_euler(EulerRot::YXZ);
+        let deg = |r: f32| (r.to_degrees() * 100.0).round() / 100.0 + 0.0;
+        match item {
+            EditorItem::Prop { index } if turned => self.def.props[at(index)].yaw = deg(yaw),
+            EditorItem::Decor { index } => {
+                let d = &mut self.decor[at(index)];
+                if turned {
+                    d.rot = Vec3::new(deg(pitch), deg(yaw), deg(roll));
+                }
+                d.scale = pose.scale.map(tidy);
+            }
+            _ => {}
+        }
     }
 
     /// Moves the item's handle to `pos` (a ground vertex keeps its area's height).
@@ -476,8 +570,8 @@ impl Doc {
                 self.decor.push(DecorItem {
                     model,
                     pos: focus,
-                    yaw: 0.0,
-                    scale: 1.0,
+                    rot: Vec3::ZERO,
+                    scale: Vec3::ONE,
                     dir: Dir::Both,
                 });
                 Ok(EditorItem::Decor {
@@ -681,14 +775,20 @@ mod tests {
     }
 
     #[test]
-    fn layout_handles_show_only_with_layout_and_follow_moves() {
+    fn markers_show_layout_only_with_layout_and_reverse_only_items_dimmed() {
         let (mut doc, _) = oval();
-        let is_point = |(item, _): &(EditorItem, Vec3)| matches!(item, EditorItem::Point { .. });
-        assert_eq!(doc.handles(false).iter().filter(|h| is_point(h)).count(), 0);
-        let points = doc.handles(true).into_iter().filter(is_point).count();
+        let is_point =
+            |(item, ..): &(EditorItem, Vec3, bool)| matches!(item, EditorItem::Point { .. });
+        assert_eq!(doc.markers(false).iter().filter(|h| is_point(h)).count(), 0);
+        let points = doc.markers(true).into_iter().filter(is_point).count();
         assert_eq!(points, doc.def.points.len());
-        let props = EditorItem::Prop { index: 0 };
-        assert!(doc.handles(false).iter().any(|(item, _)| *item == props));
+        let row = EditorItem::ItemRow { index: 0 };
+        assert!(doc.markers(false).iter().any(|(item, ..)| *item == row));
+        let prop = EditorItem::Prop { index: 0 };
+        let marked = |doc: &Doc| doc.markers(false).into_iter().find(|(i, ..)| *i == prop);
+        assert_eq!(marked(&doc), None, "a prop in the session has its mesh");
+        doc.def.props[0].dir = Dir::Rev;
+        assert_eq!(marked(&doc), Some((prop, doc.def.props[0].pos, true)));
         let vertex = EditorItem::Vertex {
             ground: 0,
             index: 0,
@@ -705,5 +805,53 @@ mod tests {
             doc.handle(copy).unwrap(),
             doc.def.props[0].pos + Vec3::X * DUPLICATE_OFFSET_U
         );
+    }
+
+    #[test]
+    fn poses_set_only_what_the_data_stores() {
+        let (mut doc, _) = oval();
+        doc.decor.push(DecorItem {
+            model: "a.glb".into(),
+            pos: Vec3::ZERO,
+            rot: Vec3::new(0.0, 270.0, 0.0),
+            scale: Vec3::ONE,
+            dir: Dir::Both,
+        });
+        let decor = EditorItem::Decor { index: 0 };
+        let (pose, turn, scales) = doc.pose(decor).unwrap();
+        assert_eq!((turn, scales), (Turn::Free, true));
+        let moved = Pose {
+            pos: Vec3::new(1.23456, 0.0, -2.0),
+            ..pose
+        };
+        doc.set_pose(decor, moved);
+        assert_eq!(doc.decor[0].pos, Vec3::new(1.235, 0.0, -2.0));
+        assert_eq!(
+            doc.decor[0].rot.y, 270.0,
+            "a move keeps the angles as written"
+        );
+        let turned = Pose {
+            rot: Quat::from_euler(EulerRot::YXZ, 0.5, 0.25, -0.1),
+            scale: Vec3::new(1.0, 2.0, 0.5),
+            ..moved
+        };
+        doc.set_pose(decor, turned);
+        let back = doc.pose(decor).unwrap().0;
+        assert!(back.rot.abs_diff_eq(turned.rot, 1e-3), "{back:?}");
+        assert_eq!(doc.decor[0].scale, Vec3::new(1.0, 2.0, 0.5));
+
+        let prop = EditorItem::Prop { index: 0 };
+        let (pose, turn, scales) = doc.pose(prop).unwrap();
+        assert_eq!((turn, scales), (Turn::Yaw, false));
+        doc.set_pose(
+            prop,
+            Pose {
+                rot: Quat::from_rotation_y(90f32.to_radians()),
+                scale: Vec3::splat(3.0),
+                ..pose
+            },
+        );
+        assert_eq!(doc.def.props[0].yaw, 90.0);
+        assert_eq!(doc.pose(EditorItem::Gap { index: 0 }), None);
     }
 }

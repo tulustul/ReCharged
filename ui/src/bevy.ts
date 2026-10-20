@@ -142,7 +142,27 @@ what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "lo
 /**
  * Every allowed time, forward and mirrored.
  */
-all: boolean, } | { "kind": "toggleProbes" };
+all: boolean, } | { "kind": "toggleProbes" } | { "kind": "gizmo", 
+/**
+ * The mode.
+ */
+mode: EditorGizmo, } | { "kind": "gizmoSpace" } | { "kind": "cancel" } | { "kind": "drag", 
+/**
+ * Added to the position (u, world axes).
+ */
+translate: [number, number, number], 
+/**
+ * Turned by (pitch, yaw, roll) degrees, applied after its rotation.
+ */
+rotate: [number, number, number], 
+/**
+ * Multiplies the scale per axis.
+ */
+scale: [number, number, number], 
+/**
+ * Keep the drag live.
+ */
+hold: boolean, };
 export type EditorCommandMsg = { 
 /**
  * The command.
@@ -166,6 +186,7 @@ optional: boolean,
  * Set explicitly (always true for non-optional fields).
  */
 set: boolean, };
+export type EditorGizmo = "move" | "rotate" | "scale";
 export type EditorItem = { "kind": "track" } | { "kind": "point", index: number, } | { "kind": "gap", index: number, } | { "kind": "ground", index: number, } | { "kind": "vertex", ground: number, index: number, } | { "kind": "itemRow", index: number, } | { "kind": "prop", index: number, } | { "kind": "shortcut", index: number, } | { "kind": "pathPoint", shortcut: number, index: number, } | { "kind": "battery" } | { "kind": "decor", index: number, };
 export type EditorOptions = { 
 /**

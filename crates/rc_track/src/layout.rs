@@ -29,6 +29,9 @@ pub(crate) struct Point {
 /// A placed prop of a layout (yaw in radians).
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayoutProp {
+    /// Index into `TrackDef::props` (direction-limited props are dropped, so it can differ from
+    /// the index here).
+    pub source: usize,
     pub kind: String,
     pub pos: Vec3,
     pub yaw: f32,
@@ -87,8 +90,10 @@ impl Layout {
             props: def
                 .props
                 .iter()
-                .filter(|p| p.dir.active(reverse))
-                .map(|p| LayoutProp {
+                .enumerate()
+                .filter(|(_, p)| p.dir.active(reverse))
+                .map(|(source, p)| LayoutProp {
+                    source,
                     kind: p.kind.clone(),
                     pos: p.pos,
                     yaw: p.yaw.to_radians(),
@@ -307,5 +312,21 @@ mod tests {
         }
         assert_eq!(mir.props[0].pos.x, -5.0);
         assert!((mir.props[0].yaw + 30f32.to_radians()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn props_keep_their_file_index_when_others_are_dropped() {
+        let mut d = def();
+        for dir in [Dir::Rev, Dir::Fwd, Dir::Both] {
+            let mut p = d.props[0].clone();
+            p.dir = dir;
+            d.props.push(p);
+        }
+        let sources = |reverse| {
+            let l = Layout::new(&d, reverse, false);
+            l.props.iter().map(|p| p.source).collect::<Vec<_>>()
+        };
+        assert_eq!(sources(false), vec![0, 2, 3]);
+        assert_eq!(sources(true), vec![0, 1, 3]);
     }
 }

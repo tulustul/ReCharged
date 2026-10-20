@@ -5,13 +5,15 @@
 //!   own race session on the track ([`TrackDraft`], so unsaved edits are what loads), held in
 //!   `RacePhase::Setup` (no cars) while editing and reloaded after each edit; test drives (F5);
 //!   saving the layout and decor files (Ctrl+S); the inspector ([`fields`]); the 3D view
-//!   ([`view`]: fly camera, handles, picking, dragging); the [`EditorStatus`] React shows.
+//!   ([`view`]: fly camera, markers, picking, hover/selection tint; [`gizmo`]: the transform
+//!   gizmo); the [`EditorStatus`] React shows.
 //! - **Inputs:** keyboard and mouse, rc_ui's `editor.*` messages, `Track` (lints, projection),
 //!   `Catalog` (name, allowed times and weather), `RaceConfig` (session layout),
 //!   `LoadingFailed`, `UserPaths::assets_dir`.
-//! - **Outputs:** [`TrackDraft`] (sole writer), [`EditorStatus`] (sole writer), `GameCommand`s
-//!   (start, restart, change track), a `UiNav::Confirm` that skips a test drive's intro, the
-//!   `GameCamera`'s `Transform` while editing, gizmos, the track and decor files on save.
+//! - **Outputs:** [`TrackDraft`] and `DragPreview` (sole writer), [`EditorStatus`] (sole
+//!   writer), `GameCommand`s (start, restart, change track), a `UiNav::Confirm` that skips a test
+//!   drive's intro, the `GameCamera`'s `Transform` while editing, `Overhead` visibility, tint
+//!   materials on the hovered and selected models, gizmos, the track and decor files on save.
 //! - **Must never:** run inside the game binary, write a data file except on an explicit save,
 //!   let a failed write truncate it, or hand the session a layout that does not build.
 //!
@@ -22,6 +24,8 @@ mod baking;
 pub mod catalog;
 pub mod doc;
 pub mod fields;
+pub mod gizmo;
+mod tint;
 pub mod view;
 
 use std::path::{Path, PathBuf};
@@ -39,8 +43,9 @@ use rc_track::{
     DECOR_FILE, PropCatalog, TRACK_FILE, Track, TrackDef, TrackDraft, decor_to_ron, map_dir,
 };
 pub use rc_ui::editor::{
-    EditorAdd, EditorCommand, EditorCommandMsg, EditorItem, EditorOptions, EditorSelect,
-    EditorSelection, EditorSet, EditorSetOptions, EditorSetTab, EditorStatus, EditorTab,
+    EditorAdd, EditorCommand, EditorCommandMsg, EditorGizmo, EditorItem, EditorOptions,
+    EditorSelect, EditorSelection, EditorSet, EditorSetOptions, EditorSetTab, EditorStatus,
+    EditorTab,
 };
 
 pub use crate::doc::Doc;
@@ -314,6 +319,7 @@ impl Editor {
             }
         );
         self.bake = Some(run);
+        self.selection = None; // no tint material in the baked light
         self.error = None;
         self.wanted += 1;
     }
@@ -440,6 +446,22 @@ fn keys(keys: Option<Res<ButtonInput<KeyCode>>>, typing: Typing, mut out: Messag
         EditorCommand::Focus
     } else if !ctrl && pressed(KeyCode::KeyP) {
         EditorCommand::ToggleProbes
+    } else if !ctrl && pressed(KeyCode::KeyG) {
+        EditorCommand::Gizmo {
+            mode: EditorGizmo::Move,
+        }
+    } else if !ctrl && pressed(KeyCode::KeyR) {
+        EditorCommand::Gizmo {
+            mode: EditorGizmo::Rotate,
+        }
+    } else if !ctrl && pressed(KeyCode::KeyC) {
+        EditorCommand::Gizmo {
+            mode: EditorGizmo::Scale,
+        }
+    } else if !ctrl && pressed(KeyCode::KeyL) {
+        EditorCommand::GizmoSpace
+    } else if pressed(KeyCode::Escape) {
+        EditorCommand::Cancel
     } else {
         return;
     };
@@ -536,6 +558,11 @@ fn commands(
                     session.view.look_at(target);
                 }
             }
+            // The view's (gizmo::commands).
+            EditorCommand::Gizmo { .. }
+            | EditorCommand::GizmoSpace
+            | EditorCommand::Cancel
+            | EditorCommand::Drag { .. } => {}
         }
     }
 }

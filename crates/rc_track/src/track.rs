@@ -100,6 +100,9 @@ pub struct ItemRow {
 /// A prop instance of this layout.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlacedProp {
+    /// Its index in `TrackDef::props` (props inactive in this direction are not placed, so this
+    /// is not always its index in [`Track::props`]).
+    pub source: usize,
     /// Kind id from `props/*.ron` (see [`Track::prop_def`]).
     pub kind: String,
     /// Spawn pose (ground-contact centre).

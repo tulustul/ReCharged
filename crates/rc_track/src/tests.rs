@@ -664,3 +664,26 @@ fn mirror_turn_props_turn_around_in_mirrored_layouts() {
     // -30° mirrored, turned by 180°: 150°.
     assert!((yaw(true) - 150.0).abs() < 1e-3, "{}", yaw(true));
 }
+
+#[test]
+fn placed_props_name_their_file_index_in_every_direction() {
+    let def = TrackDef::load(&assets(), "toy_town").expect("loads");
+    let limited = def.props.iter().filter(|p| p.dir != Dir::Both).count();
+    assert!(limited > 0, "Toy Town has direction-limited props");
+    for v in variants("toy_town") {
+        let t = Track::load(&assets(), &v).expect("builds");
+        let active = def.props.iter().filter(|p| p.dir.active(v.reverse)).count();
+        assert_eq!(t.props().len(), active);
+        for placed in t.props() {
+            let source = &def.props[placed.source];
+            assert!(source.dir.active(v.reverse), "{v:?}");
+            assert_eq!(placed.kind, source.kind);
+            let x = if v.mirror {
+                -source.pos.x
+            } else {
+                source.pos.x
+            };
+            assert_eq!(placed.transform.translation, source.pos.with_x(x));
+        }
+    }
+}

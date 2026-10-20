@@ -30,9 +30,10 @@ const USAGE: &str = "usage: rc_editor <track> [--assets-dir <dir>] [--user-data-
 
   Keys: F5 test drive / back to editing · Ctrl+S save · Ctrl+Z / Ctrl+Y undo / redo
         Delete · Insert (after the selected point) · Ctrl+D duplicate · T top view · F focus
-        P light probes on/off
-  Mouse: left click select · left drag move (Alt: height, Ctrl: snap) · right drag look
-        WASD move · Q/E down/up · Shift faster";
+        P light probes on/off · G / R / C gizmo move / rotate / scale · L world / local axes
+        Esc cancel a drag, else deselect
+  Mouse: left click select · drag a gizmo handle (Ctrl: snap) · Ctrl+click the road (Track
+        tab): new control point · right drag look · WASD move · Q/E down/up · Shift faster";
 
 /// `rc_editor new …`.
 struct NewTrack {
