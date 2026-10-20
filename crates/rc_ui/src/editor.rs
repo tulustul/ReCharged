@@ -152,6 +152,8 @@ pub struct EditorStatus {
     pub driving: bool,
     /// A session (re)load is pending or running.
     pub loading: bool,
+    /// Baking progress ("Baking Noon · mirror (5/8): 42 %"); editing waits meanwhile.
+    pub baking: Option<String>,
     /// The last failure (an edit that would not build, load, save), if any.
     pub error: Option<String>,
     /// Build warnings of the session's track.
@@ -222,6 +224,12 @@ pub enum EditorCommand {
     TopView,
     /// Fly to the selection (F).
     Focus,
+    /// Bake the irradiance volume of the current time of day (forward layout), or of every allowed
+    /// time in both layouts (`all`).
+    Bake {
+        /// Every allowed time, forward and mirrored.
+        all: bool,
+    },
     /// Show or hide one kind of handle.
     ToggleLayer {
         /// Layer name (see [`EditorStatus::layers`]).

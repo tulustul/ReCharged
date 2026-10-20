@@ -33,17 +33,19 @@ export function EditorLayer({ status }: { status: EditorStatus }) {
 function Toolbar({ status }: { status: EditorStatus }) {
   const o = status.options;
   const setOptions = (change: Partial<typeof o>) => bevy.editor.options({ options: { ...o, ...change } });
-  const state = status.loading ? words.rebuilding : status.dirty ? words.unsaved : words.saved;
+  const state = status.baking ?? (status.loading ? words.rebuilding : status.dirty ? words.unsaved : words.saved);
   return (
     <node style={{ ...solid, flexDirection: "row", alignItems: "center", gap: space.s, padding: { horizontal: space.l, vertical: space.s } }} hoverStyle={{}}>
       <node style={{ flexDirection: "column", flexGrow: 1 }}>
         <text style={text.caps}>{words.title}</text>
         <text style={text.h3}>{status.name}</text>
       </node>
-      <text style={{ ...text.label, color: status.dirty || status.loading ? color.warning : color.textDim, margin: { right: space.m } }}>{state}</text>
+      <text style={{ ...text.label, color: status.baking !== null ? color.cyan : status.dirty || status.loading ? color.warning : color.textDim, margin: { right: space.m } }}>{state}</text>
       <Tool label={words.undo} onPress={() => command({ kind: "undo" })} disabled={!status.canUndo} />
       <Tool label={words.redo} onPress={() => command({ kind: "redo" })} disabled={!status.canRedo} />
       <Tool label={words.save} onPress={() => command({ kind: "save" })} />
+      <Tool label={words.bake} onPress={() => command({ kind: "bake", all: false })} disabled={status.baking !== null} />
+      <Tool label={words.bakeAll} onPress={() => command({ kind: "bake", all: true })} disabled={status.baking !== null} />
       <node style={{ width: space.m }} />
       <Cycle label={words.time} value={o.time} options={status.times} onChange={(time) => setOptions({ time })} />
       <Cycle label={words.weather} value={o.weather} options={status.weathers} onChange={(weather) => setOptions({ weather })} />

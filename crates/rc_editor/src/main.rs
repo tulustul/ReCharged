@@ -23,6 +23,8 @@ const USAGE: &str = "usage: rc_editor <track> [--assets-dir <dir>] [--user-data-
   --user-data-dir <dir>    saves, settings and logs (default: the game's, + /editor)
   --screenshot <png>       save the window to <png> (at --screenshot-at seconds, default 3)
   --exit-after <s>         quit after <s> seconds of wall time
+  --bake                   bake the irradiance volumes (every allowed time, normal and mirror)
+                           into assets/data/lighting/<track>/, then quit
 
   Keys: F5 test drive / back to editing · Ctrl+S save · Ctrl+Z / Ctrl+Y undo / redo
         Delete · Insert (after the selected point) · Ctrl+D duplicate · T top view · F focus
@@ -43,12 +45,14 @@ struct Args {
     user_data_dir: Option<PathBuf>,
     screenshot: Option<ScreenshotPlan>,
     exit_after: Option<f32>,
+    bake: bool,
 }
 
 fn parse(args: &[String]) -> Result<Args, String> {
     let (mut track, mut assets_dir, mut user_data_dir) = (None, None, None);
     let (mut screenshot, mut screenshot_at, mut exit_after) = (None, None, None);
     let (mut new, mut env, mut name, mut style) = (false, None, None, None);
+    let mut bake = false;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let mut value = || it.next().ok_or(format!("{arg} needs a value"));
@@ -62,6 +66,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
             "--env" => env = Some(value()?.clone()),
             "--name" => name = Some(value()?.clone()),
             "--style" => style = Some(value()?.clone()),
+            "--bake" => bake = true,
             "new" if track.is_none() && !new => new = true,
             a if !a.starts_with('-') && track.is_none() => track = Some(a.to_owned()),
             a => return Err(format!("unexpected argument {a}")),
@@ -90,6 +95,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
             every: None,
         }),
         exit_after,
+        bake,
     })
 }
 
@@ -182,7 +188,12 @@ fn main() -> AppExit {
         exit_after: args.exit_after,
         ..default()
     };
+    // The light baker reads meshes, materials and textures on the CPU.
+    rc_render::keep_cpu_copies();
     let mut app = recharged::game(config, paths, bundle);
+    if args.bake {
+        rc_editor::bake_on_start(&mut app);
+    }
     app.add_plugins((editor, rc_editor::EditorViewPlugin));
     app.run()
 }

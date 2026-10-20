@@ -7,6 +7,7 @@
 
 mod camera;
 mod env;
+pub(crate) mod gi;
 pub(crate) mod glass;
 mod headlights;
 mod menu_warmup;
@@ -26,6 +27,7 @@ use crate::sky::{atmosphere, light_transform};
 use crate::weather_fx::{LightLook, Look, LookSet};
 
 pub use env::*;
+pub use room::environment_radiance;
 pub use warmup::PipelineQueue;
 pub(crate) use warmup::WarmupCamera;
 
@@ -82,9 +84,15 @@ pub(crate) fn build(app: &mut App) {
                 (warmup::start, report_ready)
                     .chain()
                     .run_if(resource_exists::<VisualsPending>),
-                (apply_lights, apply_shadows, drive_clouds)
+                (
+                    apply_lights,
+                    apply_shadows,
+                    drive_clouds,
+                    gi::follow_weather,
+                )
                     .in_set(VisualSet)
                     .after(LookSet),
+                gi::spawn_volume,
             ),
         );
     camera::build(app);

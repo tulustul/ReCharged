@@ -72,6 +72,21 @@ pub(super) fn build(app: &mut App) {
     });
 }
 
+/// Clear-weather radiance of the environment map toward `dir` (linear, cd/m²: already × the
+/// look's `env_light`): the room or sky Bevy's image-based light shows. The track editor's light
+/// baker uses it for rays that leave the scene.
+pub fn environment_radiance(env: &super::EnvironmentDef, time: TimeOfDay, dir: Vec3) -> Vec3 {
+    let look = env.look(time);
+    let toward = sun_direction(look.sun.elevation, look.sun.azimuth);
+    let [r, g, b] = if env.indoor {
+        room_radiance(&look.room, toward, look.lamps, dir)
+    } else {
+        let daylight = time != TimeOfDay::Night;
+        sky_radiance(dir, toward, env.sky.ground_albedo, daylight, 0.0)
+    };
+    Vec3::new(r, g, b) * look.env_light
+}
+
 /// Radiance of the room toward `dir` (linear; scaled by the look's `env_light`).
 pub(crate) fn room_radiance(
     colors: &super::RoomColors,

@@ -5,6 +5,8 @@ export const editorStrings = {
   saved: "Saved",
   rebuilding: "Rebuilding…",
   drive: "Test drive  F5",
+  bake: "Bake light",
+  bakeAll: "Bake all",
   save: "Save",
   undo: "Undo",
   redo: "Redo",

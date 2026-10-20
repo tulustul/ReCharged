@@ -11,6 +11,8 @@
 //! [`cars`]: crate::cars
 //! [`capture`]: crate::capture
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use bevy::asset::{LoadState, RenderAssetUsages};
 use bevy::gltf::GltfLoaderSettings;
 use bevy::mesh::{Indices, PrimitiveTopology};
@@ -96,16 +98,35 @@ fn report_loaded(
     done.write(LoadingDone(LOADING_KEY));
 }
 
-/// Loads a glb's first scene with its meshes and textures kept only on the GPU: nothing reads
-/// model vertices or texels on the CPU (colliders come from the prop RON files), and the main-world
-/// copies of every prop and car were most of the game's RSS (Q21). Every glb load goes through
-/// here, so a file is never requested with two different settings.
+/// Set once at startup by tools that read meshes, materials and textures on the CPU (the track
+/// editor's light baker); the game keeps them on the GPU only.
+static KEEP_CPU_COPIES: AtomicBool = AtomicBool::new(false);
+
+/// Keep CPU copies of every mesh, material and texture rc_render loads or builds (call before the
+/// app runs; costs the RSS that GPU-only assets save, Q21).
+pub fn keep_cpu_copies() {
+    KEEP_CPU_COPIES.store(true, Ordering::Relaxed);
+}
+
+/// Where rc_render's assets live: GPU only, unless [`keep_cpu_copies`] was called.
+pub(crate) fn asset_usage() -> RenderAssetUsages {
+    if KEEP_CPU_COPIES.load(Ordering::Relaxed) {
+        RenderAssetUsages::default()
+    } else {
+        RenderAssetUsages::RENDER_WORLD
+    }
+}
+
+/// Loads a glb's first scene with its meshes and textures kept only on the GPU: nothing in the
+/// game reads model vertices or texels on the CPU (colliders come from the prop RON files), and
+/// the main-world copies of every prop and car were most of the game's RSS (Q21). Every glb load
+/// goes through here, so a file is never requested with two different settings.
 pub(crate) fn load_scene(server: &AssetServer, path: &str) -> Handle<WorldAsset> {
     server
         .load_builder()
         .with_settings(|s: &mut GltfLoaderSettings| {
-            s.load_meshes = RenderAssetUsages::RENDER_WORLD;
-            s.load_materials = RenderAssetUsages::RENDER_WORLD;
+            s.load_meshes = asset_usage();
+            s.load_materials = asset_usage();
         })
         .load(GltfAssetLabel::Scene(0).from_asset(path.to_owned()))
 }
@@ -116,14 +137,11 @@ pub(crate) fn mesh_from_data(data: &MeshData) -> Option<Mesh> {
     if data.is_empty() {
         return None;
     }
-    let mut mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::RENDER_WORLD,
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, data.positions.clone())
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone())
-    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone())
-    .with_inserted_indices(Indices::U32(data.indices.clone()));
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, asset_usage())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, data.positions.clone())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone())
+        .with_inserted_indices(Indices::U32(data.indices.clone()));
     if let Err(e) = mesh.generate_tangents() {
         warn_once!("content: no tangents for a mesh ({e}); its normal map is ignored");
     }

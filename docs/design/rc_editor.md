@@ -1,8 +1,8 @@
 # rc_editor — track editor (design note)
 
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
-lighting. Status: **P1–P3 done** (open/create, edit everything, undo, test drive, save; every track
-editor-owned); P4 (irradiance bake) to do.
+lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
+editor-owned; irradiance bake). The shipped tracks are not baked yet (§Irradiance bake: open).
 
 ```sh
 npm --prefix ui run build                       # the editor uses the game's React bundle
@@ -99,40 +99,44 @@ with a real mouse by an agent (no input injection on the test machine).
   with `--layout` (which drops every editor edit); they still build the prop catalogs, kerb arcs
   and model inputs. The files' headers and the environment notes say they are editor-owned.
 
-## Irradiance bake (D3)
-**Constraints found in the code:**
-- Binding arrays are off on every adapter (upstream-notes U7, the Intel Mesa hang). Without them,
-  Bevy uses **only the irradiance volume closest to the view**, so we use **one volume per track**
-  covering the drivable bounds.
-- Shader priority is lightmap > irradiance volume > environment map for *diffuse*. Inside the
-  volume, the env map's diffuse is skipped, but its specular stays. So the bake must include sky
-  light, which also gives sky occlusion under tables and shelves.
-- The sun and window light are **not mirrored** in the mirror variant. Flipping a volume would put
-  the bounce on the wrong side, so mirror gets its own bake. Reverse shares the forward bake (only
-  `dir`-filtered features differ).
-- That gives **8 volumes per track**: {normal, mirror} × {Morning, Noon, Sunset, Night}.
+## Irradiance bake (D3, P4)
+```sh
+cargo run -p rc_editor -- toy_town --bake      # every allowed time × {normal, mirror}, then quit
+```
+or **Bake light** (this time, forward) / **Bake all** in the editor's toolbar. Files:
+`assets/data/lighting/<track>/<normal|mirror>_<time>.irv` (format and runtime: rc_render
+`lighting/gi.rs`, `rc_render.md` §Baked indirect light). Reverse layouts use the forward bake (only
+`dir`-filtered features differ); the sun is not mirrored, so mirror gets its own.
 
-**Baker** (an editor command plus a headless `rc_editor --bake <track>`), using the game renderer
-with no custom ray tracer:
-1. Load the variant at the time of day, Clear weather, no cars, dynamic props at rest.
-2. Probe grid: track bounds horizontally, from the floor to the highest drivable point + 6 u. 2 u
-   spacing by default (the car is 2 u long), with a per-track override.
-3. Per probe: render a small (16²) HDR cubemap with exposure fixed and no tonemapping (scene light
-   units). Convolve it to the 6 ambient-cube values (cosine-weighted irradiance per axis).
-4. Probes inside solid geometry (mostly back faces seen) are marked invalid and filled from valid
-   neighbours, so solid props don't leak darkness.
-5. Optional second pass with pass 1's volume active gives a second bounce.
-6. Pack the result into Bevy's layout: a 3D texture of (Rx, 2Ry, 3Rz), RGB9E5.
+**How (CPU ray tracing, not rendered cubemaps).** The plan was to render tiny cubemaps with the
+game's renderer; measured against Bevy's cost per camera view (shadow cascades are rendered per
+view) that is hours per track on the Iris Xe. Instead the baker traces the session itself on the
+CPU (`bake.rs`, `baking.rs`):
+- The editor calls `rc_render::keep_cpu_copies()` so meshes, materials and textures stay on the
+  CPU. Every opaque `StandardMaterial` mesh in the session (the ceiling too: editing only hides
+  it) becomes world triangles in a parry `TriMesh` (≈ 0.8 M for Toy Town); albedo = base colour ×
+  the texture's mean colour; double-sided materials are noted.
+- Lights as the game has them in clear weather: directional lights (lux × colour; shadow rays for
+  the ones that cast shadows — the indoor fill does not), point and spot lights (lumens / 4π,
+  Bevy's range fall-off and cone). Rays that leave the scene see `rc_render::environment_radiance`
+  (the room or sky the environment map shows, × `env_light`).
+- Probes over the track's bounds (indoors floor to ceiling, so tall walls have no seam; outdoors
+  to the highest drivable point + 12 u), 2 u apart horizontally (coarser on large tracks, ≤ 12 k
+  columns), ≈ 8 layers. 512 rays per probe (Fibonacci set), two passes: direct light + sky, then
+  one more bounce through pass 1's volume. Probes that mostly see back faces are inside solid
+  geometry and take their neighbours' values. RGB9E5, ≈ 0.7–1 MB per volume.
+- Each job reloads the session in its layout and time (clear weather), waits 30 frames, gathers on
+  the main thread and traces on a background thread (the window keeps running; edits wait).
+- **Measured on the Iris Xe laptop (dev build):** Toy Town 40 k probes, 0.78 M triangles: 8.6 s per
+  volume; Backyard Bash 29 k probes: 9–10 s; all 8 volumes of a track ≈ 1.5 min with reloads.
 
-**Files:** `assets/data/lighting/<track>/<normal|mirror>_<time>.irv`, a raw header (dims, bounds)
-plus RGB9E5 texels. It is read by rc_render into an `Image`, so no ktx2 feature is needed. At 2 u
-spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 MB per track.
-
-**Runtime (rc_render):**
-- If the file exists, spawn the `LightProbe + IrradianceVolume` scaled to its bounds.
-- Weather scales `intensity` by the look's sky/key factor (Cloudy, Rain, Storm, Fog).
-- Lightning and headlights stay real-time only.
-- With no file, lighting is the same as today, so tracks can be baked one at a time.
+**Look (before/after screenshots, `target/agent-data/gi/`):** indoors the overall level matches
+the environment map (units check out) and gains contact occlusion (shelf undersides) and colour
+bleeding (the orange track warms the ceiling; lamp pools glow on the ceiling at night). Outdoors
+shaded surfaces facing away from the open sky (the garden fence) get **darker**: the environment
+map's art-boosted sky fill (≈ 3× physical, so shade reads) used to reach every surface unoccluded.
+**Open (art):** accept, or add a per-environment `baked_light_scale`; the shipped tracks are not
+baked yet (≈ 40 MB compressed for all seven, no LFS in this repo).
 
 ## Phases
 | Phase | Delivers | Done when |
@@ -140,7 +144,7 @@ spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 
 | P1 Shell | shared app assembly, `rc_editor` binary, editor bundle, editing session + fly cam, overrides, open/save, F5/Esc | open Toy Town, save with no edits → identical file except comments; drive and return |
 | P2 Tools | everything in "Editing scope", undo, lints, `rc_editor new`, `label`, catalog entry | build a new track from scratch and race it in the game |
 | P3 Migration (done) | corridor lint; every track moved off `plan.py`; labels | no script writes a track without `--layout`; no lints; CI green |
-| P4 Bake | baker, `.irv` loader, weather scaling | Sofa Circuit baked; visible occlusion under furniture; bench within budget on the 3070 **and** runs on the Iris Xe |
+| P4 Bake (done) | baker, `.irv` loader, weather scaling | Toy Town and Backyard Bash baked in a scratch copy; occlusion and bleeding visible; runs on the Iris Xe. Not yet: shipped volumes, a 3070 bench run |
 
 ## Risks / to verify first
 - ~~A session with zero racers~~ — not needed: editing holds `RacePhase::Setup`, where no attempt
@@ -148,9 +152,6 @@ spacing Aisle Rush is about 104×6×85 probes, ≈ 1.3 MB per volume and ≈ 10 
 - ~~Two bundles~~ — not needed: `bevy-react build` has a fixed entry; one bundle serves both.
 - **A load failure** (a missing model, not the layout: that is built before it is accepted)
   stops the editor from restarting the session until the document changes; the error shows.
-- **Bake time:** ~50 k probes × 6 views. Bevy renders shadow cascades per view, so measure on one
-  track before committing to 2 u spacing. The budget is ≤ 10 min per track (8 volumes) on the
-  3070.
-- **The Iris Xe path:** a single irradiance volume without binding arrays has not been tried there
-  (see upstream-notes U7).
-- **Repo size:** ≈ 10 MB of volumes per track.
+- ~~Bake time~~ — ≈ 10 s per volume on the Iris Xe (CPU tracing).
+- ~~The Iris Xe path~~ — a single volume without binding arrays renders there (P4a test).
+- **Repo size:** ≈ 6–8 MB of volumes per track (≈ 75 % after git's compression).

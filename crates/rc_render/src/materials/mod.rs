@@ -14,7 +14,6 @@ mod surface;
 use std::collections::HashMap;
 use std::path::Path;
 
-use bevy::asset::RenderAssetUsages;
 use bevy::image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::math::Affine2;
 use bevy::mesh::VertexAttributeValues;
@@ -467,7 +466,7 @@ fn load_image(server: &AssetServer, path: String, srgb: bool) -> Handle<Image> {
         .with_settings(move |s: &mut ImageLoaderSettings| {
             s.is_srgb = srgb;
             // GPU only: nothing samples the sets on the CPU (≈ 250 MB of main-world copies, Q21).
-            s.asset_usage = RenderAssetUsages::RENDER_WORLD;
+            s.asset_usage = crate::content::asset_usage();
             s.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
                 address_mode_u: ImageAddressMode::Repeat,
                 address_mode_v: ImageAddressMode::Repeat,

@@ -34,7 +34,9 @@ use rc_core::prelude::*;
 
 pub use capture::Overhead;
 pub use cars::{CarModel, CarModelReady};
-pub use content::ContentVisualsPlugin;
+pub use content::{ContentVisualsPlugin, keep_cpu_copies};
+pub use lighting::environment_radiance;
+pub use lighting::gi::{FACES, IrradianceGrid, LIGHTING_DIR, rgb9e5, volume_file};
 pub use lighting::{
     ActiveEnvironment, ENVIRONMENTS_DIR, EnvironmentDef, LUMEN_SCALE, LampGrid, PipelineQueue,
     RoomDef, SHOWROOM_ENV, TimeLook, WindowDef, WindowWall, lamp_lumens,

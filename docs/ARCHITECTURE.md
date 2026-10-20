@@ -521,7 +521,8 @@ wetness/snow accumulation and drying; wind gusts; lightning → `WeatherEvent`. 
   bloom, SSAO, AA, motion blur, distance fog; volumetric fog only at Ultra in single view) and
   shadow/cascade config. No SSR. Display mode windowed/borderless, vsync, window size.
 - **Lighting & sky:** per environment (`assets/data/environments/<env>.ron`) and `TimeOfDay`: sun
-  + atmosphere (outdoor), window light + lamps/work lights (indoor), environment light probes;
+  + atmosphere (outdoor), window light + lamps/work lights (indoor), environment light probes,
+  and a baked irradiance volume for the session's layout and time when one exists (`gi.rs`);
   blends from `WeatherState` (cloudiness, fog, lightning, wetness: darker & glossier ground,
   outside-only weather through windows). Headlights (shadowless spots) on local players' cars at
   Night.
@@ -642,6 +643,7 @@ telemetry & contacts → race → weather → (FixedLast) pose snapshots`; then 
 | `assets/data/tracks/<track>.ron` | track designers | layout, surfaces, ground areas, props, items, features with `dir` |
 | `assets/data/environments/<env>.ron` | render | lighting/sky per time of day, materials, ambience ids, windows |
 | `assets/data/props/<env>.ron` (+ `common.ron`) | track (format) + environment designers (content) | prop kind → model path, collider primitives, mass, surface, light attachments; all files merged, duplicate kinds rejected |
+| `assets/data/lighting/<track>/<normal\|mirror>_<time>.irv` | the track editor's light baker (format: rc_render `gi.rs`) | baked irradiance volume of a layout at a time of day; optional (no file = environment-map lighting) |
 | `assets/data/items.ron` | items | odds table, item tuning |
 | `assets/data/ai.ron` | ai | difficulty profiles, personalities |
 | `assets/models/cars/<car>.glb` + `<car>.wheels.ron` | art | model (nodes `body`, `wheel_fl/fr/rl/rr`; materials `paint`, `paint_accent`, `light_head`, `light_tail`, `light_brake`) + wheel metadata |

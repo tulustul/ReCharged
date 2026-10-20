@@ -17,6 +17,8 @@
 //!
 //! Design and plan: `docs/design/rc_editor.md`. Run it: `cargo run -p rc_editor -- <track>`.
 
+pub mod bake;
+mod baking;
 pub mod catalog;
 pub mod doc;
 pub mod fields;
@@ -42,6 +44,11 @@ pub use rc_ui::editor::{
 pub use crate::doc::Doc;
 use crate::doc::{LAYERS, validate};
 pub use crate::view::EditorViewPlugin;
+
+/// `--bake`: bake every volume once the editing session is up, then quit.
+pub fn bake_on_start(app: &mut App) {
+    app.insert_resource(baking::BakeOnStart);
+}
 
 /// Undo steps kept.
 const UNDO_DEPTH: usize = 200;
@@ -128,6 +135,7 @@ impl Plugin for EditorPlugin {
             wanted: 0,
             built: 0,
             sent: false,
+            bake: None,
         })
         .init_resource::<EditorStatus>()
         .init_resource::<view::ViewFocus>()
@@ -158,6 +166,8 @@ impl Plugin for EditorPlugin {
             (
                 keys,
                 commands,
+                baking::bake_on_start.run_if(resource_exists::<baking::BakeOnStart>),
+                baking::run.run_if(|editor: Res<Editor>| editor.bake.is_some()),
                 reload,
                 note_failures,
                 sync_draft,
@@ -206,6 +216,8 @@ pub(crate) struct Editor {
     built: u32,
     /// A start or reload command is on its way.
     sent: bool,
+    /// A bake queue is running (editing waits).
+    bake: Option<baking::BakeRun>,
 }
 
 impl Editor {
@@ -215,6 +227,10 @@ impl Editor {
         &mut self,
         edit: impl FnOnce(&mut Doc, &mut Option<EditorItem>) -> Result<(), String>,
     ) {
+        if self.bake.is_some() {
+            self.error = Some("baking: editing waits until it is done".into());
+            return;
+        }
         let mut doc = self.doc.clone();
         let mut selection = self.selection;
         let result = edit(&mut doc, &mut selection).and_then(|()| {
@@ -274,8 +290,59 @@ impl Editor {
         self.selection = item.filter(|i| self.doc.exists(*i));
     }
 
+    /// Starts baking (see [`EditorCommand::Bake`]); `exit` quits when done.
+    pub(crate) fn start_bake(&mut self, all: bool, exit: bool) {
+        if self.bake.is_some() || self.mode != Mode::Editing {
+            return;
+        }
+        let time = fields::parse(&self.options.time).unwrap_or(TimeOfDay::Noon);
+        let run = baking::BakeRun::new(&self.doc.info.allowed_times, time, all, exit);
+        info!(
+            "editor: baking ({})",
+            if all {
+                "every time, both layouts"
+            } else {
+                "this time"
+            }
+        );
+        self.bake = Some(run);
+        self.error = None;
+        self.wanted += 1;
+    }
+
+    /// The next bake job's session (or, after the last, the editing one) should load.
+    pub(crate) fn bake_next(&mut self) {
+        self.wanted += 1;
+    }
+
+    pub(crate) fn bake_done(&mut self) {
+        self.wanted += 1;
+    }
+
+    /// The running session is built from the current document and options.
+    pub(crate) fn session_current(&self) -> bool {
+        self.built == self.wanted && !self.sent
+    }
+
+    pub(crate) fn set_error(&mut self, error: String) {
+        self.error = Some(error);
+    }
+
     /// The layout and look the session should run.
     fn pick(&self) -> TrackPick {
+        if let Some(job) = self.bake.as_ref().and_then(baking::BakeRun::current) {
+            return TrackPick {
+                variant: TrackVariant {
+                    track: self.track.clone(),
+                    reverse: false,
+                    mirror: job.mirror,
+                },
+                ai: Some(0),
+                time: Some(job.time),
+                weather: Some(WeatherChoice::Fixed(WeatherKind::Clear)),
+                ..default()
+            };
+        }
         let driving = self.mode == Mode::Driving;
         TrackPick {
             variant: TrackVariant {
@@ -388,7 +455,11 @@ fn commands(
 ) {
     for Cmd(command) in commands.read() {
         let selection = editor.selection;
+        if editor.bake.is_some() {
+            continue; // baking: the session is the baker's
+        }
         match command {
+            EditorCommand::Bake { all } => editor.start_bake(*all, false),
             EditorCommand::Save => match save(&session.paths.assets_dir, &editor) {
                 Ok((path, catalog_text)) => {
                     info!("editor: saved {}", path.display());
@@ -617,6 +688,7 @@ fn push_status(
         dirty: editor.doc != editor.saved,
         driving: editor.mode == Mode::Driving,
         loading: editor.built != editor.wanted || *state.get() != AppState::InRace,
+        baking: editor.bake.as_ref().map(|b| b.status.clone()),
         error: editor.failed.clone().or_else(|| editor.error.clone()),
         lints,
         can_undo: !editor.undo.is_empty(),
@@ -666,6 +738,7 @@ mod tests {
             wanted: 0,
             built: 0,
             sent: false,
+            bake: None,
         };
         let (path, catalog_text) = save(&assets, &editor).unwrap();
         assert_eq!(TrackDef::load(&assets, "test_oval").unwrap(), doc.def);

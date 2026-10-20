@@ -138,7 +138,11 @@ export type EditorCommand = { "kind": "save" } | { "kind": "drive" } | { "kind":
 /**
  * What.
  */
-what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "toggleLayer", 
+what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "bake", 
+/**
+ * Every allowed time, forward and mirrored.
+ */
+all: boolean, } | { "kind": "toggleLayer", 
 /**
  * Layer name (see [`EditorStatus::layers`]).
  */
@@ -237,6 +241,10 @@ driving: boolean,
  * A session (re)load is pending or running.
  */
 loading: boolean, 
+/**
+ * Baking progress ("Baking Noon · mirror (5/8): 42 %"); editing waits meanwhile.
+ */
+baking: string | null, 
 /**
  * The last failure (an edit that would not build, load, save), if any.
  */

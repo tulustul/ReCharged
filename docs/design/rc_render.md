@@ -142,6 +142,18 @@ physical sky fill (`env_light` 15–32 k) so shade under trees, fences and parke
   the coat normal to the geometric normal (warns if Bevy's source changes). `ponytail:` remove when
   Bevy fixes it upstream.
 
+## Baked indirect light (`lighting/gi.rs`, tested)
+If `assets/data/lighting/<track>/<normal|mirror>_<time>.irv` exists (reverse layouts use the
+forward file), the session gets one `LightProbe + IrradianceVolume` over its bounds: inside it,
+Bevy takes *diffuse* indirect light from the volume instead of the camera's environment map (whose
+specular stays); without a file nothing changes. Values are irradiance / π (cd/m²-like, they
+multiply the diffuse colour directly); `Look::env_light / clear env_light` scales them with the
+weather. Binding arrays are off (upstream U7), so Bevy uses one volume per view — one per session
+is all there is. Verified on the Iris Xe (Mesa): no hang, faces where the shader samples them
+(rows `[0, y)` = +axis normals, `[y, 2y)` = −axis — `bevy_pbr`'s module docs say the opposite;
+the shader wins). The editor bakes the files; `keep_cpu_copies()` (editor only) keeps rc_render's
+meshes, materials and textures on the CPU for it.
+
 ## Weather (`weather_fx.rs`, tested)
 `overcast = smoothstep(0.15, 1, cloudiness)`: sun × (1 − 0.9·overcast), exposure −1.6·overcast EV,
 sky IBL × (1 − 0.35·overcast) + grey flat ambient, greyer fog, saturation −22 %. Every look keeps
