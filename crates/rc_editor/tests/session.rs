@@ -1,7 +1,7 @@
 //! The editing session on the real sim and flow: editing holds the race in Setup with no cars,
 //! a test drive runs the race, ending it returns to Setup without reloading, accepted edits
 //! update the session in place (only reload-list fields reload), rejected ones change nothing,
-//! undo restores; library assets are placed, armed and swapped.
+//! undo restores; library assets are placed, armed and swapped; lighting edits too.
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
@@ -9,8 +9,10 @@ use rc_editor::{
     EditorAsset, EditorCommand, EditorCommandMsg, EditorItem, EditorLibrary, EditorPlace,
     EditorPlugin, EditorSelect, EditorSet, EditorStatus,
 };
+use rc_render::EnvironmentDraft;
 use rc_testkit::*;
 use rc_track::{Track, TrackDraft};
+use rc_ui::content::UiTimeOfDay;
 use rc_ui::editor::FieldValue;
 
 fn editor_app(name: &str) -> App {
@@ -101,6 +103,7 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
     let length_before = length(&app);
     let moved = before + Vec3::X * 0.5;
     app.world_mut().trigger(EditorSet {
+        item: None,
         key: "pos".into(),
         value: Some(FieldValue::Vector {
             value: moved.to_array().to_vec(),
@@ -127,6 +130,7 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
     assert_eq!(status.selection.as_ref().map(|s| s.item), Some(point));
 
     app.world_mut().trigger(EditorSet {
+        item: None,
         key: "width".into(),
         value: Some(FieldValue::Number { value: 1.0 }),
     });
@@ -156,6 +160,7 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
         item: Some(EditorItem::Track),
     });
     app.world_mut().trigger(EditorSet {
+        item: None,
         key: "indoor".into(),
         value: Some(FieldValue::Toggle { value: true }),
     });
@@ -216,4 +221,68 @@ fn library_assets_are_placed_selected_and_swapped_in_place() {
     let prop = &app.world().resource::<TrackDraft>().def.props[props];
     assert_eq!((prop.kind.as_str(), prop.pos), ("tyre_stack", at));
     assert!(in_race_setup(app.world()));
+}
+
+/// A placed spot light and an exposure set through the Lighting tab's look reach the session's
+/// environment draft in place; undo takes both back; `practicals` is on the reload list.
+#[test]
+fn lighting_edits_apply_in_place_and_undo() {
+    let mut app = editor_app("light");
+    step_until(&mut app, "the editing session", in_race_setup);
+    let env = |app: &App| app.world().resource::<EnvironmentDraft>().def.clone();
+    let before = env(&app);
+    app.world_mut().trigger(EditorPlace {
+        asset: EditorAsset::Light { spot: true },
+        at: Some([3.0, 0.0, -4.0]),
+    });
+    step(&mut app, 2);
+    assert!(in_race_setup(app.world()), "placed in place");
+    let light = EditorItem::Light {
+        index: before.lights.len() as u32,
+    };
+    let status = app.world().resource::<EditorStatus>();
+    assert_eq!(status.selection.as_ref().map(|s| s.item), Some(light));
+    assert_eq!(env(&app).lights.len(), before.lights.len() + 1);
+
+    let look = EditorItem::Look {
+        time: UiTimeOfDay::Noon,
+    };
+    let set = |key: &str, value: f32| EditorSet {
+        item: Some(look),
+        key: key.into(),
+        value: Some(FieldValue::Number { value }),
+    };
+    app.world_mut().trigger(set("exposure", 11.0));
+    step(&mut app, 2);
+    assert!(in_race_setup(app.world()), "no reload");
+    assert_eq!(env(&app).noon.exposure, 11.0);
+    let status = app.world().resource::<EditorStatus>();
+    let shown = status.look.as_ref().expect("the Lighting tab's look");
+    assert!(shown.title.contains("Noon"), "{}", shown.title);
+    assert_eq!(
+        status.selection.as_ref().map(|s| s.item),
+        Some(light),
+        "the look is set without selecting it"
+    );
+    app.world_mut().trigger(set("exposure", 99.0));
+    step(&mut app, 1);
+    assert!(
+        app.world().resource::<EditorStatus>().error.is_some(),
+        "out of range"
+    );
+
+    for _ in 0..2 {
+        app.world_mut().trigger(EditorCommandMsg {
+            command: EditorCommand::Undo,
+        });
+        step(&mut app, 2);
+    }
+    assert!(in_race_setup(app.world()));
+    assert_eq!(env(&app), before);
+    assert!(!app.world().resource::<EditorStatus>().dirty);
+
+    app.world_mut().trigger(set("practicals", 0.5));
+    step(&mut app, 2);
+    assert!(app.world().resource::<EditorStatus>().loading, "reloading");
+    step_until(&mut app, "the reloaded session", in_race_setup);
 }

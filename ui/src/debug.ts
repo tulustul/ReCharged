@@ -2,10 +2,11 @@
 // `go <route> [mode]` jumps to a screen, `demo <scene>` fills the stores with sample data for
 // screens whose data only exists after real races (`demo hud …`: the race HUD, see `hud/demo.ts`),
 // `tab <id>` is handled by tabbed screens, `editor <command>` / `editor select <kind> <index>` /
-// `editor tab <tab>` / `editor move x y z` / `editor place <asset> [x y z]` … drive the track editor.
+// `editor tab <tab>` / `editor move x y z` / `editor place <asset> [x y z]` / `editor set …` drive
+// the track editor.
 // Navigation is scripted through the real input path (`--input-script`,
 // `docs/design/automation.md`).
-import { bevy, type AppStatus, type EditorAsset, type EditorCommand, type EditorGizmo, type EditorItem, type EditorTab, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
+import { bevy, type AppStatus, type EditorAsset, type EditorCommand, type EditorGizmo, type EditorItem, type EditorTab, type FieldValue, type UiCupStandings, type UiResults, type UiVersusScore } from "./bevy";
 import { libraryQuery } from "./editor/search";
 import { useDebug } from "./hooks";
 import { demoHud, endHudDemo } from "./hud/demo";
@@ -13,7 +14,7 @@ import { resetTo, type Route } from "./nav/routes";
 import { draft, type MenuMode } from "./state/draft";
 import { lobbyChoices } from "./state/lobby";
 import { openDialog, pushToast } from "./state/overlays";
-import { appState, catalog, demoMode, loadingProgress, lobby, profile, session } from "./state/stores";
+import { appState, catalog, demoMode, editor, loadingProgress, lobby, profile, session } from "./state/stores";
 
 const RIVALS = ["Dash", "Mayhem", "Penny", "Turbo Tom", "Glitch", "Rusty", "Nova"];
 const COLORS: [number, number, number][] = [
@@ -122,14 +123,32 @@ export function useDebugRoutes() {
     // `editor select point 3`, `editor tab lighting`, `editor lookAt x y z tx ty tz`,
     // `editor gizmo rotate`, `editor move|rotate|scale x y z [hold]` (a gizmo drag of the
     // selection: hold = live, uncommitted), `editor topView`, `editor drive` (simple commands
-    // by kind).
+    // by kind), `editor select sun noon` (sun, fill and look name their time), `editor set look
+    // noon exposure 11` / `editor set sel color 1 0.5 0` (a field of a time's look or of the
+    // selection: one number, three, or on/off), `editor option time Night`.
     const [verb, kind, index] = arg.split(" ");
     const n = arg.split(" ").slice(1).map(Number);
     const v: [number, number, number] = [n[0], n[1], n[2]];
     const hold = arg.endsWith(" hold");
     const none: [number, number, number] = [0, 0, 0];
     const one: [number, number, number] = [1, 1, 1];
-    if (verb === "select") bevy.editor.select({ item: { kind, index: Number(index) } as EditorItem });
+    const timed = kind === "sun" || kind === "fill" || kind === "look";
+    if (verb === "select") bevy.editor.select({ item: (timed ? { kind, time: index } : { kind, index: Number(index) }) as EditorItem });
+    else if (verb === "option") {
+      // `editor option time Night`, `editor option mirror on` (the toolbar's session options).
+      const o = editor.get()?.options;
+      const v = arg.split(" ")[2] ?? "";
+      if (o) bevy.editor.options({ options: { ...o, [kind]: kind === "time" || kind === "weather" ? v : v === "on" } });
+    } else if (verb === "set") {
+      // `editor set look <time> <key> <value…>` or `editor set sel <key> <value…>`.
+      const words = arg.split(" ").slice(2);
+      const item = kind === "look" ? ({ kind, time: words.shift() } as EditorItem) : null;
+      const key = words.shift() ?? "";
+      const nums = words.map(Number);
+      const value: FieldValue =
+        words[0] === "on" || words[0] === "off" ? { type: "toggle", value: words[0] === "on" } : nums.length === 1 ? { type: "number", value: nums[0] } : { type: "vector", value: nums };
+      bevy.editor.set({ item, key, value });
+    }
     else if (verb === "tab") bevy.editor.tab({ tab: kind as EditorTab });
     else if (verb === "lookAt") bevy.editor.command({ command: { kind: "lookAt", from: v, at: [n[3], n[4], n[5]] } });
     else if (verb === "gizmo") bevy.editor.command({ command: { kind: "gizmo", mode: kind as EditorGizmo } });
@@ -139,10 +158,12 @@ export function useDebugRoutes() {
     else if (verb === "search") libraryQuery.set(arg.slice("search ".length));
     else if (verb === "place" || verb === "swap") {
       // `editor place prop toy_bear [x y z]`, `editor place decor models/props/toy/sign.glb …`,
-      // `editor place itemRow …`, `editor swap prop toy_duck`: without a position, place arms.
+      // `editor place itemRow …`, `editor place spot|point|sun|fill …`, `editor swap prop toy_duck`,
+      // `editor swap spot`: without a position, place arms.
       const words = arg.split(" ").slice(1);
       const named = kind === "prop" || kind === "decor";
-      const asset = (kind === "prop" ? { kind, id: words[1] } : kind === "decor" ? { kind, model: words[1] } : { kind }) as EditorAsset;
+      const light = kind === "spot" || kind === "point" ? { kind: "light", spot: kind === "spot" } : null;
+      const asset = (kind === "prop" ? { kind, id: words[1] } : kind === "decor" ? { kind, model: words[1] } : (light ?? { kind })) as EditorAsset;
       const at = words.slice(named ? 2 : 1).map(Number);
       if (verb === "swap") bevy.editor.command({ command: { kind: "swap", asset } });
       else bevy.editor.place({ asset, at: at.length === 3 ? [at[0], at[1], at[2]] : null });

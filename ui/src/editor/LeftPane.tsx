@@ -1,12 +1,15 @@
 // The track editor's left pane: Assets (the asset library, `Library.tsx`), Track (track settings,
-// add jump / ground area / shortcut, lints) and Lighting (probes, bake). The open tab lives in Bevy
-// (`editor.tab`): the Track tab shows the layout handles.
+// add jump / ground area / shortcut, lints) and Lighting (the previewed time's look and the room's
+// lamp grid, probes, bake). The open tab lives in Bevy (`editor.tab`): the Track tab shows the
+// layout handles.
+import { useState } from "react";
+
 import type { EditorAdd, EditorStatus, EditorTab } from "../bevy";
 import { bevy } from "../bevy";
 import { editorStrings as words } from "../strings/editor";
 import { text } from "../theme/styles";
 import { color, space } from "../theme/tokens";
-import { command, panel, select, Tool } from "./controls";
+import { command, Field, panel, select, Tool } from "./controls";
 import { Library } from "./Library";
 
 const TABS: EditorTab[] = ["assets", "track", "lighting"];
@@ -57,9 +60,27 @@ function Track({ status }: { status: EditorStatus }) {
 
 function Lighting({ status }: { status: EditorStatus }) {
   const baking = status.baking !== null;
+  const [active, setActive] = useState<string | null>(null);
+  const look = status.look;
   return (
     <>
       <text style={text.label}>{words.previewing(status.options.time)}</text>
+      <text style={text.small}>{words.lightingHint}</text>
+      {look !== null && (
+        <>
+          <Header label={look.title} />
+          {look.fields.map((f) => (
+            <Field
+              key={`look.${f.key}`}
+              field={f}
+              active={active === f.key}
+              onActivate={(open) => setActive(open ? f.key : null)}
+              onSet={(value) => bevy.editor.set({ item: look.item, key: f.key, value })}
+            />
+          ))}
+        </>
+      )}
+      <Header label={words.bakeHeader} />
       <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.s }}>
         <Tool label={words.probes(status.probes)} hot={status.probes === false} onPress={() => command({ kind: "toggleProbes" })} disabled={status.probes === null} />
         <Tool label={words.bake} onPress={() => command({ kind: "bake", all: false })} disabled={baking} />

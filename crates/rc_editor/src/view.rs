@@ -7,8 +7,9 @@
 //! cursor (or clears the selection); with Ctrl in the Track tab, a press on the road inserts a
 //! control point there. Models are hit with `MeshRayCast` against meshes under a `PropSource` /
 //! `DecorSource` (the road and ground carry none); items without a mesh in the editing session
-//! (item rows, the battery, the Track tab's points and vertices, reverse-only props and decor,
-//! dimmed) are screen-sized markers picked in screen space. A model wins over a marker only when
+//! (item rows, the battery, lights, the sun and fill floating above the map along their direction,
+//! the Track tab's points and vertices; reverse-only props and decor and lights off at the
+//! previewed time dimmed) are screen-sized markers picked in screen space. A model wins over a marker only when
 //! the marker is farther away. Right drag looks around; WASD move, Q/E down/up, Shift faster.
 
 use bevy::input::mouse::AccumulatedMouseMotion;
@@ -58,6 +59,9 @@ const PROP: Color = Color::srgb(0.95, 0.95, 0.95);
 const ROW: Color = Color::srgb(0.4, 0.6, 1.0);
 const BATTERY: Color = Color::srgb(1.0, 0.82, 0.3);
 const DECOR: Color = Color::srgb(0.9, 0.3, 0.9);
+const LIGHT: Color = Color::srgb(1.0, 0.7, 0.35);
+const SUN: Color = Color::srgb(1.0, 0.95, 0.5);
+const FILL: Color = Color::srgb(0.55, 0.75, 1.0);
 const SELECTED: Color = Color::srgb(0.95, 0.88, 0.06);
 const HOVERED: Color = Color::WHITE;
 const START: Color = Color::WHITE;
@@ -71,6 +75,7 @@ impl Plugin for EditorViewPlugin {
             .init_resource::<Hover>()
             .init_resource::<crate::placement::Ghost>()
             .init_resource::<DragPreview>()
+            .init_resource::<rc_render::EnvPreview>()
             .init_resource::<crate::live::PreviewBuild>()
             .add_systems(Startup, gizmo_look)
             .add_systems(Update, cutaway.run_if(in_state(AppState::InRace)))
@@ -319,7 +324,7 @@ pub(crate) fn pointer(
         }
         return;
     }
-    let target = pick(&editor.doc, editor.tab, &eye, &mut scene, ray, cursor);
+    let target = pick(&editor, &eye, &mut scene, ray, cursor);
     hover.set_if_neq(Hover(target));
     if !press {
         return;
@@ -345,14 +350,14 @@ pub(crate) fn pointer(
 
 /// The marker or model under the cursor.
 fn pick(
-    doc: &Doc,
-    tab: EditorTab,
+    editor: &Editor,
     eye: &Eye,
     scene: &mut Scene,
     ray: Ray3d,
     cursor: Vec2,
 ) -> Option<EditorItem> {
-    let marker = (doc.markers(tab == EditorTab::Track).into_iter())
+    let layout = editor.tab == EditorTab::Track;
+    let marker = (editor.doc.markers(layout, editor.time()).into_iter())
         .filter_map(|(item, pos, _)| {
             let px = eye
                 .camera
@@ -458,6 +463,9 @@ fn color(item: EditorItem) -> Color {
         EditorItem::Prop { .. } => PROP,
         EditorItem::Battery => BATTERY,
         EditorItem::Decor { .. } => DECOR,
+        EditorItem::Light { .. } => LIGHT,
+        EditorItem::Sun { .. } => SUN,
+        EditorItem::Fill { .. } | EditorItem::Look { .. } => FILL,
         EditorItem::Track | EditorItem::Gap { .. } => GAP,
     }
 }
@@ -481,7 +489,8 @@ fn draw(
     let Ok((camera, at)) = cameras.single() else {
         return;
     };
-    for (item, pos, dim) in doc.markers(layout) {
+    draw_aims(doc, editor.time(), &mut gizmos);
+    for (item, pos, dim) in doc.markers(layout, editor.time()) {
         let mut size = at.translation().distance(pos) * MARKER_PER_U;
         let color = if selected == Some(item) {
             size *= SELECTED_GROWTH;
@@ -506,6 +515,31 @@ fn draw(
         gizmos.line(pos, pos + Vec3::Y * size * 12.0, SELECTED);
     }
     gizmo::draw(&editor, &gizmo, &Eye { camera, at }, &mut gizmos);
+}
+
+/// Where the lights shine: a line from each spot to its target, and from the sun and fill (of
+/// `time`) toward the map's middle.
+fn draw_aims(doc: &Doc, time: TimeOfDay, gizmos: &mut Gizmos) {
+    for l in &doc.env.lights {
+        if let Some(t) = l.target {
+            gizmos.line(
+                Vec3::from_array(l.pos),
+                Vec3::from_array(t),
+                LIGHT.with_alpha(0.6),
+            );
+        }
+    }
+    let (middle, reach) = doc.sky_anchor();
+    for (item, pos, _) in doc.light_markers(time) {
+        if !matches!(item, EditorItem::Light { .. }) {
+            let toward_middle = (middle - pos).normalize_or_zero();
+            gizmos.line(
+                pos,
+                pos + toward_middle * reach * 0.3,
+                color(item).with_alpha(0.6),
+            );
+        }
+    }
 }
 
 /// The control polygon, the start, gaps, ground outlines and shortcuts (the Track tab).

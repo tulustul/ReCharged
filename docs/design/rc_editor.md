@@ -3,7 +3,8 @@
 A separate executable for creating and editing tracks, test driving them, and baking their indirect
 lighting. Status: **P1–P4 done** (open/create, edit everything, undo, test drive, save; every track
 editor-owned; irradiance bake). **v2 (P5–P10) designed; P5 (layout), P6 (select & gizmo),
-P7 (incremental rebuilds) and P8 (asset library) done** (§Editor v2): lighting editing to come.
+P7 (incremental rebuilds), P8 (asset library) and P9 (lighting) done** (§Editor v2): settings
+(P10) to come.
 Only Toy Town is baked so far (§Irradiance bake).
 
 ```sh
@@ -39,9 +40,11 @@ overrides; v2 reads settings from the game instead, D10). Automation as in the g
 `editor move|rotate|scale x y z [hold]` (a gizmo drag of the selection by a translation, a
 (pitch, yaw, roll) turn in degrees or per-axis factors; `hold` leaves it live and uncommitted, so
 the preview can be screenshotted), `editor place <prop id | decor path | itemRow | battery>
-[x y z]` (with a position: placed there; without: placement mode armed), `editor swap <asset>`
-and `editor search <text>` (the Assets tab's search) drives the editor through the real React
-channel.
+[x y z]` (with a position: placed there; without: placement mode armed; P9 assets: `point`,
+`spot`, `sun`, `fill`), `editor swap <asset>`, `editor search <text>` (the Assets tab's search),
+`editor select sun|fill|look <time>`, `editor set look <time> <key> <value…>` / `editor set sel
+<key> <value…>` (one number, three, or on/off) and `editor option time|weather|reverse|mirror
+<value>` (the toolbar's options) drives the editor through the real React channel.
 
 ## Decisions
 | # | Decision | Consequence |
@@ -65,6 +68,8 @@ crates/rc_editor   lib.rs   EditorPlugin: Editor state, edit/undo pipeline, sess
                    fields.rs the right pane: one slot list per item serves reading and setting
                    catalog.rs rewrites the track's entry in catalog.ron (the rest of the file untouched)
                    library.rs v2: the asset library (prop kinds, decor models, lights, gameplay items)
+                   lights.rs P9: lights, sun, fill and time looks in the document (poses, markers, slots)
+                   save.rs  Ctrl+S: track, decor, environment and catalog files (tmp + rename)
                    view.rs  EditorViewPlugin: fly camera, mesh picking, markers, focus point, cutaway
                    tint.rs  hover/selection tint (per-mesh material clones)
                    gizmo.rs the transform gizmo (move / rotate / scale, world / local, snap), DragPreview
@@ -442,6 +447,69 @@ under `--user-data-dir`, `<dir>/settings.ron` — an automation dir, harmless). 
   test, `editor.place`/swap a session test, and the ghost/placement/swap were screenshotted via
   the verbs. Screenshots: `target/agent-data/p8/`.
 
+### P9 as built
+- **Document:** `Doc.env` (`EnvironmentDef`, now `Serialize`; `to_ron` = a depth-limited pretty
+  print: top-level and time-look fields one per line, a light, material, sun or window list on one
+  line, maps sorted, absent options and empty lists left out). Save writes `environment.ron` only
+  when it differs from the last save (*deviation*: an untouched file keeps its comments).
+  `EnvironmentDef::validate` also checks the lamp grid (spacing ≥ 1, range, lumens, spot angle).
+  An environment-only edit skips `Track::build` (it validates the environment: µs, not 80 ms);
+  `live::apply` now commits whenever `applied != commits` (the `Track` is optional) and clears
+  `EnvPreview` with `DragPreview`, in the frame the drafts change.
+- **rc_render** (`lighting/lights.rs`): `EnvironmentDraft { id, def }` is what `OnEnter(Loading)`
+  activates when it is of the track (reloads and bakes keep unsaved lighting); in `InRace` a
+  changed draft is copied into `ActiveEnvironment` only when it differs, and the lights follow by
+  the plan/diff of decor (`plan(def, time, mirror)` → `placement_changes`; kind = cone, colour,
+  lumens, range). `EnvLightSource(i)` on every light. `EnvPreview(Option<EnvDrag>)`:
+  `Light(i, Transform)` moves that light (restored when it moves on), `Sun`/`Fill { elevation,
+  azimuth }` re-pose the key/fill after `apply_lights`. `RoomBuilt` keys on the floor plan and the
+  lamp grid. **Mirror fix:** the plan negates `pos.x` and `target.x` in mirror layouts (game too);
+  sun and fill are not mirrored.
+- **Items** (*deviation*): `Sun`, `Fill` carry their time (`{ time }`), and the Lighting tab's
+  fields are a fourth item, `Look { time }`; the previewed time's are shown, and a selected sun or
+  fill follows a time change. So the `Doc` needs no time, the right pane names the time ("Sun ·
+  Noon") and `editor.set` (now with an optional `item`: `null` = the selection) sets the look
+  without selecting it. `EditorStatus.look` carries the Lighting tab's fields. `Light { index }`
+  indexes `def.lights`; lights off at the previewed time get dimmed markers.
+- **Gizmo:** `Turn::Aim` (spots: move; rotate = two rings, elevation across the beam and heading
+  about +Y; the target swings around the light at its distance, a move carries it along) and
+  `Turn::Sky` (sun, fill: the same two rings in every mode, never a move; a turn sets
+  elevation/azimuth, rounded to 0.01°). Markers: lights orange, sun yellow, fill blue; spots draw
+  a line to their target, sun and fill one toward the map's middle (the control points' box, at
+  its top; markers float 0.8 × its half diagonal, ≥ 20 u, out along their direction).
+- **Library:** a *Lights* group after Gameplay (open): Point light, Spot light (`EditorAsset::Light
+  { spot }`), Sun, Fill. A point hangs 3 u above the drop, a spot 8 u aimed at it (always on).
+  Sun selects the previewed time's sun and turns its azimuth to the drop point's side of the map,
+  keeping its elevation (*interpretation*: aiming "from the drop point" at the floor would put it
+  on the horizon). Fill adds one if missing (70°, 15 % of the sun's lux, sky blue, no shadows).
+  Swap point ↔ spot (Replace / the picker): a new spot aims 5 u straight down, a point drops it.
+  Deleting the sun is refused; the right pane has no Delete for it.
+- **Lighting tab:** "Time of day: …", the look's fields (exposure, ambient (+ colour), env light,
+  fog colour/visibility, grading's seven, bloom, lamps, practicals, cloud colours, window glow)
+  and, indoors, the lamp grid (`lamp_spacing` … `lamp_fixture`), then probes and bake. Room
+  colours are not exposed.
+- **Reload list** (`live::reloads`): + any time's `practicals`, `fixture_materials`,
+  `shadow_distance`, `sky`, and the `lamps` level when there are fixture materials (their emission
+  is set at instancing; without any, the room lamps follow live).
+- **Measured:** an exposure or sun edit validates in ≈ 6 µs (no `Track::build`) and commits in
+  place the next frame (the env map is regenerated once, on the commit). Screenshots `target/agent-data/p9/`: `spot_before/after`,
+  `sun_selected/turned` (52°/120° → 25°/45°, shadows move), `look_before/after` (exposure 9.7 →
+  8.7), `point_placed`, `lamp_grid`, `mirror_dollhouse` / `mirror_castle` (the game's
+  `--track-tour toy_town --mirror --time night`: the display spot lights the mirrored dollhouse).
+- **Done-when** (on a scratch copy of the assets): add a spot, aim it, turn noon's sun, set its
+  exposure, save (the file has them; reopened, they are there), undo all four, save: the
+  environment reads back equal to the original (`EnvironmentDef` ==), track and decor equal
+  apart from comments and number formatting.
+- **Tests:** rc_render `every_environment_file_survives_a_save`,
+  `mirror_layouts_mirror_the_environment_lights`, `planned_lights_keep_their_document_index`,
+  `incremental_light_plans_equal_fresh_ones` (equivalence test (b) for lights); rc_editor
+  `ring_drags_set_the_suns_elevation_and_azimuth`, `the_fill_is_added_and_deleted_the_sun_never_deleted`,
+  `light_items_index_the_document_and_lights_off_now_are_dimmed`, `placing_and_swapping_lights`,
+  `a_spot_moves_with_its_target_and_turns_it_around_itself`, `only_reload_list_fields_reload`,
+  the save test (environment), the session test `lighting_edits_apply_in_place_and_undo`.
+- **Not verified with a real mouse** (as P6/P8): ring drags of the sun and spots by hand; the maths
+  is tested and the verbs were screenshotted.
+
 ## Editing scope (P4)
 | Item | Handles | Inspector |
 |---|---|---|
@@ -533,7 +601,7 @@ an art call. Other times of day and the mirror layout are not baked.
 | P6 Select & gizmo (done) | live drag previews (`DragPreview`, `EnvPreview` once P9 adds lights) applied by rc_track/rc_render, `MeshRayCast` picking, source tags + `PlacedProp::source`, hover/selection tint, markers (incl. dimmed unreachable items), `gizmo.rs` (G/R/C, L, Ctrl snap), Track-tab-only layout handles, Ctrl+press insert, decor rotation/scale data change. Commits still reload (P4 path) | select any object, including `dir: Rev` ones, by clicking it; move/rotate/scale decor, move/yaw props, move points; old decor files still load; a prop or decor drag is real-time (the release still reloads) |
 | P7 Incremental (done) | `TrackPreview` for point drags, track key + per-source diffs, `RoomPiece` rebuild, `TrackSummary` re-insert, no `ChangeTrack` per edit, both equivalence tests | both tests pass; a point drag updates the road visibly while dragging on the Iris Xe; no session reload on any edit outside the reload list |
 | P8 Library (done) | `library.rs`, `editor.library`, categories + search, placement mode with ghost (+ `editor place` verb), swap | build a lap of Toy Town's decor from the library without typing a model path |
-| P9 Lighting | `environment.ron` in the `Doc` (+ `to_ron`, save, undo), `EnvironmentDraft`, light objects + sun/fill markers, Lighting tab's time look, bake-stale flags; mirrored environment lights (game fix) | add a spot light, aim it, change noon's sun and exposure, undo it all, save, reopen: identical |
+| P9 Lighting (done) | `environment.ron` in the `Doc` (+ `to_ron`, save, undo), `EnvironmentDraft`, light objects + sun/fill markers, Lighting tab's time look, bake-stale flags; mirrored environment lights (game fix) | add a spot light, aim it, change noon's sun and exposure, undo it all, save, reopen: identical |
 | P10 Settings | `rc_game::read_settings`, inserted before Boot | the editor renders at the player's preset; the file is untouched after an editor run |
 
 ## Risks / to verify first

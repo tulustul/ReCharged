@@ -353,6 +353,7 @@ Rapier components on the racer are private to rc_vehicle.
 | `RaceResults { entries, ghost: Option<GhostData>, geometry_hash }` | race (on finish) | game, ui |
 | `TrackDraft { id, def: TrackDef, decor }` (editor only: the session builds and draws it instead of the track and decor files) | editor | track, render |
 | `TrackPreview { track, generation }`, `DragPreview` (editor only; defined in rc_track: a dragged control point's road / a dragged prop's or decor's pose) | editor | track, render |
+| `EnvironmentDraft`, `EnvPreview` (editor only; defined in rc_render: the edited environment / a dragged light's, sun's or fill's pose) | editor | render |
 | `TrackSummary { outline_2d, edges_2d, gates_2d, turns: Vec<TrackTurn { start_s, span, right, angle, severity }>, length, checkpoints, geometry_hash }` (also `Track`) | track; the track editor re-inserts both after an in-place edit (editor only) | ui (minimap, turn indicator), game (records) |
 | `WeatherState { kind, time, precipitation, wetness, snow_cover, wind, fog, cloudiness, lightning, outside_only }` | weather | vehicle, render, vfx, audio, ui |
 | `LocalPlayers { slots: Vec<SlotBinding { slot, devices, last_used: DeviceKind }> }` | input | game, ui, camera |

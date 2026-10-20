@@ -1,23 +1,27 @@
 //! # rc_editor — the track editor (BIN layer, above the game)
 //!
-//! - **Responsibilities:** the edited document ([`doc`]: layout + decor) with undo/redo; every
-//!   edit is built in all four variants before it is accepted; the editing session — the game's
-//!   own race session on the track ([`TrackDraft`], so unsaved edits are what loads), held in
+//! - **Responsibilities:** the edited document ([`doc`]: layout + decor + environment) with
+//!   undo/redo; every edit is built in all four variants before it is accepted; the editing
+//!   session — the game's own race session on the track ([`TrackDraft`] and `EnvironmentDraft`,
+//!   so unsaved edits are what loads), held in
 //!   `RacePhase::Setup` (no cars) while editing and updated in place after each edit (reloaded
 //!   only for the reload list, [`live`]); test drives (F5);
-//!   saving the layout and decor files (Ctrl+S); the inspector ([`fields`]); the asset library
-//!   ([`library`]: placing and swapping props, decor and gameplay items); the 3D view
+//!   saving the layout, decor and environment files (Ctrl+S); the inspector ([`fields`]); the
+//!   asset library ([`library`]: placing and swapping props, decor, gameplay items and lights;
+//!   lights, sun, fill and time looks: [`lights`]); the 3D view
 //!   ([`view`]: fly camera, markers, picking, hover/selection tint; [`gizmo`]: the transform
 //!   gizmo); the [`EditorStatus`] React shows.
 //! - **Inputs:** keyboard and mouse, rc_ui's `editor.*` messages, `Track` (lints, projection),
 //!   `Catalog` (name, allowed times and weather), `RaceConfig` (session layout),
 //!   `LoadingFailed`, `UserPaths::assets_dir`.
-//! - **Outputs:** [`TrackDraft`], `DragPreview` and `TrackPreview` (sole writer), the session's
+//! - **Outputs:** [`TrackDraft`], `DragPreview`, `TrackPreview`, `EnvironmentDraft` and
+//!   `EnvPreview` (sole writer), the session's
 //!   `Track` and `TrackSummary` on an in-place commit, [`EditorStatus`] and [`EditorLibrary`]
 //!   (sole writer), a placement ghost while placing,
 //!   `GameCommand`s (start, restart, change track), a `UiNav::Confirm` that skips a test
 //!   drive's intro, the `GameCamera`'s `Transform` while editing, `Overhead` visibility, tint
-//!   materials on the hovered and selected models, gizmos, the track and decor files on save.
+//!   materials on the hovered and selected models, gizmos, the track, decor and environment files
+//!   on save.
 //! - **Must never:** run inside the game binary, write a data file except on an explicit save,
 //!   let a failed write truncate it, or hand the session a layout that does not build.
 //!
@@ -30,12 +34,14 @@ pub mod doc;
 pub mod fields;
 pub mod gizmo;
 pub mod library;
+pub mod lights;
 mod live;
 mod placement;
+mod save;
 mod tint;
 pub mod view;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 use bevy::ecs::system::SystemParam;
@@ -45,10 +51,8 @@ use bevy::text::EditableText;
 use bevy::window::PrimaryWindow;
 use rc_core::prelude::*;
 use rc_game::{GameCommand, RaceRequest, TrackPick};
-use rc_render::{BakedGi, BakedLight, volume_file};
-use rc_track::{
-    DECOR_FILE, PropCatalog, TRACK_FILE, Track, TrackDef, TrackDraft, decor_to_ron, map_dir,
-};
+use rc_render::{BakedGi, BakedLight, EnvironmentDef, EnvironmentDraft, volume_file};
+use rc_track::{PropCatalog, Track, TrackDef, TrackDraft};
 pub use rc_ui::editor::{
     EditorAdd, EditorAsset, EditorCommand, EditorCommandMsg, EditorGizmo, EditorItem,
     EditorLibrary, EditorOptions, EditorPlace, EditorSelect, EditorSelection, EditorSet,
@@ -72,7 +76,7 @@ const UNDO_DEPTH: usize = 200;
 pub struct EditorPlugin {
     /// Track being edited.
     pub track: TrackId,
-    /// Its layout, decor and catalog entry as loaded.
+    /// Its layout, decor, environment and catalog entry as loaded.
     pub doc: Doc,
     /// Prop kinds (validation, the kind list).
     pub props: PropCatalog,
@@ -110,6 +114,7 @@ impl EditorPlugin {
             doc: Doc {
                 def: TrackDef::load(assets_dir, track)?,
                 decor: rc_track::load_decor(assets_dir, track)?,
+                env: EnvironmentDef::load(assets_dir, track)?,
                 info,
             },
             props,
@@ -126,6 +131,10 @@ impl Plugin for EditorPlugin {
             id: self.track.clone(),
             def: doc.def.clone(),
             decor: doc.decor.clone(),
+        })
+        .insert_resource(EnvironmentDraft {
+            id: self.track.clone(),
+            def: doc.env.clone(),
         })
         .insert_resource(Editor {
             track: self.track.clone(),
@@ -281,9 +290,15 @@ impl Editor {
                 return Ok(None);
             }
             let started = Instant::now();
-            let track = validate(&doc, &self.props, &self.track)?;
+            // Only a layout edit needs building (an environment edit leaves the track as it is).
+            let track = (doc.def != self.doc.def)
+                .then(|| validate(&doc, &self.props, &self.track))
+                .transpose()?;
             if doc.info != self.doc.info {
                 catalog::with_entry(&self.catalog_text, &doc.info)?;
+            }
+            if doc.env != self.doc.env {
+                doc.env.validate()?;
             }
             info!("editor: edit validated in {:?}", started.elapsed());
             Ok(Some(track))
@@ -292,7 +307,7 @@ impl Editor {
             Ok(built) => {
                 if let Some(track) = built {
                     let old = std::mem::replace(&mut self.doc, doc);
-                    self.changed(&old, Some(track));
+                    self.changed(&old, track);
                     self.undo.push(old);
                     if self.undo.len() > UNDO_DEPTH {
                         self.undo.remove(0);
@@ -309,14 +324,15 @@ impl Editor {
         }
     }
 
-    /// The document changed from `old` (`track`: its editing variant, if built): reload when a
-    /// reload-list field changed, else commit in place ([`live`]); every volume is stale now.
+    /// The document changed from `old` (`track`: its editing variant, built if the layout
+    /// changed): reload when a reload-list field changed (or a changed layout did not build),
+    /// else commit in place ([`live`]); every volume is stale now.
     fn changed(&mut self, old: &Doc, track: Option<Track>) {
         self.failed = None;
         self.commits += 1;
         let reload = live::reloads(old, &self.doc)
             | live::fall_back(&mut self.options, &self.doc.info)
-            || track.is_none();
+            || (track.is_none() && old.def != self.doc.def);
         if reload {
             self.wanted += 1;
             self.pending = None;
@@ -346,9 +362,13 @@ impl Editor {
             return;
         };
         let old = std::mem::replace(&mut self.doc, doc);
-        let track = Track::build(&self.doc.def, &self.props, &live::editing_variant(self))
-            .inspect_err(|e| warn!("editor: undo/redo: {e}; reloading"))
-            .ok();
+        let track = (old.def != self.doc.def)
+            .then(|| Track::build(&self.doc.def, &self.props, &live::editing_variant(self)))
+            .and_then(|built| {
+                built
+                    .inspect_err(|e| warn!("editor: undo/redo: {e}; reloading"))
+                    .ok()
+            });
         self.changed(&old, track);
         if back {
             self.redo.push(old);
@@ -365,15 +385,20 @@ impl Editor {
 
     /// Adds library `asset` at `at` as one edit and selects it.
     pub(crate) fn place(&mut self, asset: &EditorAsset, at: Vec3) {
-        let props = self.props.clone();
+        let (props, time) = (self.props.clone(), self.time());
         self.edit(|doc, sel| {
-            *sel = Some(doc.place(asset, at, &props)?);
+            *sel = Some(doc.place(asset, at, &props, time)?);
             Ok(())
         });
     }
 
     pub(crate) fn select(&mut self, item: Option<EditorItem>) {
         self.selection = item.filter(|i| self.doc.exists(*i));
+    }
+
+    /// The time of day being previewed (its sun, fill and look are the ones edited).
+    pub(crate) fn time(&self) -> TimeOfDay {
+        fields::parse(&self.options.time).unwrap_or(TimeOfDay::Noon)
     }
 
     /// Starts baking (see [`EditorCommand::Bake`]; `time` overrides the session's time of day for
@@ -578,7 +603,13 @@ fn commands(
                     );
                 }
             }
-            EditorCommand::Save => match save(&session.paths.assets_dir, &editor) {
+            EditorCommand::Save => match save::save(
+                &session.paths.assets_dir,
+                &editor.track,
+                &editor.doc,
+                &editor.saved,
+                &editor.catalog_text,
+            ) {
                 Ok((path, catalog_text)) => {
                     info!("editor: saved {}", path.display());
                     editor.saved = editor.doc.clone();
@@ -708,7 +739,7 @@ fn on_set(msg: On<EditorSet>, track: Option<Res<Track>>, mut editor: ResMut<Edit
     let choices = editor.choices.clone();
     let track = track.as_deref();
     editor.edit(|doc, sel| {
-        let item = sel.ok_or("nothing is selected")?;
+        let item = msg.item.or(*sel).ok_or("nothing is selected")?;
         fields::set_field(doc, item, &msg.key, msg.value.clone(), &choices, track)
     });
 }
@@ -717,38 +748,15 @@ fn on_options(msg: On<EditorSetOptions>, mut editor: ResMut<Editor>) {
     if editor.options != msg.options {
         editor.options = msg.options.clone();
         editor.wanted += 1;
+        // A selected sun or fill is the previewed time's.
+        let time = editor.time().into();
+        let selection = editor.selection.map(|item| match item {
+            EditorItem::Sun { .. } => EditorItem::Sun { time },
+            EditorItem::Fill { .. } => EditorItem::Fill { time },
+            other => other,
+        });
+        editor.select(selection);
     }
-}
-
-/// Writes `<assets>/maps/<id>/track.ron`, `<assets>/maps/<id>/decor.ron` and (if the entry
-/// changed) `catalog.ron` through temporary files, so a failed write never truncates them. What
-/// it writes must parse back. No decor and no decor file: none is created. Returns the track
-/// file and the catalog text now on disk.
-fn save(assets_dir: &Path, editor: &Editor) -> Result<(PathBuf, String), String> {
-    let id = &editor.track;
-    let ron = editor.doc.def.to_ron()?;
-    TrackDef::parse(&ron).map_err(|e| format!("the saved layout would not load: {e}"))?;
-    let header = format!("// Written by the track editor: cargo run -p rc_editor -- {id}\n");
-    let dir = map_dir(assets_dir, id.as_str());
-    let (path, decor_path) = (dir.join(TRACK_FILE), dir.join(DECOR_FILE));
-    write(&path, &format!("{header}{ron}"))?;
-    if !editor.doc.decor.is_empty() || decor_path.exists() {
-        let decor = decor_to_ron(&editor.doc.decor)?;
-        write(&decor_path, &format!("{header}{decor}"))?;
-    }
-    let mut catalog_text = editor.catalog_text.clone();
-    if editor.doc.info != editor.saved.info {
-        catalog_text = catalog::with_entry(&catalog_text, &editor.doc.info)?;
-        write(&assets_dir.join(CATALOG_FILE), &catalog_text)?;
-    }
-    Ok((path, catalog_text))
-}
-
-fn write(path: &Path, text: &str) -> Result<(), String> {
-    let tmp = path.with_extension("ron.tmp");
-    std::fs::write(&tmp, text)
-        .and_then(|()| std::fs::rename(&tmp, path))
-        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn note_failures(mut failed: MessageReader<LoadingFailed>, mut editor: ResMut<Editor>) {
@@ -757,11 +765,21 @@ fn note_failures(mut failed: MessageReader<LoadingFailed>, mut editor: ResMut<Ed
     }
 }
 
-/// The session builds what the editor holds.
-fn sync_draft(editor: Res<Editor>, mut draft: ResMut<TrackDraft>) {
-    if editor.is_changed() && (draft.def != editor.doc.def || draft.decor != editor.doc.decor) {
+/// The session builds what the editor holds (in the frame [`live::apply`] commits it).
+fn sync_draft(
+    editor: Res<Editor>,
+    mut draft: ResMut<TrackDraft>,
+    mut env: ResMut<EnvironmentDraft>,
+) {
+    if !editor.is_changed() {
+        return;
+    }
+    if draft.def != editor.doc.def || draft.decor != editor.doc.decor {
         draft.def = editor.doc.def.clone();
         draft.decor = editor.doc.decor.clone();
+    }
+    if env.def != editor.doc.env {
+        env.def = editor.doc.env.clone();
     }
 }
 
@@ -826,7 +844,7 @@ fn push_status(
         return;
     }
     let info = &editor.doc.info;
-    let selection = editor.selection.and_then(|item| {
+    let shown = |item| {
         let (title, fields) = fields::fields(&editor.doc, item, &editor.choices, track.as_deref())?;
         Some(EditorSelection {
             item,
@@ -834,6 +852,10 @@ fn push_status(
             fields,
             asset: editor.doc.asset(item),
         })
+    };
+    let selection = editor.selection.and_then(shown);
+    let look = shown(EditorItem::Look {
+        time: editor.time().into(),
     });
     let lints = match &track {
         Some(track) => track.lints().to_vec(),
@@ -859,65 +881,6 @@ fn push_status(
         weathers: info.allowed_weather.iter().map(fields::name).collect(),
         tab: editor.tab,
         placing: editor.placing.clone(),
+        look,
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn save_writes_files_that_load_back_and_replace_the_old_ones() {
-        let real = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-        let assets = std::env::temp_dir().join(format!("rc_editor-save-{}", std::process::id()));
-        let dir = map_dir(&assets, "test_oval");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::create_dir_all(assets.join("data")).unwrap();
-        std::fs::write(dir.join(TRACK_FILE), "old").unwrap();
-        let plugin = EditorPlugin::load(&real, "test_oval").unwrap();
-        let mut doc = plugin.doc.clone();
-        doc.def.points[1].pos.x += 0.5;
-        doc.def.points[1].label = Some("start".into());
-        doc.decor = rc_track::load_decor(&real, "toy_town").unwrap();
-        doc.info.name = "Renamed Oval".into();
-        let editor = Editor {
-            track: plugin.track.clone(),
-            props: PropCatalog::default(),
-            choices: fields::Choices::default(),
-            catalog_text: plugin.catalog_text.clone(),
-            saved: plugin.doc.clone(),
-            doc: doc.clone(),
-            undo: Vec::new(),
-            redo: Vec::new(),
-            selection: None,
-            mode: Mode::Editing,
-            options: EditorOptions::default(),
-            tab: EditorTab::default(),
-            error: None,
-            failed: None,
-            wanted: 0,
-            built: 0,
-            sent: false,
-            pending: None,
-            commits: 0,
-            applied: 0,
-            stale: Vec::new(),
-            bake: None,
-            placing: None,
-        };
-        let (path, catalog_text) = save(&assets, &editor).unwrap();
-        assert_eq!(TrackDef::load(&assets, "test_oval").unwrap(), doc.def);
-        assert_eq!(
-            rc_track::load_decor(&assets, "test_oval").unwrap(),
-            doc.decor
-        );
-        let catalog = Catalog::load(&assets).unwrap();
-        assert_eq!(catalog.track(&plugin.track), Some(&doc.info));
-        assert_eq!(
-            std::fs::read_to_string(assets.join(CATALOG_FILE)).unwrap(),
-            catalog_text
-        );
-        assert!(!path.with_extension("ron.tmp").exists());
-        let _ = std::fs::remove_dir_all(&assets);
-    }
 }

@@ -5,6 +5,8 @@
 use bevy::prelude::*;
 use bevy_react::prelude::*;
 
+use crate::content::UiTimeOfDay;
+
 /// Something in the layout the editor can select.
 #[derive(
     serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Copy, PartialEq, Eq, Hash,
@@ -44,6 +46,23 @@ pub enum EditorItem {
     Battery,
     Decor {
         index: u32,
+    },
+    /// An environment point or spot light (index into `EnvironmentDef::lights`).
+    Light {
+        index: u32,
+    },
+    /// The sun (key light) of a time of day's look.
+    Sun {
+        time: UiTimeOfDay,
+    },
+    /// The fill light of a time of day's look (it may have none).
+    Fill {
+        time: UiTimeOfDay,
+    },
+    /// A time of day's look (exposure, fog, grading …) and the room's lamp grid: the Lighting
+    /// tab's fields.
+    Look {
+        time: UiTimeOfDay,
     },
 }
 
@@ -125,6 +144,15 @@ pub enum EditorAsset {
     ItemRow,
     /// The Golden Battery (one per track).
     Battery,
+    /// An environment light: a spot (aimed 5 u below when placed) or a point light.
+    Light {
+        /// A spot light.
+        spot: bool,
+    },
+    /// Selects the previewed time's sun, aimed from where it is placed.
+    Sun,
+    /// The previewed time's fill light (added if it has none).
+    Fill,
 }
 
 /// One entry of the asset library.
@@ -254,6 +282,9 @@ pub struct EditorStatus {
     pub tab: EditorTab,
     /// The library asset placement mode is armed with (the next click in the view adds it).
     pub placing: Option<EditorAsset>,
+    /// The previewed time's look and the room's lamp grid (the Lighting tab; set with
+    /// `editor.set` naming its item).
+    pub look: Option<EditorSelection>,
 }
 
 /// React → Bevy request `editor.snapshot`: the [`EditorStatus`], `null` outside the editor.
@@ -375,11 +406,13 @@ pub struct EditorSelect {
     pub item: Option<EditorItem>,
 }
 
-/// React → Bevy message `editor.set`: set a field of the selection (`null` = unset an optional
-/// field). Rejected (with `error`) when the layout would not build.
+/// React → Bevy message `editor.set`: set a field of the selection, or of `item` (`null` = unset
+/// an optional field). Rejected (with `error`) when the layout would not build.
 #[react_message(name = "editor.set")]
 #[derive(Debug, Clone)]
 pub struct EditorSet {
+    /// The item (`null`: the selection).
+    pub item: Option<EditorItem>,
     /// Field name.
     pub key: String,
     /// New value.

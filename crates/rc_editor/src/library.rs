@@ -1,14 +1,14 @@
 //! The asset library (built once at start, `editor.library`): prop kinds grouped by the
 //! `assets/data/props/<env>.ron` file they come from, decor models from a scan of
-//! `assets/models/props/<env>/`, and the gameplay items; the track's own environment first and
-//! expanded. Also what placing and swapping a library asset does to the document.
-//!
-//! Lights (point, spot, sun, fill) join in P9, with lights in the document.
+//! `assets/models/props/<env>/`, the gameplay items and the lights (point, spot, sun, fill); the
+//! track's own environment first and expanded. Also what placing and swapping a library asset
+//! does to the document (lights: [`crate::lights`]).
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use bevy::math::Vec3;
+use rc_core::prelude::TimeOfDay;
 use rc_track::{DecorItem, Dir, GoldenBatteryDef, ItemRowDef, PropCatalog, PropPlacement};
 use rc_ui::editor::{EditorAsset, EditorItem, EditorLibrary, LibraryEntry, LibraryGroup};
 
@@ -105,24 +105,37 @@ pub fn build(assets_dir: &Path, props: &PropCatalog, environment: &str) -> Edito
     }
     groups.sort_by(|a, b| a.0.cmp(&b.0));
     let mut groups: Vec<LibraryGroup> = groups.into_iter().map(|(_, g)| g).collect();
-    // Gameplay after the track's own groups, open.
+    // Gameplay and lights after the track's own groups, open.
+    let entry = |name: &str, asset| LibraryEntry {
+        name: name.into(),
+        asset,
+    };
+    let fixed = |title: &str, entries| LibraryGroup {
+        title: title.into(),
+        open: true,
+        entries,
+    };
     let at = groups.iter().take_while(|g| g.open).count();
-    groups.insert(
-        at,
-        LibraryGroup {
-            title: "Gameplay".into(),
-            open: true,
-            entries: vec![
-                LibraryEntry {
-                    name: "Item row".into(),
-                    asset: EditorAsset::ItemRow,
-                },
-                LibraryEntry {
-                    name: "Golden Battery".into(),
-                    asset: EditorAsset::Battery,
-                },
-            ],
-        },
+    groups.splice(
+        at..at,
+        [
+            fixed(
+                "Gameplay",
+                vec![
+                    entry("Item row", EditorAsset::ItemRow),
+                    entry("Golden Battery", EditorAsset::Battery),
+                ],
+            ),
+            fixed(
+                "Lights",
+                vec![
+                    entry("Point light", EditorAsset::Light { spot: false }),
+                    entry("Spot light", EditorAsset::Light { spot: true }),
+                    entry("Sun", EditorAsset::Sun),
+                    entry("Fill", EditorAsset::Fill),
+                ],
+            ),
+        ],
     );
     EditorLibrary { groups }
 }
@@ -132,7 +145,7 @@ fn last(len: usize) -> u32 {
 }
 
 impl Doc {
-    /// The library asset `item` shows (props and decor).
+    /// The library asset `item` shows (props, decor and lights: what a swap replaces).
     pub fn asset(&self, item: EditorItem) -> Option<EditorAsset> {
         match item {
             EditorItem::Prop { index } => (self.def.props.get(index as usize))
@@ -142,19 +155,29 @@ impl Doc {
                     model: d.model.clone(),
                 })
             }
+            EditorItem::Light { index } => {
+                (self.env.lights.get(index as usize)).map(|l| EditorAsset::Light {
+                    spot: l.target.is_some(),
+                })
+            }
             _ => None,
         }
     }
 
-    /// Adds `asset` standing at `at` (upright, default size); returns the new item.
+    /// Adds `asset` standing at `at` (upright, default size; the sun and fill are `time`'s);
+    /// returns the new item.
     pub fn place(
         &mut self,
         asset: &EditorAsset,
         at: Vec3,
         props: &PropCatalog,
+        time: TimeOfDay,
     ) -> Result<EditorItem, String> {
         let d = &mut self.def;
         Ok(match asset {
+            EditorAsset::Light { .. } | EditorAsset::Sun | EditorAsset::Fill => {
+                return self.place_light(asset, at, time);
+            }
             EditorAsset::Prop { id } => {
                 if props.get(id).is_none() {
                     return Err(format!("no prop kind \"{id}\""));
@@ -206,7 +229,7 @@ impl Doc {
     }
 
     /// `item` becomes `asset`, keeping everything else (pose, scale, direction): a prop another
-    /// prop kind, a decor item another model.
+    /// prop kind, a decor item another model, a light a spot or point light.
     pub fn swap(
         &mut self,
         item: EditorItem,
@@ -225,11 +248,14 @@ impl Doc {
                 let d = (self.decor.get_mut(index as usize)).ok_or("no such decor item")?;
                 model.clone_into(&mut d.model);
             }
+            (EditorItem::Light { index }, EditorAsset::Light { spot }) => {
+                self.swap_light(index, *spot)?;
+            }
             (EditorItem::Prop { .. }, _) => return Err("a prop swaps only with a prop".into()),
             (EditorItem::Decor { .. }, _) => {
                 return Err("a decor item swaps only with decor".into());
             }
-            _ => return Err("only props and decor can be swapped".into()),
+            _ => return Err("only props, decor and point/spot lights can be swapped".into()),
         }
         Ok(())
     }
@@ -243,6 +269,8 @@ mod tests {
     use rc_track::TrackDef;
 
     use super::*;
+
+    const NOON: TimeOfDay = TimeOfDay::Noon;
 
     fn assets() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets")
@@ -260,14 +288,20 @@ mod tests {
         let library = build(&assets(), &props, "toy_store");
         let titles: Vec<&str> = library.groups.iter().map(|g| g.title.as_str()).collect();
         assert_eq!(
-            titles[..4],
-            ["Props · toy", "Decor · toy", "Gameplay", "Props · common"]
+            titles[..5],
+            [
+                "Props · toy",
+                "Decor · toy",
+                "Gameplay",
+                "Lights",
+                "Props · common"
+            ]
         );
         let open: Vec<bool> = library.groups.iter().map(|g| g.open).collect();
         assert_eq!(
-            open[..4],
-            [true, true, true, false],
-            "only the track's own and gameplay"
+            open[..5],
+            [true, true, true, true, false],
+            "only the track's own, gameplay and lights"
         );
         let entries = |kind: &str| -> usize {
             (library.groups.iter())
@@ -299,6 +333,7 @@ mod tests {
                 scale: Vec3::new(1.0, 2.0, 0.5),
                 dir: Dir::Rev,
             }],
+            env: rc_render::EnvironmentDef::load(&assets(), "test_oval").unwrap(),
             info: TrackInfo::default(),
         }
     }
@@ -350,21 +385,21 @@ mod tests {
         let bear = EditorAsset::Prop {
             id: "toy_bear".into(),
         };
-        let item = doc.place(&bear, at, &props).unwrap();
+        let item = doc.place(&bear, at, &props, NOON).unwrap();
         assert_eq!(doc.asset(item), Some(bear));
         assert_eq!(doc.handle(item), Some(at));
-        let row = doc.place(&EditorAsset::ItemRow, at, &props).unwrap();
+        let row = doc.place(&EditorAsset::ItemRow, at, &props, NOON).unwrap();
         assert_eq!(doc.handle(row), Some(at));
-        let battery = doc.place(&EditorAsset::Battery, at, &props).unwrap();
+        let battery = doc.place(&EditorAsset::Battery, at, &props, NOON).unwrap();
         assert_eq!(doc.handle(battery), Some(at + Vec3::Y * BATTERY_LIFT_U));
         assert!(
-            doc.place(&EditorAsset::Battery, at, &props).is_err(),
+            doc.place(&EditorAsset::Battery, at, &props, NOON).is_err(),
             "one only"
         );
         let decor = EditorAsset::Decor {
             model: "models/props/toy/duck.glb".into(),
         };
-        let item = doc.place(&decor, at, &props).unwrap();
+        let item = doc.place(&decor, at, &props, NOON).unwrap();
         assert_eq!(doc.pose(item).unwrap().0.scale, Vec3::ONE);
     }
 }

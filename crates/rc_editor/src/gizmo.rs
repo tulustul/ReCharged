@@ -1,12 +1,14 @@
 //! The transform gizmo (D7): drawn with `Gizmos` on the selection, its handles picked in screen
 //! space. Move = three arrows + three plane squares; rotate = three rings; scale = three
 //! cube-tipped axes + a centre cube (uniform). Each item shows only what its data stores
-//! ([`Doc::pose`]): props turn about the vertical only, points and rows only move; a mode the
-//! item lacks shows the move gizmo.
+//! ([`Doc::pose`]): props turn about the vertical only, points, rows and point lights only move,
+//! spots move and aim (two rings: elevation across the beam, heading about +Y), the sun and fill
+//! only aim (the same rings, in every mode); a mode the item lacks shows the move gizmo.
 //!
 //! G · R · C pick the mode, L the space (world or the item's own axes; scale is always local).
 //! Ctrl during a drag snaps (0.5 u, 15°, 0.1). A drag writes rc_track's `DragPreview` (props and
-//! decor follow it live; markers and the control polygon are drawn from a copy of the document;
+//! decor follow it live) or rc_render's `EnvPreview` (lights, sun, fill; markers and the control
+//! polygon are drawn from a copy of the document;
 //! layout handles get a `TrackPreview`, [`crate::live`]) and commits one edit on release. The
 //! preview stays until the commit is in the session (in place: the same frame the session's
 //! `Track` is replaced, [`crate::live::apply`]), so the item never flashes back to where it was.
@@ -16,10 +18,12 @@ use bevy::gizmos::transform_gizmo::{
 };
 use bevy::prelude::*;
 use rc_core::prelude::*;
+use rc_render::{EnvDrag, EnvPreview, sun_direction};
 use rc_track::{DragPreview, DragSource};
 use rc_ui::editor::{EditorGizmo, EditorItem, EditorTab};
 
 use crate::doc::{Doc, Pose, Turn};
+use crate::lights::{aim, sky_angles};
 use crate::{Cmd, Editor, EditorCommand, Mode};
 
 /// The gizmo is this fraction of its distance from the camera (constant on screen).
@@ -134,6 +138,10 @@ impl Gizmo {
 
 /// The handles of `mode` for an item that turns `turn` and may scale.
 fn handles(mode: EditorGizmo, turn: Turn, scales: bool) -> Vec<Handle> {
+    let aims = turn == Turn::Sky || (mode == EditorGizmo::Rotate && turn == Turn::Aim);
+    if aims {
+        return vec![Handle::Ring(0), Handle::Ring(1)];
+    }
     match mode {
         EditorGizmo::Rotate if turn == Turn::Yaw => vec![Handle::Ring(1)],
         EditorGizmo::Rotate if turn == Turn::Free => (0..3).map(Handle::Ring).collect(),
@@ -149,11 +157,19 @@ fn handles(mode: EditorGizmo, turn: Turn, scales: bool) -> Vec<Handle> {
     }
 }
 
-/// The axes `handle` works in: scale always the item's, a yaw ring the world's.
+/// The heading of an aimed item: X across its beam (the elevation ring's axis), Y up.
+fn heading(rot: Quat) -> Quat {
+    let d = rot * Vec3::NEG_Z;
+    Quat::from_rotation_y(f32::atan2(-d.x, -d.z))
+}
+
+/// The axes `handle` works in: scale always the item's, a yaw ring the world's, aim rings the
+/// heading's.
 fn frame(handle: Handle, local: bool, turn: Turn, pose: &Pose) -> Quat {
     match handle {
         Handle::Stretch(_) | Handle::Uniform => pose.rot,
         Handle::Ring(_) if turn == Turn::Yaw => Quat::IDENTITY,
+        Handle::Ring(_) if matches!(turn, Turn::Aim | Turn::Sky) => heading(pose.rot),
         _ if local => pose.rot,
         _ => Quat::IDENTITY,
     }
@@ -479,14 +495,19 @@ fn scripted(
         return;
     };
     let [pitch, yaw, roll] = rotate.map(f32::to_radians);
-    let turned = match turn {
-        Turn::No => Quat::IDENTITY,
-        Turn::Yaw => Quat::from_rotation_y(yaw),
-        Turn::Free => Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll),
+    let rot = match turn {
+        Turn::No => start.rot,
+        Turn::Yaw => start.rot * Quat::from_rotation_y(yaw),
+        Turn::Free => start.rot * Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll),
+        Turn::Aim | Turn::Sky => {
+            // Raised by pitch, turned counterclockwise (seen from above) by yaw.
+            let (elevation, azimuth) = sky_angles(start.rot * Vec3::NEG_Z);
+            aim(sun_direction(elevation + rotate[0], azimuth - rotate[1]))
+        }
     };
     let live = Pose {
         pos: start.pos + Vec3::from(translate),
-        rot: start.rot * turned,
+        rot,
         scale: if scales {
             start.scale * Vec3::from(scale)
         } else {
@@ -506,12 +527,14 @@ fn scripted(
 }
 
 /// Every frame in a session (editing or not): ends a drag the editor left (mode, tab, selection,
-/// a bake), and writes the `DragPreview` (kept until a committed drag is in the session).
+/// a bake), and writes the `DragPreview` and `EnvPreview` (kept until a committed drag is in the
+/// session).
 pub(crate) fn sync(
     editor: Res<Editor>,
     state: Res<State<AppState>>,
     mut gizmo: ResMut<Gizmo>,
     mut preview: ResMut<DragPreview>,
+    mut env: ResMut<EnvPreview>,
 ) {
     let stale = |d: &Drag| {
         editor.mode != Mode::Editing
@@ -529,7 +552,9 @@ pub(crate) fn sync(
         }
         gizmo.settling = false;
     }
-    let shown = gizmo.drag.filter(|d| d.live != d.start).and_then(|d| {
+    let moved = gizmo.drag.filter(|d| d.live != d.start);
+    env.set_if_neq(EnvPreview(moved.and_then(|d| env_drag(d.item, &d.live))));
+    let shown = moved.and_then(|d| {
         let source = match d.item {
             EditorItem::Prop { index } => DragSource::Prop(index as usize),
             EditorItem::Decor { index } => DragSource::Decor(index as usize),
@@ -543,6 +568,20 @@ pub(crate) fn sync(
         ))
     });
     preview.set_if_neq(DragPreview(shown));
+}
+
+/// What rc_render shows of a live drag of a light, the sun or the fill.
+fn env_drag(item: EditorItem, live: &Pose) -> Option<EnvDrag> {
+    let (elevation, azimuth) = sky_angles(live.rot * Vec3::NEG_Z);
+    match item {
+        EditorItem::Light { index } => Some(EnvDrag::Light(
+            index as usize,
+            Transform::from_translation(live.pos).with_rotation(live.rot),
+        )),
+        EditorItem::Sun { .. } => Some(EnvDrag::Sun { elevation, azimuth }),
+        EditorItem::Fill { .. } => Some(EnvDrag::Fill { elevation, azimuth }),
+        _ => None,
+    }
 }
 
 /// Draws the selection's gizmo.
@@ -725,6 +764,51 @@ mod tests {
         let right = Vec2::new(100.0 + UNIFORM_PX_PER_DOUBLING, 100.0);
         let p = dragged(&start, Turn::Free, &g, ray(eye, Vec3::ZERO), right, false).unwrap();
         assert!(p.scale.distance(start.scale * 2.0) < 1e-3, "{p:?}");
+    }
+
+    /// The sun's azimuth ring (about +Y) and elevation ring (across its direction), dragged with
+    /// the mouse, set its elevation and azimuth by the angle swept; only the previewed time's.
+    #[test]
+    fn ring_drags_set_the_suns_elevation_and_azimuth() {
+        let mut doc = crate::lights::tests::toy_town();
+        let noon = rc_ui::content::UiTimeOfDay::Noon;
+        let sun = EditorItem::Sun { time: noon };
+        let (start, turn, _) = doc.pose(sun).unwrap();
+        assert_eq!(turn, Turn::Sky);
+        assert_eq!(
+            handles(EditorGizmo::Move, turn, false).len(),
+            2,
+            "aims in every mode"
+        );
+        let drag = |doc: &Doc, ring: usize, from: Vec3, to: Vec3, eye: Vec3| {
+            let (start, ..) = doc.pose(sun).unwrap();
+            let f = frame(Handle::Ring(ring), false, Turn::Sky, &start);
+            let ray = |p: Vec3| ray(eye, start.pos + p);
+            let g = grab(Handle::Ring(ring), f, &start, ray(from), Vec2::ZERO).unwrap();
+            dragged(&start, Turn::Sky, &g, ray(to), Vec2::ZERO, false).unwrap()
+        };
+        // Azimuth ring from above: from +X to −Z is a quarter turn counterclockwise, −90°.
+        let above = start.pos + Vec3::new(0.0, 40.0, 0.1);
+        let turned = drag(&doc, 1, Vec3::X, Vec3::NEG_Z, above);
+        doc.set_pose(sun, turned);
+        let s = &doc.env.noon.sun;
+        assert_eq!((s.elevation, s.azimuth), (52.0, 30.0));
+        // Elevation ring, seen along its axis: a 10° sweep raises (or lowers) the sun by 10°.
+        let (start, ..) = doc.pose(sun).unwrap();
+        let across = heading(start.rot) * Vec3::X;
+        let a = across.any_orthonormal_vector();
+        let b = across.cross(a);
+        let ten = (a * 10f32.to_radians().cos() + b * 10f32.to_radians().sin()) * 5.0;
+        let raised = drag(&doc, 0, a * 5.0, ten, start.pos + across * 40.0);
+        doc.set_pose(sun, raised);
+        let s = &doc.env.noon.sun;
+        assert!(
+            (s.elevation - 52.0).abs() > 9.9 && (s.elevation - 52.0).abs() < 10.1,
+            "{s:?}"
+        );
+        assert!((s.azimuth - 30.0).abs() < 0.02, "the heading stays: {s:?}");
+        let morning = crate::lights::tests::toy_town().env.morning.sun;
+        assert_eq!(doc.env.morning.sun, morning, "only noon's sun");
     }
 
     #[test]

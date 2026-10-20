@@ -68,7 +68,9 @@ function Inspector({ status }: { status: EditorStatus }) {
   const item = sel.item;
   const kind = item.kind;
   const insertable = kind === "point" || kind === "vertex" || kind === "pathPoint";
-  const duplicable = ["prop", "itemRow", "ground", "vertex", "shortcut", "pathPoint", "decor"].includes(kind);
+  const duplicable = ["prop", "itemRow", "ground", "vertex", "shortcut", "pathPoint", "decor", "light"].includes(kind);
+  // The track, a time's sun and its look always exist.
+  const deletable = kind !== "track" && kind !== "sun" && kind !== "look";
   return (
     <node style={{ ...panel, width: 520, maxHeight: "100%", overflowY: "scroll" }} hoverStyle={{}}>
       <text style={text.h3}>{sel.title}</text>
@@ -79,7 +81,7 @@ function Inspector({ status }: { status: EditorStatus }) {
           field={f}
           active={active === f.key}
           onActivate={(open) => setActive(open ? f.key : null)}
-          onSet={(value) => bevy.editor.set({ key: f.key, value })}
+          onSet={(value) => bevy.editor.set({ item: null, key: f.key, value })}
         />
       ))}
       <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.s, margin: { top: space.s } }}>
@@ -89,7 +91,7 @@ function Inspector({ status }: { status: EditorStatus }) {
         {item.kind === "pathPoint" && <Tool label={words.wholeShortcut} onPress={() => select({ kind: "shortcut", index: item.shortcut })} />}
         {duplicable && <Tool label={words.duplicate} onPress={() => command({ kind: "duplicate" })} />}
         <Tool label={words.focus} onPress={() => command({ kind: "focus" })} />
-        {kind !== "track" && <Tool label={words.remove} onPress={() => command({ kind: "delete" })} />}
+        {deletable && <Tool label={words.remove} onPress={() => command({ kind: "delete" })} />}
       </node>
     </node>
   );

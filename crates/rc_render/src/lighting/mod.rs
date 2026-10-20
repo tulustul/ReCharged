@@ -1,7 +1,8 @@
 //! Environments (GDD §10.1, art bible §3): which [`EnvironmentDef`] is active (the menu's
 //! `showroom`, or the session track's `TrackInfo.environment`), its directional lights (key =
 //! sun / window light / moon, fill, lightning flash), the outdoor atmosphere and cloud dome, the
-//! cameras' look ([`camera`]), indoor rooms ([`room`]) and night headlights ([`headlights`]).
+//! cameras' look ([`camera`]), indoor rooms ([`room`]), night headlights ([`headlights`]) and the
+//! environment's point and spot lights ([`lights`], with the track editor's draft and preview).
 //! Also owns the `"visuals"` loading key: done once the session's textures are loaded and its
 //! render pipelines are compiled ([`warmup`]).
 
@@ -10,6 +11,7 @@ mod env;
 pub(crate) mod gi;
 pub(crate) mod glass;
 mod headlights;
+mod lights;
 mod menu_warmup;
 mod room;
 mod volumetric;
@@ -28,6 +30,7 @@ use crate::sky::{atmosphere, light_transform};
 use crate::weather_fx::{LightLook, Look, LookSet};
 
 pub use env::*;
+pub use lights::{EnvDrag, EnvLightSource, EnvPreview, EnvironmentDraft};
 pub use room::environment_radiance;
 pub use warmup::PipelineQueue;
 pub(crate) use warmup::WarmupCamera;
@@ -72,6 +75,7 @@ struct VisualsPending;
 
 pub(crate) fn build(app: &mut App) {
     app.init_resource::<gi::BakedLight>()
+        .init_resource::<lights::BuiltLights>()
         .add_systems(OnEnter(AppState::Menu), enter_menu)
         .add_systems(OnEnter(AppState::Loading), enter_session)
         .add_systems(OnExit(AppState::Menu), clear_environment)
@@ -88,13 +92,24 @@ pub(crate) fn build(app: &mut App) {
                     .chain()
                     .run_if(resource_exists::<VisualsPending>),
                 (
-                    apply_lights,
+                    (apply_lights, lights::preview_sky).chain(),
                     apply_shadows,
                     drive_clouds,
                     gi::follow_weather,
                 )
                     .in_set(VisualSet)
                     .after(LookSet),
+                // The editor's draft becomes the session's environment before the look is
+                // computed from it; a cleared preview puts its light back before a commit moves it.
+                (
+                    lights::preview_light.run_if(resource_exists_and_changed::<EnvPreview>),
+                    lights::follow_draft
+                        .run_if(in_state(AppState::InRace))
+                        .run_if(resource_exists_and_changed::<EnvironmentDraft>),
+                )
+                    .chain()
+                    .in_set(VisualSet)
+                    .before(LookSet),
                 (gi::spawn_volume, gi::switch_volume).chain(),
             ),
         );
@@ -118,7 +133,7 @@ fn enter_menu(mut commands: Commands, paths: Option<Res<UserPaths>>, spawner: En
                 def,
                 time: TimeOfDay::Noon,
             };
-            spawner.spawn(&mut commands, &active, DespawnOnExit(AppState::Menu));
+            spawner.spawn(&mut commands, &active, false, DespawnOnExit(AppState::Menu));
             commands.insert_resource(active);
         }
         // The menu still works without its lighting file (React shows its 2D backdrop).
@@ -126,19 +141,21 @@ fn enter_menu(mut commands: Commands, paths: Option<Res<UserPaths>>, spawner: En
     }
 }
 
-/// `OnEnter(Loading)`: activates the track's environment, rebuilds the material library for it
-/// and spawns its lights. A missing or broken environment file falls back to the neutral
-/// one of [`FALLBACK_MAP`] (logged as an error); only when that fails too does the load fail.
+/// `OnEnter(Loading)`: activates the track's environment (the editor's [`EnvironmentDraft`] when
+/// it is of this track), rebuilds the material library for it and spawns its lights (mirrored
+/// with a mirror layout). A missing or broken environment file falls back to the neutral one of
+/// [`FALLBACK_MAP`] (logged as an error); only when that fails too does the load fail.
 #[allow(clippy::too_many_arguments)]
 fn enter_session(
     mut commands: Commands,
     config: Option<Res<RaceConfig>>,
     catalog: Option<Res<Catalog>>,
     paths: Option<Res<UserPaths>>,
+    draft: Option<Res<EnvironmentDraft>>,
     mut library: Option<ResMut<MaterialLibrary>>,
     mut surfaces: ResMut<Assets<crate::materials::SurfaceMaterial>>,
     mut failed: MessageWriter<LoadingFailed>,
-    spawner: EnvSpawner,
+    (spawner, mut built): (EnvSpawner, ResMut<lights::BuiltLights>),
 ) {
     let root = paths
         .map(|p| p.assets_dir.clone())
@@ -151,7 +168,9 @@ fn enter_session(
         .as_ref()
         .and_then(|c| c.tracks.iter().find(|t| t.id == track))
         .map_or_else(|| "test".to_owned(), |t| t.environment.clone());
-    let loaded = EnvironmentDef::load(&root, track.as_str()).or_else(|error| {
+    let drafted = draft.filter(|d| d.id == track).map(|d| d.def.clone());
+    let loaded = drafted.map_or_else(|| EnvironmentDef::load(&root, track.as_str()), Ok);
+    let loaded = loaded.or_else(|error| {
         error!("visuals: {error}; using the '{FALLBACK_MAP}' environment");
         EnvironmentDef::load(&root, FALLBACK_MAP)
     });
@@ -173,14 +192,15 @@ fn enter_session(
             warn!("environment {env_id}: unknown material '{name}'");
         }
     }
-    let time = config.map_or(TimeOfDay::Noon, |c| c.weather.time);
+    let time = config.as_ref().map_or(TimeOfDay::Noon, |c| c.weather.time);
+    let mirror = config.is_some_and(|c| c.variant.mirror);
     info!("visuals: environment {env_id} ({}), {time:?}", def.name);
     let active = ActiveEnvironment {
         id: env_id,
         def,
         time,
     };
-    spawner.spawn(&mut commands, &active, DespawnOnExit(RaceSession));
+    built.0 = spawner.spawn(&mut commands, &active, mirror, DespawnOnExit(RaceSession));
     commands.insert_resource(active);
     commands.insert_resource(VisualsPending);
 }
@@ -236,12 +256,14 @@ struct EnvSpawner<'w> {
 }
 
 impl EnvSpawner<'_> {
+    /// Returns the planned environment lights it spawned.
     fn spawn(
         mut self,
         commands: &mut Commands,
         env: &ActiveEnvironment,
+        mirror: bool,
         scope: impl Component + Clone,
-    ) {
+    ) -> Vec<lights::PlannedLight> {
         for (role, name) in [
             (EnvLight::Key, "Key light"),
             (EnvLight::Fill, "Fill light"),
@@ -258,45 +280,8 @@ impl EnvSpawner<'_> {
                 scope.clone(),
             ));
         }
-        for light in env.def.lights.iter().filter(|l| l.on_at(env.time)) {
-            let color = Color::srgb(light.color[0], light.color[1], light.color[2]);
-            let pos = Vec3::from_array(light.pos);
-            let intensity = lamp_lumens(light.lumens);
-            match light.target {
-                Some(target) => {
-                    let outer = light.angle.to_radians();
-                    commands.spawn((
-                        Name::new("Environment spot"),
-                        SpotLight {
-                            color,
-                            intensity,
-                            range: light.range,
-                            outer_angle: outer,
-                            inner_angle: outer * 0.6,
-                            shadow_maps_enabled: false,
-                            ..default()
-                        },
-                        Transform::from_translation(pos)
-                            .looking_at(Vec3::from_array(target), Vec3::Y),
-                        scope.clone(),
-                    ));
-                }
-                None => {
-                    commands.spawn((
-                        Name::new("Environment light"),
-                        PointLight {
-                            color,
-                            intensity,
-                            range: light.range,
-                            shadow_maps_enabled: false,
-                            ..default()
-                        },
-                        Transform::from_translation(pos),
-                        scope.clone(),
-                    ));
-                }
-            }
-        }
+        let planned = lights::plan(&env.def, env.time, mirror);
+        lights::spawn(commands, &planned, scope.clone());
         if !env.def.indoor {
             commands.spawn((
                 Name::new("Atmosphere"),
@@ -308,6 +293,7 @@ impl EnvSpawner<'_> {
                 scope,
             ));
         }
+        planned
     }
 }
 

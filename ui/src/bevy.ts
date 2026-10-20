@@ -142,7 +142,11 @@ id: string, } | { "kind": "decor",
 /**
  * glb path under the assets root (`models/props/toy/sign.glb`).
  */
-model: string, } | { "kind": "itemRow" } | { "kind": "battery" };
+model: string, } | { "kind": "itemRow" } | { "kind": "battery" } | { "kind": "light", 
+/**
+ * A spot light.
+ */
+spot: boolean, } | { "kind": "sun" } | { "kind": "fill" };
 export type EditorCommand = { "kind": "save" } | { "kind": "drive" } | { "kind": "undo" } | { "kind": "redo" } | { "kind": "delete" } | { "kind": "insert" } | { "kind": "duplicate" } | { "kind": "add", 
 /**
  * What.
@@ -200,7 +204,7 @@ optional: boolean,
  */
 set: boolean, };
 export type EditorGizmo = "move" | "rotate" | "scale";
-export type EditorItem = { "kind": "track" } | { "kind": "point", index: number, } | { "kind": "gap", index: number, } | { "kind": "ground", index: number, } | { "kind": "vertex", ground: number, index: number, } | { "kind": "itemRow", index: number, } | { "kind": "prop", index: number, } | { "kind": "shortcut", index: number, } | { "kind": "pathPoint", shortcut: number, index: number, } | { "kind": "battery" } | { "kind": "decor", index: number, };
+export type EditorItem = { "kind": "track" } | { "kind": "point", index: number, } | { "kind": "gap", index: number, } | { "kind": "ground", index: number, } | { "kind": "vertex", ground: number, index: number, } | { "kind": "itemRow", index: number, } | { "kind": "prop", index: number, } | { "kind": "shortcut", index: number, } | { "kind": "pathPoint", shortcut: number, index: number, } | { "kind": "battery" } | { "kind": "decor", index: number, } | { "kind": "light", index: number, } | { "kind": "sun", time: UiTimeOfDay, } | { "kind": "fill", time: UiTimeOfDay, } | { "kind": "look", time: UiTimeOfDay, };
 export type EditorLibrary = { 
 /**
  * Groups: the track's own environment first.
@@ -255,6 +259,10 @@ fields: Array<EditorField>,
  */
 asset: EditorAsset | null, };
 export type EditorSet = { 
+/**
+ * The item (`null`: the selection).
+ */
+item: EditorItem | null, 
 /**
  * Field name.
  */
@@ -345,7 +353,12 @@ tab: EditorTab,
 /**
  * The library asset placement mode is armed with (the next click in the view adds it).
  */
-placing: EditorAsset | null, };
+placing: EditorAsset | null, 
+/**
+ * The previewed time's look and the room's lamp grid (the Lighting tab; set with
+ * `editor.set` naming its item).
+ */
+look: EditorSelection | null, };
 export type EditorTab = "assets" | "track" | "lighting";
 export type FieldValue = { "type": "number", value: number, } | { "type": "integer", value: number, } | { "type": "toggle", value: boolean, } | { "type": "choice", value: string, options: Array<string>, } | { "type": "vector", value: Array<number>, } | { "type": "text", value: string, };
 export type GamepadAxisChange = { gamepad: number, axis: GamepadAxisName, value: number, };

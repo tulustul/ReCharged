@@ -149,7 +149,11 @@ pub(crate) fn ghost(
             let model = match &asset {
                 EditorAsset::Prop { id } => editor.props.get(id).map(|d| d.model.clone()),
                 EditorAsset::Decor { model } => Some(model.clone()),
-                EditorAsset::ItemRow | EditorAsset::Battery => None,
+                EditorAsset::ItemRow
+                | EditorAsset::Battery
+                | EditorAsset::Light { .. }
+                | EditorAsset::Sun
+                | EditorAsset::Fill => None,
             };
             let exists = |m: &String| {
                 paths

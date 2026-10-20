@@ -39,9 +39,10 @@ pub(crate) struct EnvMap {
 const OVERCAST_STEP: f32 = 0.12;
 
 /// The floor plan (min x, min z, max x, max z of the bounds) the session's room lamps and window
-/// glass stand in (a track-editor commit can change it: the room is rebuilt then).
+/// glass stand in, and the lamp grid they were built with (a track-editor commit can change
+/// either: the room is rebuilt then).
 #[derive(Resource, Debug, PartialEq)]
-struct RoomBuilt([f32; 4]);
+struct RoomBuilt([f32; 4], Option<LampGrid>);
 
 /// A ceiling lamp or window pane of the room (despawned by tag when the room is rebuilt).
 #[derive(Component, Debug, Clone, Copy)]
@@ -169,7 +170,7 @@ fn make_env_map(
 }
 
 /// Places lamps and window glass once the session's track (and so the shell) exists, and again
-/// when its bounds change.
+/// when its bounds or the lamp grid change.
 #[allow(clippy::too_many_arguments)]
 fn build_room(
     mut commands: Commands,
@@ -187,10 +188,11 @@ fn build_room(
     };
     let (min, max) = track.bounds();
     let plan = [min.x, min.z, max.x, max.z];
-    if built.is_some_and(|b| b.0 == plan) {
+    let grid = env.def.room.as_ref().and_then(|r| r.lamps.clone());
+    if built.is_some_and(|b| b.0 == plan && b.1 == grid) {
         return;
     }
-    commands.insert_resource(RoomBuilt(plan));
+    commands.insert_resource(RoomBuilt(plan, grid));
     for entity in &pieces {
         commands.entity(entity).despawn();
     }

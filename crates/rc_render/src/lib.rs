@@ -10,7 +10,8 @@
 //!   `RaceConfig`, `Catalog`, `WeatherState`, `Track` (bounds), `MenuBackdrop`, camera markers
 //!   (`GameCamera`, `MenuCamera`), `LocalPlayer` racers, `UserPaths`; the track editor's
 //!   `TrackDraft`, `DragPreview`, `TrackPreview` and replaced `Track` (track meshes, room and decor
-//!   rebuilt in place by key).
+//!   rebuilt in place by key), [`EnvironmentDraft`] (copied into [`ActiveEnvironment`], lights
+//!   diffed) and [`EnvPreview`].
 //! - **Outputs:** visual entities only (proxies, lights, sky, showroom), camera rendering
 //!   components, the window's mode/size/vsync, [`MaterialLibrary`], [`ActiveEnvironment`],
 //!   [`PipelineQueue`], `ShowroomReady`, `LoadingDone("visuals")` / `LoadingFailed`.
@@ -39,8 +40,9 @@ pub use cars::{CarModel, CarModelReady};
 pub use content::{ContentVisualsPlugin, keep_cpu_copies, load_scene};
 pub use lighting::gi::{BakedGi, BakedLight, FACES, IrradianceGrid, rgb9e5, volume_file};
 pub use lighting::{
-    ActiveEnvironment, ENVIRONMENT_FILE, EnvironmentDef, LUMEN_SCALE, LampGrid, PipelineQueue,
-    RoomDef, SHOWROOM_ENV, SHOWROOM_FILE, TimeLook, WindowDef, WindowWall, lamp_lumens,
+    ActiveEnvironment, ENVIRONMENT_FILE, EnvDrag, EnvLightDef, EnvLightSource, EnvPreview,
+    EnvironmentDef, EnvironmentDraft, LUMEN_SCALE, LampGrid, PipelineQueue, RoomDef, SHOWROOM_ENV,
+    SHOWROOM_FILE, SunDef, TimeLook, WindowDef, WindowWall, lamp_lumens,
 };
 pub use lighting::{EnvLight, environment_radiance};
 pub use materials::{
@@ -49,6 +51,7 @@ pub use materials::{
 };
 pub use props::DecorSource;
 pub use quality::{AaMode, ShadowTier, ViewQuality, shadow_tier, view_quality};
+pub use sky::sun_direction;
 
 /// Loading-gate key of this crate.
 pub const LOADING_KEY: &str = "visuals";

@@ -1,9 +1,11 @@
-//! The edited document (layout + decor): handles of the items, structural edits (add, insert,
-//! delete, duplicate) with index fix-ups, and validation (placing and swapping library assets:
-//! [`crate::library`]). Pure; the ECS side is in `lib.rs`.
+//! The edited document (layout + decor + environment): handles of the items, structural edits
+//! (add, insert, delete, duplicate) with index fix-ups, and validation (placing and swapping
+//! library assets: [`crate::library`]; lights, sun, fill and time looks: [`crate::lights`]).
+//! Pure; the ECS side is in `lib.rs`.
 
 use bevy::math::{EulerRot, Quat, Vec2, Vec3};
 use rc_core::prelude::*;
+use rc_render::EnvironmentDef;
 use rc_track::{
     ControlPoint, DecorItem, Dir, Gap, Ground, ItemRowDef, PropCatalog, RibbonStyle, ShortcutDef,
     Track, TrackDef,
@@ -37,20 +39,26 @@ pub enum Turn {
     Yaw,
     /// Any way (decor).
     Free,
+    /// Aimed about its position (spot lights: the target swings around the light).
+    Aim,
+    /// Aimed only, never moved (sun and fill: elevation and azimuth).
+    Sky,
 }
 
 /// Rounds to the millimetre-ish grid saved files use (dragging makes long fractions).
-fn tidy(v: f32) -> f32 {
+pub(crate) fn tidy(v: f32) -> f32 {
     (v * 1000.0).round() / 1000.0 + 0.0 // + 0.0: no "-0.0" in the file
 }
 
-/// Layout, decor and catalog entry of one track.
+/// Layout, decor, environment and catalog entry of one track.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Doc {
     /// The layout.
     pub def: TrackDef,
     /// The decorative models.
     pub decor: Vec<DecorItem>,
+    /// Its lighting (`environment.ron`).
+    pub env: EnvironmentDef,
     /// Its entry in `catalog.ron`.
     pub info: TrackInfo,
 }
@@ -100,6 +108,9 @@ impl Doc {
                 .is_some_and(|s| at(index) < s.path.len()),
             EditorItem::Battery => d.golden_battery.is_some(),
             EditorItem::Decor { index } => at(index) < self.decor.len(),
+            EditorItem::Light { index } => at(index) < self.env.lights.len(),
+            EditorItem::Fill { .. } => self.sky(item).is_some(),
+            EditorItem::Sun { .. } | EditorItem::Look { .. } => true,
         }
     }
 
@@ -126,15 +137,21 @@ impl Doc {
                 .and_then(|s| s.path.get(at(index)).copied()),
             EditorItem::Battery => d.golden_battery.map(|b| b.pos),
             EditorItem::Decor { index } => self.decor.get(at(index)).map(|d| d.pos),
-            EditorItem::Track | EditorItem::Ground { .. } | EditorItem::Shortcut { .. } => None,
+            EditorItem::Light { .. } | EditorItem::Sun { .. } | EditorItem::Fill { .. } => {
+                self.light_handle(item)
+            }
+            EditorItem::Track
+            | EditorItem::Ground { .. }
+            | EditorItem::Shortcut { .. }
+            | EditorItem::Look { .. } => None,
         }
     }
 
     /// Items without a mesh in the (forward) editing session, which the view marks with an icon:
-    /// item rows, the battery, props and decor of reverse layouts only (`true`: shown dimmed);
-    /// with `layout` also control points, gaps, ground vertices and shortcut path points (the
-    /// Track tab's).
-    pub fn markers(&self, layout: bool) -> Vec<(EditorItem, Vec3, bool)> {
+    /// item rows, the battery, lights, the sun and fill of `time`, props and decor of reverse
+    /// layouts only and lights off at `time` (`true`: shown dimmed); with `layout` also control
+    /// points, gaps, ground vertices and shortcut path points (the Track tab's).
+    pub fn markers(&self, layout: bool, time: TimeOfDay) -> Vec<(EditorItem, Vec3, bool)> {
         let d = &self.def;
         let reverse_only = |dir: Dir| !dir.active(false);
         let mut items: Vec<EditorItem> = (0..d.item_rows.len())
@@ -169,12 +186,19 @@ impl Doc {
         let marker = |dim| move |item| self.handle(item).map(|pos| (item, pos, dim));
         let mut out: Vec<_> = items.into_iter().filter_map(marker(false)).collect();
         out.extend(dimmed.into_iter().filter_map(marker(true)));
+        out.extend(self.light_markers(time));
         out
     }
 
     /// The item's pose and how it may turn and scale; `None` for items the gizmo does not move
     /// (the track, gaps, whole ground areas and shortcuts).
     pub fn pose(&self, item: EditorItem) -> Option<(Pose, Turn, bool)> {
+        if matches!(
+            item,
+            EditorItem::Light { .. } | EditorItem::Sun { .. } | EditorItem::Fill { .. }
+        ) {
+            return self.light_pose(item);
+        }
         let pos = self.handle(item)?;
         let plain = Pose {
             pos,
@@ -212,8 +236,14 @@ impl Doc {
         let Some((old, ..)) = self.pose(item) else {
             return;
         };
-        self.set_handle(item, pose.pos.map(tidy));
         let turned = !old.rot.abs_diff_eq(pose.rot, 1e-6);
+        if matches!(
+            item,
+            EditorItem::Light { .. } | EditorItem::Sun { .. } | EditorItem::Fill { .. }
+        ) {
+            return self.set_light_pose(item, pose, turned);
+        }
+        self.set_handle(item, pose.pos.map(tidy));
         let (yaw, pitch, roll) = pose.rot.to_euler(EulerRot::YXZ);
         let deg = |r: f32| (r.to_degrees() * 100.0).round() / 100.0 + 0.0;
         match item {
@@ -276,10 +306,14 @@ impl Doc {
                     item.pos = pos;
                 }
             }
+            EditorItem::Light { index } => self.move_light(index, pos),
             EditorItem::Track
             | EditorItem::Gap { .. }
             | EditorItem::Ground { .. }
-            | EditorItem::Shortcut { .. } => {}
+            | EditorItem::Shortcut { .. }
+            | EditorItem::Sun { .. }
+            | EditorItem::Fill { .. }
+            | EditorItem::Look { .. } => {}
         }
     }
 
@@ -405,6 +439,13 @@ impl Doc {
                 self.decor.remove(at(index));
                 None
             }
+            EditorItem::Light { .. }
+            | EditorItem::Sun { .. }
+            | EditorItem::Fill { .. }
+            | EditorItem::Look { .. } => {
+                self.delete_light(item)?;
+                None
+            }
         })
     }
 
@@ -456,8 +497,10 @@ impl Doc {
                     index: idx(self.decor.len() - 1),
                 })
             }
+            EditorItem::Light { index } => Ok(self.duplicate_light(index)),
             _ => Err(
-                "only props, item rows, ground areas, shortcuts and decor can be duplicated".into(),
+                "only props, item rows, ground areas, shortcuts, decor and lights can be duplicated"
+                    .into(),
             ),
         }
     }
@@ -529,14 +572,16 @@ const NEW_OVAL_POINTS: usize = 16;
 const NEW_FLOOR_MARGIN_U: f32 = 30.0;
 
 /// A new track: a flat oval of `style` on a floor (wood indoors, grass outdoors) with four item
-/// rows, and a hidden catalog entry (allowed everything the environment allows).
+/// rows, lit by `env` (a copy of another map's), and a hidden catalog entry (allowed everything
+/// the environment allows).
 pub fn new_track(
     id: &TrackId,
     name: &str,
     environment: &str,
-    indoor: bool,
+    env: EnvironmentDef,
     style: RibbonStyle,
 ) -> Doc {
+    let indoor = env.indoor;
     // The ribbon's top lies on the floor: its body (this thick) hangs below the points.
     let top = match style {
         RibbonStyle::ToyTrack => 0.25,
@@ -607,6 +652,7 @@ pub fn new_track(
     Doc {
         def,
         decor: Vec::new(),
+        env,
         info: TrackInfo {
             id: id.clone(),
             name: name.to_owned(),
@@ -657,6 +703,7 @@ mod tests {
             Doc {
                 def,
                 decor: Vec::new(),
+                env: EnvironmentDef::load(&assets(), "test_oval").unwrap(),
                 info: TrackInfo::default(),
             },
             PropCatalog::load(&assets()).unwrap(),
@@ -701,9 +748,10 @@ mod tests {
             RibbonStyle::CarpetRunner,
             RibbonStyle::Invisible,
         ] {
-            for indoor in [false, true] {
+            for map in ["test_oval", "toy_town"] {
                 let id = "fresh".into();
-                let doc = new_track(&id, "Fresh", "toy_store", indoor, style);
+                let env = EnvironmentDef::load(&assets(), map).unwrap();
+                let doc = new_track(&id, "Fresh", "toy_store", env, style);
                 validate(&doc, &props, &id).unwrap_or_else(|e| panic!("{style:?}: {e}"));
             }
         }
@@ -722,13 +770,31 @@ mod tests {
         let (mut doc, _) = oval();
         let is_point =
             |(item, ..): &(EditorItem, Vec3, bool)| matches!(item, EditorItem::Point { .. });
-        assert_eq!(doc.markers(false).iter().filter(|h| is_point(h)).count(), 0);
-        let points = doc.markers(true).into_iter().filter(is_point).count();
+        assert_eq!(
+            doc.markers(false, TimeOfDay::Noon)
+                .iter()
+                .filter(|h| is_point(h))
+                .count(),
+            0
+        );
+        let points = doc
+            .markers(true, TimeOfDay::Noon)
+            .into_iter()
+            .filter(is_point)
+            .count();
         assert_eq!(points, doc.def.points.len());
         let row = EditorItem::ItemRow { index: 0 };
-        assert!(doc.markers(false).iter().any(|(item, ..)| *item == row));
+        assert!(
+            doc.markers(false, TimeOfDay::Noon)
+                .iter()
+                .any(|(item, ..)| *item == row)
+        );
         let prop = EditorItem::Prop { index: 0 };
-        let marked = |doc: &Doc| doc.markers(false).into_iter().find(|(i, ..)| *i == prop);
+        let marked = |doc: &Doc| {
+            doc.markers(false, TimeOfDay::Noon)
+                .into_iter()
+                .find(|(i, ..)| *i == prop)
+        };
         assert_eq!(marked(&doc), None, "a prop in the session has its mesh");
         doc.def.props[0].dir = Dir::Rev;
         assert_eq!(marked(&doc), Some((prop, doc.def.props[0].pos, true)));

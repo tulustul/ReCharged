@@ -19,7 +19,7 @@ use bevy::math::Affine2;
 use bevy::mesh::VertexAttributeValues;
 use bevy::prelude::*;
 use rc_core::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub use paint::{CarPaint, paint_material};
 pub use surface::{SurfaceExtension, SurfaceMaterial};
@@ -55,7 +55,7 @@ pub const TEXTURE_SETS: &[(&str, f32)] = &[
 const ANISOTROPY: u16 = 16;
 
 /// A material of an environment's list (`assets/maps/<map>/environment.ron`, `materials`).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MaterialDef {
     /// Texture set (see [`TEXTURE_SETS`]); `None` = a flat colour.

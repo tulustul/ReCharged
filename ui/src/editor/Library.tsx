@@ -94,7 +94,7 @@ export function SwapPicker({ asset }: { asset: EditorAsset }) {
   return (
     <node style={{ flexDirection: "column", gap: space.xs }}>
       <node style={{ flexDirection: "row", alignItems: "center", gap: space.s }}>
-        <text style={{ ...text.small, color: color.text, width: 150, flexShrink: 0 }}>{asset.kind === "prop" ? words.kind : words.model}</text>
+        <text style={{ ...text.small, color: color.text, width: 150, flexShrink: 0 }}>{asset.kind === "prop" ? words.kind : asset.kind === "light" ? words.lightType : words.model}</text>
         <text style={{ ...text.small, color: color.text, flexGrow: 1 }}>{library ? assetName(library.groups, asset) : ""}</text>
         <Tool label={open ? words.close : words.swap} hot={open} onPress={() => setOpen(!open)} />
       </node>

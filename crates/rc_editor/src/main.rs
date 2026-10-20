@@ -145,7 +145,7 @@ fn create(assets_dir: &Path, id: &str, new: &NewTrack) -> Result<(), String> {
         ));
     }
     let template = map_dir(assets_dir, &new.environment).join(ENVIRONMENT_FILE);
-    let indoor = EnvironmentDef::load_file(&template)?.room.is_some();
+    let env = EnvironmentDef::load_file(&template)?;
     let style = match &new.style {
         Some(s) => rc_editor::fields::parse::<RibbonStyle>(s)?,
         None => RibbonStyle::ToyTrack,
@@ -153,7 +153,7 @@ fn create(assets_dir: &Path, id: &str, new: &NewTrack) -> Result<(), String> {
     let track = TrackId::new(id);
     let name = new.name.clone().unwrap_or_else(|| id.replace('_', " "));
     let kind = catalog_kind(assets_dir, &new.environment)?;
-    let doc = rc_editor::doc::new_track(&track, &name, &kind, indoor, style);
+    let doc = rc_editor::doc::new_track(&track, &name, &kind, env, style);
     rc_editor::doc::validate(&doc, &PropCatalog::load(assets_dir)?, &track)?;
     let catalog_path = assets_dir.join(CATALOG_FILE);
     let catalog = std::fs::read_to_string(&catalog_path)

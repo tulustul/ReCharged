@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use rc_core::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::materials::MaterialDef;
 
@@ -25,7 +25,7 @@ pub fn lamp_lumens(real: f32) -> f32 {
 }
 
 /// One environment (art bible §3): materials, surfaces, room and sky, and a look per time of day.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnvironmentDef {
     /// Display name (logs, debugging).
@@ -33,13 +33,13 @@ pub struct EnvironmentDef {
     /// Indoor: window light, room lamps and a room environment map instead of sun and sky.
     pub indoor: bool,
     /// Named materials (override the built-ins of the same name).
-    #[serde(default)]
+    #[serde(default, serialize_with = "sorted")]
     pub materials: HashMap<String, MaterialDef>,
     /// Surface → material name (else the surface's built-in default).
-    #[serde(default)]
+    #[serde(default, serialize_with = "sorted")]
     pub surfaces: HashMap<SurfaceKind, String>,
     /// Indoor room: ceiling height, windows, ceiling lamps.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub room: Option<RoomDef>,
     /// Outdoor sky.
     #[serde(default)]
@@ -48,12 +48,12 @@ pub struct EnvironmentDef {
     #[serde(default = "default_shadow_distance")]
     pub shadow_distance: f32,
     /// Fixed lights of this environment's track (display spots, local fills), in world units.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lights: Vec<EnvLightDef>,
     /// glTF material names of prop/decor light fixtures that belong to the room lamps: their
     /// emission follows the time look's `lamps` level (supermarket ceiling tubes: lit by day,
     /// off at night). Props' own `lamp*` bulbs follow `practicals` instead.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fixture_materials: Vec<String>,
     /// Look at Morning.
     pub morning: TimeLook,
@@ -91,10 +91,25 @@ impl EnvironmentDef {
     /// Reads and validates an environment file.
     pub fn load_file(path: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let def: Self = ron::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-        def.validate()
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+        Self::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// Parses and validates environment RON.
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let def: Self = ron::from_str(text).map_err(|e| e.to_string())?;
+        def.validate()?;
         Ok(def)
+    }
+
+    /// Environment RON that [`Self::parse`] reads back: top-level and time-look fields one per
+    /// line, everything deeper (a light, a material, a sun) on one line; maps sorted by key, empty
+    /// lists and absent options left out. Comments of a hand-written file are not kept.
+    pub fn to_ron(&self) -> Result<String, String> {
+        let pretty = ron::ser::PrettyConfig::new()
+            .depth_limit(2)
+            .indentor("    ")
+            .struct_names(false);
+        ron::ser::to_string_pretty(self, pretty).map_err(|e| e.to_string())
     }
 
     /// Checks references and ranges.
@@ -131,6 +146,14 @@ impl EnvironmentDef {
         if let Some(room) = &self.room {
             if room.height <= 0.0 {
                 return Err("room.height must be > 0".into());
+            }
+            if let Some(g) = &room.lamps {
+                let cone = g.spot_angle.is_none_or(|a| (1.0..=89.0).contains(&a));
+                if g.spacing < 1.0 || g.range <= 0.0 || g.lumens < 0.0 || !cone {
+                    return Err(
+                        "room.lamps: spacing, range, lumens or spot_angle out of range".into(),
+                    );
+                }
             }
             for (i, w) in room.windows.iter().enumerate() {
                 let fits = (0.0..=1.0).contains(&w.center)
@@ -171,14 +194,27 @@ impl EnvironmentDef {
     }
 }
 
+/// Serializes a map in key order (a `HashMap`'s own order changes per run; saved files must not).
+fn sorted<K: Serialize, V: Serialize, S: serde::Serializer>(
+    map: &HashMap<K, V>,
+    out: S,
+) -> Result<S::Ok, S::Error> {
+    let mut entries: Vec<(String, &K, &V)> = map
+        .iter()
+        .map(|(k, v)| (ron::to_string(k).unwrap_or_default(), k, v))
+        .collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    out.collect_map(entries.into_iter().map(|(_, k, v)| (k, v)))
+}
+
 /// A fixed light of the environment (one environment per track, so world positions are fine).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnvLightDef {
     /// Position (u).
     pub pos: [f32; 3],
     /// Spot target (u); `None` = point light.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<[f32; 3]>,
     /// Spot outer cone angle (degrees).
     #[serde(default = "default_spot_angle")]
@@ -190,7 +226,7 @@ pub struct EnvLightDef {
     /// Range (u).
     pub range: f32,
     /// Times of day it is on (empty = always).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub times: Vec<TimeOfDay>,
 }
 
@@ -206,7 +242,7 @@ impl EnvLightDef {
 }
 
 /// An indoor room (the shell itself is built by the track visuals from `Track::bounds()`).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RoomDef {
     /// Ceiling height (u above the floor at y = 0).
@@ -215,12 +251,12 @@ pub struct RoomDef {
     #[serde(default)]
     pub windows: Vec<WindowDef>,
     /// Ceiling lamps over the room.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lamps: Option<LampGrid>,
 }
 
 /// A wall of the room shell (`Track::bounds()`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowWall {
     /// The −Z wall.
     North,
@@ -233,7 +269,7 @@ pub enum WindowWall {
 }
 
 /// A window opening; the track visuals cut it, rc_render glazes and lights it.
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WindowDef {
     /// Wall.
@@ -252,7 +288,7 @@ pub struct WindowDef {
 }
 
 /// A grid of ceiling lamps over the room (at the time look's `lamps` level).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LampGrid {
     /// Distance between lamps (u).
@@ -264,7 +300,7 @@ pub struct LampGrid {
     /// Light range (u).
     pub range: f32,
     /// Spot cone (outer angle, degrees) pointing down; `None` = point light.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spot_angle: Option<f32>,
     /// Emissive strength of the lamp fixtures (art bible §1.2: 8–20).
     #[serde(default = "default_fixture")]
@@ -280,7 +316,7 @@ fn default_fixture() -> f32 {
 }
 
 /// Outdoor sky options.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SkyDef {
     /// Average ground albedo for the atmosphere's multiple scattering.
@@ -299,7 +335,7 @@ impl Default for SkyDef {
 }
 
 /// A directional light: the sun (outdoor), window light (indoor), the moon or a fill.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SunDef {
     /// Degrees above the horizon.
@@ -327,12 +363,13 @@ impl Default for SunDef {
 }
 
 /// The look of one time of day.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct TimeLook {
     /// Key light (sun / window light / moon).
     pub sun: SunDef,
     /// Second directional light without shadows (moon, sky bounce).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fill: Option<SunDef>,
     /// Camera exposure (EV100).
     pub exposure: f32,
@@ -356,6 +393,7 @@ pub struct TimeLook {
     pub lamps: f32,
     /// Level 0–1 of the props' lamps (their real lights and `lamp*` bulbs); default 1 at Night,
     /// 0 otherwise (street porch lights at sunset: 0.2).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub practicals: Option<f32>,
     /// Cloud colours (display-referred: 1 ≈ a bright sky).
     pub clouds: CloudColors,
@@ -386,7 +424,7 @@ impl Default for TimeLook {
 }
 
 /// Indoor environment-map colours (linear, before `env_light`).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RoomColors {
     /// Floor (below the horizon).
@@ -414,7 +452,7 @@ impl Default for RoomColors {
 }
 
 /// Colour grading (Bevy `ColorGrading`).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct GradingDef {
     /// White balance shift (+ = warmer).
@@ -448,7 +486,7 @@ impl Default for GradingDef {
 }
 
 /// Cloud layer colours (display-referred).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct CloudColors {
     /// Sun-lit tops.
@@ -488,6 +526,30 @@ mod tests {
             );
         }
         EnvironmentDef::load_file(&assets().join(SHOWROOM_FILE)).unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Every environment file (catalog maps and the showroom) reads back equal after a save
+    /// (in memory: the files are never written).
+    #[test]
+    fn every_environment_file_survives_a_save() {
+        let catalog = Catalog::load(&assets()).expect("catalog loads");
+        let mut files: Vec<_> = (catalog.tracks.iter())
+            .map(|t| rc_track::map_dir(&assets(), t.id.as_str()).join(ENVIRONMENT_FILE))
+            .collect();
+        files.push(assets().join(SHOWROOM_FILE));
+        for path in files {
+            let def = EnvironmentDef::load_file(&path).unwrap_or_else(|e| panic!("{e}"));
+            let text = def.to_ron().expect("serializes");
+            let back = EnvironmentDef::parse(&text)
+                .unwrap_or_else(|e| panic!("{}: {e}\n{text}", path.display()));
+            assert_eq!(back, def, "{}", path.display());
+            assert_eq!(
+                back.to_ron().expect("again"),
+                text,
+                "stable: {}",
+                path.display()
+            );
+        }
     }
 
     #[test]

@@ -47,7 +47,7 @@ pub fn parse<T: DeserializeOwned>(name: &str) -> Result<T, String> {
 }
 
 /// A field to pick from a list.
-trait Pick {
+pub(crate) trait Pick {
     fn shown(&self) -> String;
     /// May be unset (inherited).
     fn optional(&self) -> bool {
@@ -132,7 +132,7 @@ impl Pick for StringPick<'_> {
 }
 
 /// A value edited as its RON text (lists, unlock rules).
-trait RonText {
+pub(crate) trait RonText {
     fn text(&self) -> String;
     fn set(&mut self, text: &str) -> Result<(), String>;
 }
@@ -156,7 +156,7 @@ pub struct Choices {
 }
 
 /// A mutable view of one field.
-enum Slot<'a> {
+pub(crate) enum Slot<'a> {
     Num(&'a mut f32),
     Bool(&'a mut bool),
     Ron(Box<dyn RonText + 'a>),
@@ -167,6 +167,8 @@ enum Slot<'a> {
     OptBool(&'a mut Option<bool>, bool),
     V3(&'a mut Vec3),
     V2(&'a mut Vec2),
+    /// Positions and colours of the environment file.
+    Arr3(&'a mut [f32; 3]),
     Text(&'a mut String),
     OptText(&'a mut Option<String>),
     Bounds(&'a mut Option<BoundsDef>, Option<(Vec3, Vec3)>),
@@ -224,6 +226,10 @@ fn slots<'a>(
     }
     let i = |index: u32| index as usize;
     Some(match item {
+        EditorItem::Light { .. }
+        | EditorItem::Sun { .. }
+        | EditorItem::Fill { .. }
+        | EditorItem::Look { .. } => return crate::lights::slots(doc, item),
         EditorItem::Track => {
             let bounds = track.map(Track::bounds);
             let (d, info) = (&mut doc.def, &mut doc.info);
@@ -431,6 +437,7 @@ fn read(key: &'static str, slot: &Slot) -> Vec<EditorField> {
         Slot::V2(v) => plain(FieldValue::Vector {
             value: v.to_array().to_vec(),
         }),
+        Slot::Arr3(v) => plain(FieldValue::Vector { value: v.to_vec() }),
         Slot::Text(v) => plain(FieldValue::Text {
             value: (*v).clone(),
         }),
@@ -554,6 +561,7 @@ pub fn set_field(
         },
         Slot::V3(v) => *v = Vec3::from_array(vector(value)?),
         Slot::V2(v) => *v = Vec2::from_array(vector(value)?),
+        Slot::Arr3(v) => *v = vector(value)?,
         Slot::Text(v) => match value {
             Some(FieldValue::Text { value }) if !value.trim().is_empty() => *v = value,
             other => return Err(format!("{key} needs text, got {other:?}")),
@@ -611,6 +619,7 @@ mod tests {
         Doc {
             def: TrackDef::load(&assets, "test_oval").unwrap(),
             decor: Vec::new(),
+            env: rc_render::EnvironmentDef::load(&assets, "test_oval").unwrap(),
             info: TrackInfo::default(),
         }
     }
