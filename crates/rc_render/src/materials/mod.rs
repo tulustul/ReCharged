@@ -7,8 +7,8 @@
 //! macro variation, wetness/puddles and snow cover, see [`surface`]). Their UVs are **world
 //! units**: a material repeats every `tile_u` u, matching rc_track's `MeshData` UVs.
 
-mod coat_fix;
 mod paint;
+mod shader_fixes;
 mod surface;
 mod water;
 
@@ -27,7 +27,7 @@ pub use surface::{SurfaceExtension, SurfaceMaterial};
 pub use water::WaterMaterial;
 
 pub(crate) fn build(app: &mut App) {
-    coat_fix::build(app);
+    shader_fixes::build(app);
     surface::build(app);
     water::build(app);
     app.add_systems(Startup, load_textures);

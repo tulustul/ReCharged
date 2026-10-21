@@ -27,6 +27,10 @@ use crate::weather_fx::Look;
 const MAGIC: &[u8; 4] = b"RCIV";
 const VERSION: u32 = 1;
 const HEADER_BYTES: usize = 4 + 4 + 3 * 4 + 6 * 4;
+/// The probe box reaches this far past the baked bounds (u) on every side. The room shell's walls
+/// and ceiling stand exactly on the bounds, where Bevy's probe weight is 0 and rounding put half
+/// their fragments outside the volume (black speckles); the texture still maps to within this.
+const PAD_U: f32 = 0.1;
 
 /// Faces of an ambient cube: +X, −X, +Y, −Y, +Z, −Z.
 pub const FACES: [Vec3; 6] = [
@@ -264,7 +268,8 @@ pub(super) fn spawn_volume(
             voxels: images.add(grid.image()),
         },
         LightProbe::default(),
-        Transform::from_translation((grid.min + grid.max) / 2.0).with_scale(grid.max - grid.min),
+        Transform::from_translation((grid.min + grid.max) / 2.0)
+            .with_scale(grid.max - grid.min + 2.0 * PAD_U),
         DespawnOnExit(RaceSession),
     ));
 }

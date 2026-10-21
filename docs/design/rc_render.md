@@ -12,7 +12,7 @@ crate; `lib.rs` registers both).
 | `lighting/` | `ActiveEnvironment` lifecycle, env RON (`env.rs`), key/fill/flash lights, cascades, camera look, generated env maps + room lamps + window glass, headlights, volumetric fog, pipeline warm-up, `"visuals"` key |
 | `sky/` | sun direction maths, atmosphere entity, star cubemap, sky radiance model, cloud dome |
 | `weather_fx.rs` | the frame's `Look` = env time look × `WeatherState`; surface wetness/snow |
-| `materials/` | `MaterialLibrary`, `SurfaceMaterial` (world-space extension), car paints, `with_world_uvs`, Bevy clear-coat fix (`coat_fix.rs`) |
+| `materials/` | `MaterialLibrary`, `SurfaceMaterial` (world-space extension), car paints, `with_world_uvs`, Bevy shader fixes (`shader_fixes.rs`: clear coat, irradiance volumes) |
 | `showroom/` | menu garage set, turntable, `CarModel` swap without gaps, `ShowroomReady` |
 | `profiling.rs` | diagnostics for rc_ui's F12 profiler: Bevy's frame-time, entity-count and render-pass (`RenderDiagnosticsPlugin`) ones, plus `rc_core::perf` — main-world CPU ms (`First` → `Last`), entities the cameras draw (`VisibleEntities` of active cameras, summed; not `ViewVisibility`, which also counts shadow views and every bounds-less hierarchy node), whole-frame GPU ms (a `frame` timestamp span opened and closed by exclusive `RenderGraph` systems, so it nests the passes recorded on the render thread and times the uninstrumented ones too), draw calls of camera and shadow views (counted from every `ViewBinnedRenderPhases` / `ViewSortedRenderPhases` after `RenderSystems::Render`: one per multidraw batch set, batchable bin, unbatchable entity and non-empty sorted batch; the indirect commands inside a multidraw are Bevy-private, so not counted) |
 
@@ -141,7 +141,7 @@ physical sky fill (`env_light` 15–32 k) so shade under trees, fences and parke
 - **Emissives** are not scaled by exposure (`emissive_exposure_weight = 0`), so art-bible values
   read the same in every environment. Clear-coated paints reflect the environment map: keep
   `env_light` consistent with the actual room brightness.
-- **Clear-coat fix** (`materials/coat_fix.rs`): Bevy 0.20 leaves `clearcoat_N = vec3(0)` when the
+- **Clear-coat fix** (`materials/shader_fixes.rs`): Bevy 0.20 leaves `clearcoat_N = vec3(0)` when the
   PBR fragment loads prepass normals (SSAO on, MSAA off — always the case here); the coat's Fresnel
   goes to ≈ 1 and every coated material (paints, `KHR_materials_clearcoat` props) mirrors the
   environment and reads white. The embedded `pbr_fragment.wesl` is patched once at startup to set
@@ -158,7 +158,7 @@ weather. The environment's **fill light is off** while a volume is used: it is s
 light that lit everything (under decks, under tables) and is baked into the volume instead,
 occluded. `BakedLight { enabled }` switches the volume (and with it the fill) for diagnosis — the
 editor's probes toggle. Binding arrays are off (upstream U7), so Bevy uses one volume per view — one per session
-is all there is. Verified on the Iris Xe (Mesa): no hang, faces where the shader samples them
+is all there is. The probe box reaches 0.1 u past the baked bounds: the shell's walls and ceiling stand on them, and on the box's face Bevy's weight is 0 (black speckles). Outside the volume Bevy would give no diffuse indirect at all; `shader_fixes.rs` patches it to fall back to the environment map (upstream U8). Verified on the Iris Xe (Mesa): no hang, faces where the shader samples them
 (rows `[0, y)` = +axis normals, `[y, 2y)` = −axis — `bevy_pbr`'s module docs say the opposite;
 the shader wins). The editor bakes the files; `keep_cpu_copies()` (editor only) keeps rc_render's
 meshes, materials and textures on the CPU for it.
