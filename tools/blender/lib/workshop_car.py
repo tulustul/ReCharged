@@ -444,10 +444,10 @@ def _rim(bm, c, s, rim_r, w, style):
     mi = core.mi
     hw = w / 2
     rim = mi('car_rim') if style == 'alloy' else mi('car_under')
-    # barrel + lip (outer face at +hw*0.82)
+    # barrel + lip (outer face at +hw*0.82), closed by the barrel's inner wall
     prof = [(rim_r * 0.97, -hw * 0.86), (rim_r * 1.01, -hw * 0.82), (rim_r * 0.92, -hw * 0.6),
             (rim_r * 0.92, hw * 0.55), (rim_r * 1.01, hw * 0.8), (rim_r * 0.99, hw * 0.86),
-            (rim_r * 0.9, hw * 0.84)]
+            (rim_r * 0.9, hw * 0.84), (rim_r * 0.88, -hw * 0.84), (rim_r * 0.97, -hw * 0.86)]
     fs, vs = revolve(bm, prof, rim, n=16)
     if style == 'alloy':  # 5 twin spokes on a hub
         hub = [(rim_r * 0.28, hw * 0.78), (rim_r * 0.24, hw * 0.86), (0.0, hw * 0.86)]
@@ -475,7 +475,8 @@ def _rim(bm, c, s, rim_r, w, style):
                               mi('car_under'), n=6)
             vs += list({v for f in f3 for v in f.verts})
     # brake disc + caliper (inside the barrel, visible through the spokes and from behind)
-    disc = [(rim_r * 0.8, -hw * 0.1), (rim_r * 0.8, hw * 0.12), (0.0, hw * 0.12)]
+    disc = [(rim_r * 0.8, -hw * 0.1), (rim_r * 0.8, hw * 0.12), (0.0, hw * 0.12),
+            (0.0, -hw * 0.1), (rim_r * 0.8, -hw * 0.1)]  # solid
     f5, v5 = revolve(bm, disc, mi('car_disc'), n=16)
     vs += v5
     cal = geo.box(bm, V((0, rim_r * 0.62, -hw * 0.05)), (rim_r * 0.5, rim_r * 0.28, hw * 0.55),

@@ -28,11 +28,12 @@ def wedge_panels(bm, ya, yb, ha, hb, mat_side, mat_top, inset=0.0):
     for s in (-1, 1):
         x = s * (W / 2 - 0.05 - inset)
         geo.extrude_x(bm, prof, x - 0.05, x + 0.05, mat_side)
-    # top sheet: a thin slab following the slope
+    # top sheet: a thin slab following the slope, square-edged where it meets the floor (a
+    # sharp toe is so acute that the part bevel turns it inside out)
     rows = []
     for x in (-W / 2 + inset, W / 2 - inset):
-        rows.append([V((x, ya, max(ha - T, 0.0))), V((x, yb, max(hb - T, 0.0))), V((x, yb, hb)),
-                     V((x, ya, ha))])
+        rows.append([V((x, ya, max(ha - T, 0.0))), V((x, yb, max(hb - T, 0.0))),
+                     V((x, yb, max(hb, T))), V((x, ya, max(ha, T)))])
     return geo._finish(bm, geo._bridge(bm, rows, mat_top))
 
 

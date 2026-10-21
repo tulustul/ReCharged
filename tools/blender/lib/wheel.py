@@ -46,7 +46,8 @@ def _tyre(bm, R, W, rb, tread, n, rows, letter_ring=None):
         prof = prof[:i0 + 1] + groove + prof[i0 + 1:]
     prof = [p for i, p in enumerate(prof) if i == 0 or (p - prof[i - 1]).length > 1e-7]
     rub = core.mi('rubber')
-    fs = geo.revolve_x(bm, [(p.x, p.y) for p in prof], rub, n=n)
+    # closed along the bead seat (facing the axis): a solid tyre, no inside to see through the rim
+    fs = geo.revolve_x(bm, [(p.x, p.y) for p in prof + prof[:1]], rub, n=n)
     if letter_ring:  # raised sidewall ring (white letters / coloured stripe) on the outer side
         r0, r1 = rb + 0.18 * h, rb + 0.42 * h
         xr = x1 + 0.02 * W + 0.002

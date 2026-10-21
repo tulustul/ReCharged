@@ -177,8 +177,8 @@ decals = core.obj_from_bm('decals', bm, weighted=False, angle=60)
 # --- hard parts: blade, bull bar, blower, spoiler, gun receiver -------------------------------
 bm = core.new_bm()
 # dozer blade: concave plate leaning back, wing tips swept back, ribs + push arms behind
-blade = [(HL - 0.002, CLR), (HL - 0.03, CLR + 0.08), (HL - 0.05, CLR + 0.17),
-         (HL - 0.032, CLR + 0.175), (HL - 0.016, CLR + 0.08), (HL - 0.022, CLR)]
+blade = [(HL - 0.002, CLR), (HL - 0.016, CLR + 0.08), (HL - 0.032, CLR + 0.175),
+         (HL - 0.05, CLR + 0.17), (HL - 0.03, CLR + 0.08), (HL - 0.022, CLR)]
 geo.extrude_x(bm, blade[::-1], -0.40, 0.40, RUST)
 for s in (-1, 1):  # swept wing tips
     pts = [V((s * 0.395, 0, 0)), V((s * 0.50, -0.09, 0))]
@@ -285,7 +285,7 @@ for s in (-1, 1):  # outward spikes on the blade wing tips
 round_ = core.obj_from_bm('round', bm, weighted=False, angle=40)
 
 # --- wheels: rusty steel dish rims, chunky block tyres, spiked hubs ---------------------------
-style = dict(tread='block', rim=dict(spokes=0, holes=8, hub=0.34, depth=0.22), rim_ratio=0.56, n=24, rows=13)
+style = dict(tread='block', rim=dict(spokes=0, holes=8, hub=0.34, depth=0.22), rim_ratio=0.56, n=24, rows=12)
 wheels = export.wheels(D, front=style)
 out = []
 for w in wheels:

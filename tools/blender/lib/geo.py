@@ -14,9 +14,14 @@ V = Vector
 # helpers
 
 def _bridge(bm, rings, mat, cap0=True, cap1=True):
-    """Bridge equal-length vertex rings (lists of Vector) into quads; optional n-gon end caps."""
-    vr = [[bm.verts.new(p) for p in r] for r in rings]
+    """Bridge equal-length vertex rings (lists of Vector) into quads; optional n-gon end caps.
+    A point that coincides with the next one in every ring is dropped: its zero-area faces can
+    turn the whole island inside out in `_finish`'s normal recalculation."""
     n = len(rings[0])
+    keep = [j for j in range(n)
+            if any((V(r[j]) - V(r[(j + 1) % n])).length > 1e-6 for r in rings)]
+    vr = [[bm.verts.new(r[j]) for j in keep] for r in rings]
+    n = len(keep)
     out = []
     for a, b in zip(vr, vr[1:]):
         for j in range(n):
@@ -36,6 +41,8 @@ def _finish(bm, fs, orient=True):
     ng = [f for f in fs if len(f.verts) > 4]
     keep = [f for f in fs if len(f.verts) <= 4]
     if ng:
+        for f in ng:  # new faces have no normal yet; triangulate projects along it
+            f.normal_update()
         keep += bmesh.ops.triangulate(bm, faces=ng, quad_method='BEAUTY',
                                       ngon_method='BEAUTY')['faces']
     if orient:

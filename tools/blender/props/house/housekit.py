@@ -52,12 +52,13 @@ MATERIALS = {
     'knit_cream': ('#E3DACA', 0.0, 0.98, 'fabric', {}),
     'leather': ('#7A4E33', 0.0, 0.55, None, {}),
     'metal_black': ('#2B2B2D', 0.0, 0.45, None, {}),       # powder-coated steel
+    'shade_black': ('#2B2B2D', 0.0, 0.45, None, {'two_sided': True}),  # open lamp shade
     'brass': ('#C8A15A', 1.0, 0.32, None, {}),
     'steel': ('#BFC3C7', 1.0, 0.35, None, {}),
     'ceramic': ('#ECE7DD', 0.0, 0.15, None, {}),
     'terracotta': ('#B8653F', 0.0, 0.75, None, {}),
-    'leaf': ('#4E7A3C', 0.0, 0.65, None, {}),
-    'leaf_dark': ('#3B5F31', 0.0, 0.65, None, {}),
+    'leaf': ('#4E7A3C', 0.0, 0.65, None, {'two_sided': True}),
+    'leaf_dark': ('#3B5F31', 0.0, 0.65, None, {'two_sided': True}),
     'soil': ('#3B2C21', 0.0, 0.95, None, {}),
     'pages': ('#EEE7D4', 0.0, 0.85, None, {}),
     'book_red': ('#9A4636', 0.0, 0.80, None, {}),
@@ -74,7 +75,7 @@ MATERIALS = {
     'rubber': ('#262628', 0.0, 0.85, None, {}),
     'worktop': ('#DCD6CB', 0.0, 0.25, None, {}),           # pale quartz
     'tile_wall': (TILE, 0.0, 0.2, 'tile', {}),               # glazed subway tiles (backsplash)
-    'lamp_shade': ('#EFE6D2', 0.0, 0.90, 'fabric', {}),
+    'lamp_shade': ('#EFE6D2', 0.0, 0.90, 'fabric', {'two_sided': True}),
     'bulb': ('#FFF3DC', 0.0, 0.30, None, {'emission': (1.0, 0.80, 0.55), 'strength': 12.0}),
     'glass': ('#1E2124', 0.0, 0.05, None, {}),
     'mirror': ('#E9ECEE', 1.0, 0.04, None, {}),
@@ -90,7 +91,8 @@ def materials(*names):
     for n in names:
         base, metal, rough, tex, extra = MATERIALS[n]
         m = core.material(n, base, metal, rough,
-                          emission=extra.get('emission'), strength=extra.get('strength', 0.0))
+                          emission=extra.get('emission'), strength=extra.get('strength', 0.0),
+                          two_sided=extra.get('two_sided', False))
         if tex:
             nt = m.node_tree
             t = nt.nodes.new('ShaderNodeTexImage')

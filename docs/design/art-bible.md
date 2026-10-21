@@ -22,6 +22,10 @@ GDD §1, §4, §7.1, §17 and PRACTICES §7. Car-specific notes live in `art-car
   light contrast (window vs. lamp, sun vs. sky).
 - **Everything is a PBR material** (metallic-roughness). No baked lighting in albedo, no painted
   highlights, no black outlines.
+- **Meshes are closed and one-sided.** The game culls back faces, so every surface faces out of
+  its solid (tyres are closed along the bead seat, not open shells). Only true sheets seen from
+  both sides — leaves, grass, flowers, lamp shades — get a two-sided material
+  (`core.material(..., two_sided=True)`).
 
 ### 1.1 PBR value ranges
 

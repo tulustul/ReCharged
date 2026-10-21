@@ -198,7 +198,7 @@ def spare(r=0.18, w=0.11, rb=0.105):
                              (w / 2, r - 0.02), (w / 2, rb + 0.03), (w / 2 - 0.012, rb)],
                             [0, 0.02, 0.022, 0.022, 0.02, 0], [0, 1, 2, 2, 1, 0], closed=False)
     prof = [p for i, p in enumerate(prof) if i == 0 or (p - prof[i - 1]).length > 1e-7]
-    geo.revolve_x(bm, [(p.x, p.y) for p in prof], mi('rubber'), n=20)
+    geo.revolve_x(bm, [(p.x, p.y) for p in prof + prof[:1]], mi('rubber'), n=20)  # solid
     for k in range(20):  # chunky tread blocks, staggered
         a = 2 * math.pi * k / 20
         rad, tan = V((0, math.cos(a), math.sin(a))), V((0, -math.sin(a), math.cos(a)))

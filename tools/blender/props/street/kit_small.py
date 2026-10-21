@@ -287,7 +287,7 @@ def barricade():
                         (x0 + 0.42, z + 0.41)]
                 pts = [(min(max(px, -5.0), 5.0), pz) for px, pz in quad]
                 vs = [bm.verts.new(V((px, s * 0.08, pz))) for px, pz in pts]
-                f = bm.faces.new(vs if s > 0 else vs[::-1])
+                f = bm.faces.new(vs if s < 0 else vs[::-1])
                 f.material_index = mi('orange_plastic')
     geo.box(bm, V((-4.4, 0, 4.5)), (0.3, 0.3, 0.35), mi('plastic_black'))
     geo.cylinder(bm, V((-4.4, 0, 4.65)), V((-4.4, 0, 5.1)), 0.32, mi('lamp_amber'), n=12)

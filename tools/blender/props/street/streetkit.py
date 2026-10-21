@@ -54,10 +54,10 @@ MATS = {
     'lawn': dict(base=LAWN, rough=0.85),
     'hedge': dict(base='#3D6A2C', rough=0.9),
     'hedge_light': dict(base='#46743A', rough=0.9),
-    'leaf_red': dict(base=MAPLE_RED, rough=0.75),
-    'leaf_orange': dict(base=MAPLE_ORANGE, rough=0.75),
-    'leaf_yellow': dict(base='#D7A23A', rough=0.75),
-    'leaf_brown': dict(base='#8A5A32', rough=0.8),
+    'leaf_red': dict(base=MAPLE_RED, rough=0.75, two_sided=True),
+    'leaf_orange': dict(base=MAPLE_ORANGE, rough=0.75, two_sided=True),
+    'leaf_yellow': dict(base='#D7A23A', rough=0.75, two_sided=True),
+    'leaf_brown': dict(base='#8A5A32', rough=0.8, two_sided=True),
     'bark': dict(base='#6E5F52', rough=0.92),
     'soil': dict(base='#5E4532', rough=0.95),
     'mulch': dict(base='#6E4A33', rough=0.95),
@@ -230,7 +230,7 @@ def road_wheel(name, center, radius, width, side, spokes=5, rim_ratio=0.58, n=24
             (0.15 * W, R - 0.04 * R), (0.17 * W, R), (x1 - sh, R), (x1 - 0.35 * sh, R - 0.1 * sh),
             (x1, R - sh), (x1 + 0.03 * W, rb + 0.45 * h), (x1 - 0.08 * W, rb)]
     bm_t = bmesh.new()
-    geo.revolve_x(bm_t, prof, mi('rubber'), n=n)
+    geo.revolve_x(bm_t, prof + prof[:1], mi('rubber'), n=n)  # solid: closed along the bead seat
     bm_r = bmesh.new()
     xf = x1 - 0.12 * W                     # face plane
     lip = [(xf - 0.05 * W, rb + 0.01), (xf + 0.01, rb + 0.01), (xf + 0.01, rb - 0.1 * rb),

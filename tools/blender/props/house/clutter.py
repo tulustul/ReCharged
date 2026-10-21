@@ -215,13 +215,13 @@ def toy_truck():
 def pendant():
     """Pendant lamp hanging from the 11.5 u ceiling: black dome shade (35 cm) over a warm bulb,
     shade rim at 7.0 u; origin on the floor below it (catalog light at the bulb)."""
-    mats('metal_black', 'brass', 'bulb', 'plastic_black')
+    mats('metal_black', 'shade_black', 'brass', 'bulb', 'plastic_black')
     bm = core.new_bm()
     n = 28
     prof = [(0.08, 8.15), (0.12, 8.0), (0.55, 7.65), (0.78, 7.2), (0.8, 7.0), (0.76, 7.02)]
     rings = [[V((r * math.cos(2 * math.pi * k / n), r * math.sin(2 * math.pi * k / n), z))
               for k in range(n)] for r, z in prof]
-    geo._bridge(bm, rings, mi('metal_black'), cap0=True, cap1=False)
+    geo._bridge(bm, rings, mi('shade_black'), cap0=True, cap1=False)
     geo.cylinder(bm, V((0, 0, 8.1)), V((0, 0, 8.45)), 0.1, mi('brass'), n=12)
     geo.cylinder(bm, V((0, 0, 8.45)), V((0, 0, 11.5)), 0.02, mi('plastic_black'), n=6)
     geo.cylinder(bm, V((0, 0, 11.4)), V((0, 0, 11.5)), 0.3, mi('metal_black'), n=16)

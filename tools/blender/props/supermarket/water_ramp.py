@@ -22,9 +22,10 @@ def build():
         x = s * (W / 2 - 0.05)
         geo.extrude_x(bm, [(y0, 0.0), (y1, 0.0), (y1, RISE)], x - 0.05, x + 0.05,
                       mi('cardboard_dark'))
-    # the flattened carton: a 0.07 u sheet along the slope
+    # the flattened carton: a 0.07 u sheet along the slope (a square edge at the toe: a bevelled
+    # one is so acute that the part bevel pushes it below the floor)
     prof = lambda x: [V((x, y0, 0.0)), V((x, y1, RISE - 0.07)), V((x, y1, RISE)),  # noqa: E731
-                      V((x, y0 + 0.25, 0.07))]
+                      V((x, y0, 0.07))]
     top = geo._finish(bm, geo._bridge(bm, [prof(-W / 2), prof(W / 2)], mi('packaging')))
     for f in top:
         f.normal_update()

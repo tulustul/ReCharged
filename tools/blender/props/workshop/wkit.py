@@ -395,8 +395,9 @@ def steel_rim(bm, center=(0, 0, 0), axis=(0, 0, 1), rim_r=0.9, w=0.8, n=24, mat=
     prof = [(rim_r * 0.99, -hw * 0.9), (rim_r, -hw * 0.85), (rim_r * 0.93, -hw * 0.6),
             (rim_r * 0.93, hw * 0.6), (rim_r, hw * 0.85), (rim_r * 0.99, hw * 0.9),
             (rim_r * 0.9, hw * 0.88), (rim_r * 0.72, hw * 0.45), (rim_r * 0.36, hw * 0.55),
-            (rim_r * 0.3, hw * 0.62), (0.0, hw * 0.62)]
-    fs, vs = revolve(bm, prof, mi(mat), n=n)
+            (rim_r * 0.3, hw * 0.62), (0.0, hw * 0.62),
+            (0.0, -hw * 0.9), (rim_r * 0.99, -hw * 0.9)]
+    fs, vs = revolve(bm, prof, mi(mat), n=n)  # closed by a flat back plate: a solid wheel
     for i in range(5):  # wheel studs + nuts
         a = 2 * math.pi * i / 5
         c = V((math.cos(a) * rim_r * 0.2, math.sin(a) * rim_r * 0.2, hw * 0.62))
@@ -415,14 +416,14 @@ def steel_rim(bm, center=(0, 0, 0), axis=(0, 0, 1), rim_r=0.9, w=0.8, n=24, mat=
 
 
 def tyre_stack(n, seed=1, name='stack', segs=32):
-    """`n` used tyres lying flat, each nudged and spun a little (hidden sidewalls dropped)."""
+    """`n` used tyres lying flat, each nudged and spun a little."""
     import random
     rng = random.Random(seed)
     bm = core.new_bm()
     w = C.TYRE['w']
     for i in range(n):
         tyre(bm, (rng.uniform(-0.04, 0.04), rng.uniform(-0.04, 0.04), w * (i + 0.5)),
-             bottom=(i == 0), top=(i == n - 1), spin=rng.uniform(0, 360), n=segs)
+             spin=rng.uniform(0, 360), n=segs)
     return core.obj_from_bm(name, bm, weighted=False, angle=60)
 
 

@@ -19,11 +19,12 @@ V = Vector
 
 def materials(spec):
     """Create materials from {name: dict(base=hex, metallic, rough, coat, coat_rough, emission,
-    strength)}; the dict order is the slot order (core.MATS)."""
+    strength, two_sided)}; the dict order is the slot order (core.MATS)."""
     for name, m in spec.items():
         core.material(name, m['base'], m.get('metallic', 0.0), m.get('rough', 0.5),
                       coat=m.get('coat', 0.0), coat_rough=m.get('coat_rough', 0.04),
-                      emission=m.get('emission'), strength=m.get('strength', 0.0))
+                      emission=m.get('emission'), strength=m.get('strength', 0.0),
+                      two_sided=m.get('two_sided', False))
 
 
 def outdoor_stage(ground='#4A4C50', sun_elev=40.0, sun_az=-35.0, size=400.0, hole=None):

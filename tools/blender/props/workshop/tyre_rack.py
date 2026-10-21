@@ -27,11 +27,11 @@ bm = core.new_bm()
 for z in LEVELS:
     for y in (0.95, D - 0.95):  # round bars the tyres sit on
         geo.cylinder(bm, V((-L / 2, y, z + 0.25)), V((L / 2, y, z + 0.25)), 0.12, mi('galvanised'),
-                     n=8)
+                     n=7)
     for k in range(5):
         x = -L / 2 + 1.2 + k * (L - 2.4) / 4
         r = C.TYRE['r'] * rng.uniform(0.96, 1.04)
         tyre(bm, V((x + rng.uniform(-0.1, 0.1), D / 2, z + 0.25 + r - 0.15)), axis=(1, 0, 0), r=r,
-             n=14, inner=False, spin=rng.uniform(0, 360), seg=1)
+             n=12, spin=rng.uniform(0, 360), seg=1)
 tyres = core.obj_from_bm('tyres', bm, weighted=False, angle=60)
 finish('tyre_rack', [frame, tyres], budget=KIT, car=(0.0, D + 3.0, 180.0))

@@ -21,7 +21,7 @@ geo.cylinder(base, V((0, 0, 0.14)), V((0, 0, 1.25)), 0.09, mi('beech'), n=12)
 z = 0.14
 for k in range(6):  # tori around the X axis (x = height), turned upright below
     r, t = 0.56 - 0.045 * k, 0.09 - 0.004 * k
-    prof = [(z + t - t * math.sin(a), r - t + t * math.cos(a))
+    prof = [(z + t + t * math.sin(a), r - t + t * math.cos(a))  # counter-clockwise: faces out
             for a in (2 * math.pi * j / 10 for j in range(11))]
     geo.revolve_x(rings, prof, mi(f'ring{k}'), n=28)
     z += 2 * t

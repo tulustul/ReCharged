@@ -30,9 +30,12 @@ def srgb(hex_or_rgb):
 
 
 def material(name, base, metallic=0.0, roughness=0.5, coat=0.0, coat_rough=0.04,
-             emission=None, strength=0.0):
-    """Principled BSDF material that exports to glTF metallic-roughness (+clearcoat/emissive)."""
+             emission=None, strength=0.0, two_sided=False):
+    """Principled BSDF material that exports to glTF metallic-roughness (+clearcoat/emissive).
+    One-sided (the game culls back faces) unless `two_sided`: leaves, grass and other open
+    shells seen from both sides."""
     m = bpy.data.materials.new(name)
+    m.use_backface_culling = not two_sided
     b = m.node_tree.nodes['Principled BSDF']
     b.inputs['Base Color'].default_value = (*srgb(base), 1.0)
     b.inputs['Metallic'].default_value = metallic

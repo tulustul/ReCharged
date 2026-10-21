@@ -62,18 +62,18 @@ MATS = {
     'rubber': dict(base='#232326', rough=0.88),
     'brass': dict(base='#C9A45A', metallic=1.0, rough=0.35),
     'felt': dict(base='#3B3D40', rough=0.95),
-    'leaf': dict(base='#4C8A2E', rough=0.7),
-    'leaf_dark': dict(base='#2F5E2A', rough=0.7),
-    'leaf_light': dict(base='#7AAE45', rough=0.7),
-    'leaf_blue': dict(base='#5E8C6A', rough=0.65),
-    'grass': dict(base='#5E9A3A', rough=0.8),
-    'grass_dry': dict(base='#9A9A4E', rough=0.85),
-    'stem': dict(base='#5B7A32', rough=0.8),
-    'flower_pink': dict(base=PINK, rough=0.6),
-    'flower_yellow': dict(base=YELLOW, rough=0.6),
-    'flower_red': dict(base='#D2382F', rough=0.6),
-    'flower_white': dict(base='#ECE8DE', rough=0.6),
-    'flower_purple': dict(base='#8C78B4', rough=0.7),
+    'leaf': dict(base='#4C8A2E', rough=0.7, two_sided=True),
+    'leaf_dark': dict(base='#2F5E2A', rough=0.7, two_sided=True),
+    'leaf_light': dict(base='#7AAE45', rough=0.7, two_sided=True),
+    'leaf_blue': dict(base='#5E8C6A', rough=0.65, two_sided=True),
+    'grass': dict(base='#5E9A3A', rough=0.8, two_sided=True),
+    'grass_dry': dict(base='#9A9A4E', rough=0.85, two_sided=True),
+    'stem': dict(base='#5B7A32', rough=0.8, two_sided=True),
+    'flower_pink': dict(base=PINK, rough=0.6, two_sided=True),
+    'flower_yellow': dict(base=YELLOW, rough=0.6, two_sided=True),
+    'flower_red': dict(base='#D2382F', rough=0.6, two_sided=True),
+    'flower_white': dict(base='#ECE8DE', rough=0.6, two_sided=True),
+    'flower_purple': dict(base='#8C78B4', rough=0.7, two_sided=True),
     'bark': dict(base='#5B4838', rough=0.92, tex='grit'),
     'glass': dict(base='#1A222A', rough=0.06),
     'paint_white': dict(base='#E6E3DA', rough=0.5),
@@ -183,7 +183,8 @@ def material(name, seed=None):
     m = MATS[name]
     mat = core.material(name, m['base'], m.get('metallic', 0.0), m.get('rough', 0.5),
                         coat=m.get('coat', 0.0), coat_rough=m.get('coat_rough', 0.04),
-                        emission=m.get('emission'), strength=m.get('strength', 0.0))
+                        emission=m.get('emission'), strength=m.get('strength', 0.0),
+                        two_sided=m.get('two_sided', False))
     if 'tex' in m:
         nt = mat.node_tree
         node = nt.nodes.new('ShaderNodeTexImage')

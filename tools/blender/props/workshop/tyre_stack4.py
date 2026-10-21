@@ -9,4 +9,4 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wkit import *  # noqa: E402,F403
 
 start('tyre', 'rubber')
-finish('tyre_stack4', [tyre_stack(4, seed=4, segs=28)], budget=KIT, car=(3.0, -1.2, 25))
+finish('tyre_stack4', [tyre_stack(4, seed=4, segs=24)], budget=KIT, car=(3.0, -1.2, 25))
