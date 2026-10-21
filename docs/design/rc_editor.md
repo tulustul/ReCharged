@@ -82,7 +82,8 @@ ui/src/editor/     EditorLayer (toolbar, left tabs, right pane), controls.tsx (f
   the track; while editing, `SimSet::Race` (rc_race's phase driver) does not run, so the session
   stays in `RacePhase::Setup`: track, props, lighting, no cars. The editor writes the
   `GameCamera`'s transform (rc_camera holds its pose without a racer) and hides rc_render's
-  `Overhead` entities (ceiling, lamp fixtures; they cast no shadows) so rooms are seen from above.
+  `Overhead` entities (lamp fixtures; they cast no shadows) so rooms are seen from above (the
+  ceiling is a single downward face, culled from above, so it stays shown).
 - **Every edit is built before it is accepted.** An edit runs on a copy of the `Doc`;
   `Track::build` must pass in all four variants (≈ 90 ms on the Iris Xe for Toy Town) and a
   changed catalog entry must leave `catalog.ron` valid (`Catalog::parse` of the rewritten text).
@@ -588,8 +589,8 @@ view) that is hours per track on the Iris Xe. Instead the baker ray-traces the s
   on a surface (round coordinates) sees past it rather than by the sign of a zero.
 - The editor calls `rc_render::keep_cpu_copies()` so meshes, materials and textures stay on the
   CPU. Every opaque mesh in the session — `StandardMaterial` (props, decor) and `SurfaceMaterial`
-  (ground, ribbons, walls, the room shell; its `StandardMaterial` base), the ceiling too (editing
-  only hides it) — becomes world triangles in a parry `TriMesh` (≈ 0.83 M for Toy Town); albedo =
+  (ground, ribbons, walls, the room shell; its `StandardMaterial` base), the ceiling too (a single
+  downward face) — becomes world triangles in a parry `TriMesh` (≈ 0.83 M for Toy Town); albedo =
   base colour × the texture's mean colour; double-sided materials are noted.
 - Lights as the game has them in clear weather: the key (always shadowed), point and spot lights
   (lumens / 4π, Bevy's range fall-off and cone). Shadow rays see only meshes that cast shadows in

@@ -40,7 +40,7 @@ fn push(m: &mut MeshData, p: Vec3, n: Vec3, uv: [f32; 2]) -> u32 {
 }
 
 /// Appends a flat convex polygon (any winding) facing away from the point `inside`.
-fn face(m: &mut MeshData, pts: &[Vec3], inside: Vec3) {
+pub(crate) fn face(m: &mut MeshData, pts: &[Vec3], inside: Vec3) {
     let count = pts.len();
     let centroid = pts.iter().copied().sum::<Vec3>() / count as f32;
     // Newell's normal: robust for any planar polygon.

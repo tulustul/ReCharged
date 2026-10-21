@@ -3,17 +3,17 @@
 //! environment's `room.height`); outdoors a ground plane reaching past the play area so the world
 //! never ends at its edge. Walls cast shadows (the window openings make sun patches); the ceiling
 //! does not, so the shadowed key light reaches the whole room like a skylight (T13a's lighting
-//! model). rc_render's lighting glazes the openings.
+//! model), and is one face looking down, so views from above see into the room. rc_render's
+//! lighting glazes the openings.
 
 use bevy::light::NotShadowCaster;
 use bevy::prelude::*;
 use rc_track::{MeshData, Track};
 
-use crate::capture::Overhead;
 use crate::content::mesh_from_data;
 use crate::lighting::{ActiveEnvironment, RoomDef, WindowDef, WindowWall};
 use crate::materials::{MaterialLibrary, SurfaceMaterial};
-use crate::props::shapes::chamfer_box;
+use crate::props::shapes::{chamfer_box, face};
 
 /// Shell wall thickness (u); the inner faces stand on the bounds.
 const WALL_U: f32 = 1.0;
@@ -81,19 +81,26 @@ pub(super) fn spawn(
     let [walls, trim] = room_meshes(min, max, room);
     add(walls, "room walls", role("wall"), true);
     add(trim, "room trim", role("trim"), true);
-    let lid = Vec3::new(WALL_U, 0.0, WALL_U);
-    let ceiling = chamfer_box(
-        Vec3::new(
-            (min.x + max.x) * 0.5,
-            room.height + WALL_U * 0.5,
-            (min.z + max.z) * 0.5,
-        ),
-        ((max - min) * 0.5 + lid).with_y(WALL_U * 0.5),
-        0.0,
+    add(
+        ceiling(min, max, room.height),
+        "room ceiling",
+        role("ceiling"),
+        false,
     );
-    if let Some(e) = add(ceiling, "room ceiling", role("ceiling"), false) {
-        commands.entity(e).insert(Overhead);
-    }
+}
+
+/// The ceiling: one face looking down over the room and the walls, culled from above, so views
+/// from outside the room (the editor, cutaway previews) see in.
+fn ceiling(min: Vec3, max: Vec3, height: f32) -> MeshData {
+    let (lo, hi) = (min - WALL_U, max + WALL_U);
+    let corners = [(lo.x, lo.z), (hi.x, lo.z), (hi.x, hi.z), (lo.x, hi.z)];
+    let mut m = MeshData::default();
+    face(
+        &mut m,
+        &corners.map(|(x, z)| Vec3::new(x, height, z)),
+        Vec3::new(0.0, height + 1.0, 0.0),
+    );
+    m
 }
 
 /// A thin floor slab over the x/z box with its top just below `top`.
@@ -332,6 +339,16 @@ mod tests {
             let inside = (lo.x..hi.x).contains(&centre.x) && (lo.z..hi.z).contains(&centre.z);
             assert!(!inside, "a ring piece covers the play area");
         }
+    }
+
+    #[test]
+    fn the_ceiling_faces_down_only() {
+        let m = ceiling(Vec3::splat(-10.0), Vec3::splat(10.0), 8.0);
+        assert!(m.normals.iter().all(|n| n[1] < -0.999), "{:?}", m.normals);
+        // Counter-clockwise seen from below.
+        let p = |i: u32| Vec3::from_array(m.positions[i as usize]);
+        let [a, b, c] = [0, 1, 2].map(|i| p(m.indices[i]));
+        assert!((b - a).cross(c - a).y < 0.0);
     }
 
     #[test]

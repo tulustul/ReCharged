@@ -171,8 +171,8 @@ pub fn anchor(doc: &Doc, item: EditorItem) -> Option<Vec3> {
     })
 }
 
-/// Editing looks into rooms from above: the ceiling and lamp fixtures hide (they cast no shadows,
-/// so the lighting stays the same); test drives show them.
+/// Editing looks into rooms from above: the lamp fixtures hide (they cast no shadows, so the
+/// lighting stays the same; the ceiling is culled from above); test drives show them.
 fn cutaway(editor: Res<Editor>, mut overhead: Query<&mut Visibility, With<rc_render::Overhead>>) {
     let shown = if editor.mode == Mode::Editing {
         Visibility::Hidden

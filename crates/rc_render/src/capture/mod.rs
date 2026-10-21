@@ -67,8 +67,9 @@ const CUTAWAY_HEIGHT: f32 = 2.2;
 #[derive(Component, Debug, Clone, Copy)]
 struct CaptureCamera;
 
-/// Room ceiling and lamp fixtures: hidden for cutaway previews of low rooms and while the track
-/// editor edits (they cast no shadows, so the lighting stays the same).
+/// Ceiling lamp fixtures: hidden for cutaway previews of low rooms and while the track editor
+/// edits (they cast no shadows, so the lighting stays the same). The ceiling itself is culled from
+/// above.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Overhead;
 
