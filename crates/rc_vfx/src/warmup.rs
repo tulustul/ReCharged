@@ -79,6 +79,7 @@ struct Params<'w> {
     meshes: ResMut<'w, Assets<Mesh>>,
     materials: ResMut<'w, Assets<StandardMaterial>>,
     precips: ResMut<'w, Assets<PrecipMaterial>>,
+    bolts: ResMut<'w, Assets<lightning::BoltMaterial>>,
 }
 
 /// One never-culled instance of every effect mesh/material pair at `origin`, scoped to `state`.
@@ -89,6 +90,7 @@ fn spawn(mut commands: Commands, params: Params, state: AppState, origin: Vec3) 
         mut meshes,
         mut materials,
         mut precips,
+        mut bolts,
     } = params;
     let at = Transform::from_translation(origin).with_scale(Vec3::splat(SCALE));
     let scope = (
@@ -122,11 +124,14 @@ fn spawn(mut commands: Commands, params: Params, state: AppState, origin: Vec3) 
     );
     commands.spawn((pbr(&skid.0, skid.1), NotShadowCaster, scope.clone()));
     let bolt = lightning::bolt_mesh(&[(vec![Vec3::ZERO, Vec3::Y], 1.0)], Vec3::Z);
-    let bolt = (
-        meshes.add(bolt),
-        materials.add(lightning::bolt_material(LinearRgba::BLACK)),
-    );
-    commands.spawn((pbr(&bolt.0, bolt.1), NotShadowCaster, scope.clone()));
+    commands.spawn((
+        Mesh3d(meshes.add(bolt)),
+        MeshMaterial3d(bolts.add(lightning::bolt_material(LinearRgba::BLACK))),
+        at,
+        NoFrustumCulling,
+        NotShadowCaster,
+        scope.clone(),
+    ));
     // Shields, EMP shells and the orb's field.
     commands.spawn((
         Mesh3d(assets.sphere.clone()),

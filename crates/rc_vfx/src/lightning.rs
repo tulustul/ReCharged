@@ -7,7 +7,10 @@ use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::{NoFrustumCulling, RenderLayers};
 use bevy::light::NotShadowCaster;
 use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
 use rc_core::prelude::*;
 
 use bevy::mesh::MeshTag;
@@ -19,6 +22,8 @@ use crate::fx::{Fx, FxRng, sprite};
 use crate::particles::{Facing, Look, Shape, pack_tag};
 use crate::weather::player_layer;
 
+/// The bolt shader (`assets/shaders/vfx/bolt.wesl`).
+const BOLT_SHADER: &str = "shaders/vfx/bolt.wesl";
 /// Sky bolts strike this far from the camera (u) and last this long (s).
 const BOLT_DISTANCE_U: (f32, f32) = (150.0, 230.0);
 const BOLT_LIFE_S: f32 = 0.5;
@@ -39,7 +44,7 @@ const GLOW_LIFE_S: f32 = 1.0;
 /// One sky bolt for one camera.
 #[derive(Component, Debug)]
 struct SkyBolt {
-    material: Handle<StandardMaterial>,
+    material: Handle<BoltMaterial>,
     age: f32,
     peak: LinearRgba,
 }
@@ -51,7 +56,29 @@ struct SkyGlow {
     peak: LinearRgba,
 }
 
+/// An unlit additive bolt that fades where it meets opaque geometry (soft particles).
+pub(crate) type BoltMaterial = ExtendedMaterial<StandardMaterial, BoltExtension>;
+
+/// The soft-fading fragment stage of [`BoltMaterial`].
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
+pub(crate) struct BoltExtension {}
+
+impl MaterialExtension for BoltExtension {
+    fn fragment_shader() -> ShaderRef {
+        BOLT_SHADER.into()
+    }
+
+    fn enable_prepass() -> bool {
+        false
+    }
+
+    fn enable_shadows() -> bool {
+        false
+    }
+}
+
 pub(crate) fn build(app: &mut App) {
+    app.add_plugins(MaterialPlugin::<BoltMaterial>::default());
     app.add_systems(
         Update,
         (sky_lightning, fade_bolts, fade_glows).in_set(crate::VfxSystems::Emit),
@@ -126,15 +153,18 @@ pub(crate) fn bolt_mesh(paths: &[(Vec<Vec3>, f32)], eye: Vec3) -> Mesh {
 }
 
 /// The additive material of a bolt at brightness `peak` (faded by `fade_bolts`).
-pub(crate) fn bolt_material(peak: LinearRgba) -> StandardMaterial {
-    StandardMaterial {
-        base_color: Color::from(peak),
-        unlit: true,
-        alpha_mode: AlphaMode::Add,
-        fog_enabled: false,
-        double_sided: true,
-        cull_mode: None,
-        ..default()
+pub(crate) fn bolt_material(peak: LinearRgba) -> BoltMaterial {
+    BoltMaterial {
+        base: StandardMaterial {
+            base_color: Color::from(peak),
+            unlit: true,
+            alpha_mode: AlphaMode::Add,
+            fog_enabled: false,
+            double_sided: true,
+            cull_mode: None,
+            ..default()
+        },
+        extension: BoltExtension {},
     }
 }
 
@@ -145,7 +175,7 @@ fn sky_lightning(
     mut fx: ResMut<Fx>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<BoltMaterial>>,
     assets: Res<VfxAssets>,
     cameras: Query<(&GameCamera, &GlobalTransform, &Projection)>,
 ) {
@@ -220,7 +250,7 @@ fn fade_bolts(
     time: Res<Time>,
     mut commands: Commands,
     mut bolts: Query<(Entity, &mut SkyBolt)>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<BoltMaterial>>,
 ) {
     for (entity, mut bolt) in &mut bolts {
         bolt.age += time.delta_secs();
@@ -229,7 +259,7 @@ fn fade_bolts(
             continue;
         }
         if let Some(mut m) = materials.get_mut(&bolt.material) {
-            m.base_color = Color::from(bolt.peak * strike_brightness(bolt.age));
+            m.base.base_color = Color::from(bolt.peak * strike_brightness(bolt.age));
         }
     }
 }

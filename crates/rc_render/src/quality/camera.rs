@@ -1,5 +1,6 @@
 //! Camera decoration: rc_camera spawns bare `GameCamera` / `MenuCamera`s; this adds HDR, filmic
-//! tonemapping, `Msaa::Off` and the per-quality post-processing, and re-applies it live whenever
+//! tonemapping, `Msaa::Off`, a depth prepass (soft particles) and the per-quality post-processing,
+//! and re-applies it live whenever
 //! the settings or the number of player views change. The split-screen `OverlayCamera` is never
 //! touched.
 
@@ -97,7 +98,7 @@ fn mark<C: Component>(add: On<Add<C>>, mut commands: Commands) {
 fn decorate(add: On<Add<QualityCamera>>, mut commands: Commands) {
     commands
         .entity(add.entity)
-        .insert((Hdr, Tonemapping::TonyMcMapface, Msaa::Off));
+        .insert((Hdr, Tonemapping::TonyMcMapface, Msaa::Off, DepthPrepass));
 }
 
 /// Number of player views: game cameras on screen (menus: 1). While Loading, before the game
@@ -207,12 +208,10 @@ fn apply(camera: &mut EntityCommands, old: Option<ViewQuality>, new: ViewQuality
     );
 
     // Drop prepasses this module needed before and no longer needs (never ones it did not add).
+    // The depth prepass stays: particles fade against it.
     if let Some(old) = old {
-        let (depth, normal, motion) = prepasses(old);
-        let (new_depth, new_normal, new_motion) = prepasses(new);
-        if depth && !new_depth {
-            camera.remove::<DepthPrepass>();
-        }
+        let (normal, motion) = prepasses(old);
+        let (new_normal, new_motion) = prepasses(new);
         if normal && !new_normal {
             camera.remove::<NormalPrepass>();
         }
@@ -230,14 +229,10 @@ fn toggle<C: Component>(camera: &mut EntityCommands, on: bool, component: C) {
     }
 }
 
-/// Prepasses (depth, normal, motion vectors) the effects of `q` require.
-fn prepasses(q: ViewQuality) -> (bool, bool, bool) {
+/// Prepasses (normal, motion vectors) the effects of `q` require besides the depth prepass.
+fn prepasses(q: ViewQuality) -> (bool, bool) {
     let taa = q.aa == AaMode::Taa;
-    (
-        taa || q.ssao.is_some() || q.motion_blur || q.contact_shadows,
-        q.ssao.is_some(),
-        taa || q.motion_blur,
-    )
+    (q.ssao.is_some(), taa || q.motion_blur)
 }
 
 #[cfg(test)]
@@ -247,7 +242,7 @@ mod tests {
     #[test]
     fn prepasses_cover_every_effect_that_needs_them() {
         let base = view_quality(&GraphicsSettings::default(), 1);
-        assert_eq!(prepasses(base), (true, true, true));
+        assert_eq!(prepasses(base), (true, true));
         let none = ViewQuality {
             aa: AaMode::Fxaa,
             ssao: None,
@@ -256,12 +251,12 @@ mod tests {
             contact_shadows: false,
             volumetric_fog: false,
         };
-        assert_eq!(prepasses(none), (false, false, false));
+        assert_eq!(prepasses(none), (false, false));
         let blur = ViewQuality {
             motion_blur: true,
             ..none
         };
-        assert_eq!(prepasses(blur), (true, false, true));
+        assert_eq!(prepasses(blur), (false, true));
     }
 
     #[test]

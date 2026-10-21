@@ -4,8 +4,16 @@
 // dragging it along; each camera's mesh sits on that camera's own render layer.
 //   vertex: position = random seed in [0,1)^3, uv = corner (x −0.5..0.5, y 0..1),
 //           uv_b = (rank 0..1: drops above `amount` collapse, size variation 0..1)
+// Drops fade where they meet opaque geometry (soft particles) when the view has a depth prepass.
 
-import bevy_pbr::render::mesh_view_bindings::view;
+import bevy_pbr::render::{
+    mesh_view_bindings::view,
+    view_transformations::depth_ndc_to_view_z,
+};
+import bevy_pbr::prepass::utils as prepass_utils;
+
+// A drop fades out over this distance (u) in front of the scene behind it.
+const SOFT_DEPTH: f32 = 0.25;
 
 // xyz: fall velocity (u/s, wind included), w: precipitation clock (s; stops while paused)
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> motion: vec4<f32>;
@@ -94,5 +102,10 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         a = across * (1.0 - in.corner.y * 0.8);
     }
     a = a * color.a * in.fade;
+    @if(DEPTH_PREPASS)
+    {
+        let scene = depth_ndc_to_view_z(prepass_utils::prepass_depth(in.clip, 0u));
+        a *= clamp((depth_ndc_to_view_z(in.clip.z) - scene) / SOFT_DEPTH, 0.0, 1.0);
+    }
     return vec4<f32>(color.rgb * a, a);
 }
