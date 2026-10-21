@@ -1,7 +1,7 @@
 //! Track visuals (ARCHITECTURE §5.9): the session's `TrackGeometry` as meshes — ribbon runs
 //! (driving surface, lips or curbs, sides), barriers in the environment's style ([`barriers`]),
 //! way-finding marks ([`guides`]: edge tape, corner arrows, chevron boards, crosses) and ground
-//! polygons — plus the room shell or the outdoor ground beyond the play area
+//! polygons (water in its own material, [`water`]) — plus the room shell or the outdoor ground beyond the play area
 //! ([`shell`]), all in the environment's
 //! `MaterialLibrary` materials (surfaces by `SurfaceKind`, everything else by role name, so each
 //! environment file picks its look). Built while `Loading`, session-scoped; in a race they are
@@ -11,6 +11,7 @@
 mod barriers;
 mod guides;
 pub(crate) mod shell;
+mod water;
 
 use std::time::Instant;
 
@@ -259,7 +260,27 @@ fn spawn_meshes(
         .fold(f32::INFINITY, f32::min);
     for (g, area) in geo.ground.iter().zip(track.ground()) {
         let raised = area.height > floor + RAISED_GROUND_U;
-        piece(&g.mesh, library.surface(g.surface), raised, "ground");
+        if g.surface != SurfaceKind::Water {
+            piece(&g.mesh, library.surface(g.surface), raised, "ground");
+        }
+    }
+    for g in geo
+        .ground
+        .iter()
+        .filter(|g| g.surface == SurfaceKind::Water)
+    {
+        let (data, shore) = water::water_mesh(&g.mesh);
+        let Some(mut mesh) = mesh_with_tangents(&data, exact) else {
+            continue;
+        };
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, shore);
+        commands.spawn((
+            Name::new("water"),
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(library.water()),
+            NotShadowCaster,
+            ChildOf(root),
+        ));
     }
     shell::spawn(commands, root, track, env, library, meshes);
     let tris = geo

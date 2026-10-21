@@ -1,7 +1,7 @@
 # rc_vfx — visual effects (design note, T14)
 
 Juicy, readable, cheap effects for driving, items and weather, correct in split-screen. Code:
-`crates/rc_vfx/src/`, shaders `assets/shaders/vfx/{particle,bubble,precip}.wesl`, lab
+`crates/rc_vfx/src/`, shaders `assets/shaders/vfx/{particle,bubble,precip,bolt}.wesl`, lab
 `crates/rc_vfx/examples/vfx_lab/`. rc_vfx only spawns visual entities (and adds `RenderLayers` to
 each `GameCamera`); it never writes simulation state.
 
@@ -50,7 +50,9 @@ rapier body. Session entities (particle slots, skid mesh, precipitation, name at
   meet opaque geometry, over half their size (width of stretched ones) in front of the scene
   depth (`soft_fade` in `particle.wesl`), so puffs no longer cut a hard line into the ground.
   EMP/orb shells (`bubble.wesl`, 0.3 u), rain and snow (`precip.wesl`, 0.25 u) and sky bolts
-  (`bolt.wesl`, `BoltMaterial`, 4 u) fade the same way. Flat particles, skid marks and oil keep
+  (`bolt.wesl`, `BoltMaterial`, 4 u) fade the same way; the shells also glow along the cut
+  (`CONTACT_U` 0.06 u: a bright line on the ground, cars lit as the shell sweeps over them).
+  Flat particles, skid marks and oil keep
   their edges (they lie on the ground by design). Every rc_render view has a depth prepass
   (`quality/camera.rs`), whatever the quality.
 
@@ -73,7 +75,7 @@ comes from telemetry (`forward_speed`, `speed × sin(slip)`).
 | Respawn | `CarRespawned` | `ToTrack`: scan ring rising through the car, beam, converging sparkles; flip: sparkles |
 | Finish | `RaceEvent::Finished` of a local player | 160–240 tumbling confetti, gold sparkles for 1st |
 | Stun | `StatusEffects::power_mul() < 0.05` (EMP, Storm Strike) | blue arcs crawling over the body |
-| Skid marks | slip > 0.35 on hard floors, > 0.15–0.2 on grass/dirt, always in snow | dark rubber, torn grass, ruts, grey snow tracks; segments every 0.3 u; fade 14 → 22 s; ring of 2400 × density segments; one dynamic mesh rebuilt only when a segment is added or while marks fade (buffers reused) |
+| Skid marks | slip > 0.35 on hard floors, > 0.15–0.2 on grass/dirt, always in snow | dark rubber, torn grass, ruts, grey snow tracks; segments every 0.3 u; fade 14 → 22 s; ring of 2400 × density segments; one dynamic mesh rebuilt only when a segment is added or while marks fade (buffers reused); a forward decal (`ForwardDecalMaterial`, 0.12 u depth): each pixel lands on the surface behind the ribbon, so marks follow curbs and crests |
 
 ## Items (`items.rs`, `hazards.rs`, `blasts.rs`)
 Visuals are separate entities bound to their item by `Follows` (despawned when the item is gone)
@@ -89,7 +91,7 @@ and drawn at `ItemRadius` wherever a reach matters — **what you see is what tr
 | Leech Coil | two wobbling acid-green strands owner → target, charge motes flowing to the owner; sparks orbit the coil while it searches |
 | EMP | wind-up shell swelling around the user + converging sparks; pulse: two rings racing to the pulse radius, an expanding rim-only shell, radial arcs |
 | Goo Bomb | glossy slime blob on its carrier, red light blinking 1 s → 0.12 s as the fuse runs out, drips; last 2 s: red ring of the blast radius on the ground; blast: slime splatter across the radius |
-| Oil Slick | dark puddle with thin-film sheen (generated texture) at its radius; spreads in 0.4 s, shrinks over its last 1.5 s |
+| Oil Slick | dark puddle with thin-film sheen (generated texture) at its radius, a `ForwardDecal` (0.15 u depth: flows over curbs and ribbon edges); spreads in 0.4 s, shrinks over its last 1.5 s |
 | Spring Pad | rubber base, chrome coils, yellow plate, glowing ring at its radius; bounces (damped spring) + sparks when it launches someone; shrinks away over its last 1.5 s like a drying puddle (a used-up pad gets exactly that long) |
 | Shield Bubble | drawn by the car body's shader (rc_render `car_status.wesl`: cyan rim, flare on blocked hits, blink in the last 2 s); rc_vfx bursts it into shards when it ends |
 | Storm Strike | `HitEvent { by: StormStrike }`: jagged bolt (midpoint displacement) from 26 u above, branches, glow, flash, sparks |
@@ -144,8 +146,8 @@ the Intro froze it for ≈ 1 s (pickup glass, sprites, name tags), later ones hi
 (skid marks, shields). `OnEnter(Loading)` and, in human runs, the menu (once the showroom is
 ready and no shader asset has arrived for 1 s, as rc_render's menu warm-up waits) spawn one
 `NoFrustumCulling` instance of every pair the effects draw — particle quad, item parts (shadowless and
-shadow-casting), Volt Cube glass, oil (same pipeline as the name tags), skid-mark mesh and
-material, bubble shell, lightning bolt, precipitation (amount 0) — scoped to that state (in the
+shadow-casting), Volt Cube glass, a plain alpha-blended material (the name tags' pipeline),
+oil and skid marks (forward decals), bubble shell, lightning bolt, precipitation (amount 0) — scoped to that state (in the
 menu at (0, −600, 0), rc_render's menu warm-up scene, out of the showroom's view). Every 3D camera
 draws them: rc_render's menu warm-up cameras compile them for every view variant once per run,
 its Loading warm-up camera whatever the race still needs (`docs/design/rc_render.md`). New effect
@@ -182,7 +184,8 @@ never exceed the budget; each camera sees only its own precipitation.
   `cargo run -p rc_vfx --example vfx_lab -- --scene
   <shapes|drive|sparks|items|blasts|events|weather> [--chase] [--snow] --screenshot <png>
   --screenshot-at 2,3 --exit-after 4`. The lab's views have a depth prepass like the game's;
-  `--hard` leaves it out to compare soft particles (`--scene events`: landing puffs).
+  `--hard` leaves it out to compare soft particles (`--scene events`: landing puffs); skid marks
+  and oil (forward decals) need it and do not draw then.
 - Warm-up: `RUST_LOG=rc_render=debug` names every pipeline compiled; after the warm-up a race's
   start logs `race start: 0 pipelines compiled after the warm-up` (rc_render).
 - Game: `cargo run -p recharged -- --user-data-dir target/agent-data/T14 --quick-race test_oval

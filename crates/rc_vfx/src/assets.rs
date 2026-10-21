@@ -4,6 +4,7 @@
 
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::pbr::decal::{ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
@@ -17,6 +18,9 @@ const PARTICLE_SHADER: &str = "shaders/vfx/particle.wesl";
 const BUBBLE_SHADER: &str = "shaders/vfx/bubble.wesl";
 /// Side of the generated oil-sheen texture, px.
 const OIL_TEXTURE_PX: u32 = 128;
+/// An oil slick (a forward decal) fades out on surfaces this far from its plane (u): it flows
+/// over curbs and ribbon edges without staining the barriers beside it.
+const OIL_DEPTH_U: f32 = 0.15;
 
 /// The particle material: `StandardMaterial` lighting with a billboarding vertex stage and
 /// procedural shapes decoded from each instance's `MeshTag` (see [`crate::particles`]).
@@ -104,8 +108,6 @@ pub struct VfxAssets {
     pub cone: Handle<Mesh>,
     /// Coil ring of the Spring Pad (outer diameter 1).
     pub torus: Handle<Mesh>,
-    /// Unit square in the XZ plane facing +Y (ground decals).
-    pub decal: Handle<Mesh>,
     /// Translucent glowing glass of the Volt Cubes.
     pub cube_glass: Handle<StandardMaterial>,
     /// Glossy white plastic (rocket body).
@@ -124,8 +126,8 @@ pub struct VfxAssets {
     pub spring_plate: Handle<StandardMaterial>,
     /// Glowing plasma core (Shock Orb).
     pub plasma: Handle<StandardMaterial>,
-    /// Dark oil with a rainbow sheen (Oil Slick).
-    pub oil: Handle<StandardMaterial>,
+    /// Dark oil with a rainbow sheen (Oil Slick; a forward decal).
+    pub oil: Handle<ForwardDecalMaterial<StandardMaterial>>,
     /// Faint violet field showing a Shock Orb's knock radius.
     pub orb_field: Handle<BubbleMaterial>,
 }
@@ -145,6 +147,7 @@ fn create_assets(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut particle_materials: ResMut<Assets<ParticleMaterial>>,
     mut bubbles: ResMut<Assets<BubbleMaterial>>,
+    mut decals: ResMut<Assets<ForwardDecalMaterial<StandardMaterial>>>,
 ) {
     let mut pbr = |base: [f32; 3], rough: f32, metal: f32, glow: LinearRgba| {
         materials.add(StandardMaterial {
@@ -195,7 +198,6 @@ fn create_assets(
             minor_radius: 0.07,
             major_radius: 0.43,
         }),
-        decal: meshes.add(Plane3d::default().mesh().size(1.0, 1.0)),
         cube_glass: materials.add(StandardMaterial {
             base_color: Color::srgba(0.35, 0.85, 1.0, 0.28),
             emissive: LinearRgba::rgb(0.25, 1.1, 1.8),
@@ -229,12 +231,17 @@ fn create_assets(
             unlit: true,
             ..default()
         }),
-        oil: materials.add(StandardMaterial {
-            base_color_texture: Some(oil_texture),
-            perceptual_roughness: 0.06,
-            reflectance: 0.6,
-            alpha_mode: AlphaMode::Blend,
-            ..default()
+        oil: decals.add(ForwardDecalMaterial {
+            base: StandardMaterial {
+                base_color_texture: Some(oil_texture),
+                perceptual_roughness: 0.06,
+                reflectance: 0.6,
+                alpha_mode: AlphaMode::Blend,
+                ..default()
+            },
+            extension: ForwardDecalMaterialExt {
+                depth_fade_factor: OIL_DEPTH_U,
+            },
         }),
         orb_field: bubbles.add(BubbleMaterial::new(LinearRgba::rgb(0.5, 0.3, 1.2), 0.3)),
     });

@@ -6,6 +6,7 @@
 
 use bevy::light::NotShadowCaster;
 use bevy::mesh::MeshTag;
+use bevy::pbr::decal::ForwardDecal;
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
@@ -154,13 +155,9 @@ fn spawn_hazard(
             commands
                 .spawn((base, OilFx { age: 0.0 }, Name::new("Oil Slick visual")))
                 .with_child((
-                    Mesh3d(assets.decal.clone()),
+                    ForwardDecal,
                     MeshMaterial3d(assets.oil.clone()),
-                    Transform::from_xyz(0.0, 0.015, 0.0).with_scale(Vec3::new(
-                        2.0 * r,
-                        1.0,
-                        2.0 * r,
-                    )),
+                    Transform::from_scale(Vec3::new(2.0 * r, 1.0, 2.0 * r)),
                     NotShadowCaster,
                 ));
         }

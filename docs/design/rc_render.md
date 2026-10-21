@@ -187,8 +187,13 @@ widening) written as KTX2 + Zstandard by our own writer (stdlib `compression.zst
 `ktx validate`). 32 MB total, 1024² for hero ground, 512² for walls/props. Loaded with repeat
 addressing and 16× anisotropy; missing sets fall back to flat colours instead of invisible meshes.
 UVs are world units; `tile_u` per set/material; `hue_variation` drifts macro patches toward a
-drier tint (lawns). Water: light muddy base under a clear coat (puddles mirror the sky instead of
-reading as holes). Environment files override the built-in names
+drier tint (lawns). Water ground areas have their own `WaterMaterial` (`water.wesl`, every
+environment): drawn in the transmissive pass and absent from the depth prepass, it shows the bed
+through a dark tint, mirrors what is on screen (32-step ray march against the depth prepass,
+sampled from the opaque scene copy; `ScreenSpaceTransmission` on every view) with the environment
+map and light glints where the ray leaves the screen (F0 0.1: puddles read as mirrors), ripples
+gently, and foams in clumps along the shore (an inset ring in the mesh, UV_1 = 0 on the outline
+→ 1 at 0.45 u; `track_visuals/water.rs`). Environment files override the built-in names
 (`floor`, `wall`, `ceiling`, `trim`, `barrier`, `ribbon_side`, generic sets, toy palette) and map
 surfaces to them. Car paint: clear coat 1.0 (0.04 solid / 0.06 metallic coat roughness, none on
 chrome).

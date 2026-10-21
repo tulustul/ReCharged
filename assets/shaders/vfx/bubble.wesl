@@ -1,7 +1,8 @@
 // rc_vfx energy shell (crates/rc_vfx/src/assets.rs, BubbleMaterial): Shield Bubble, EMP shells.
 // Additive (premultiplied output with alpha 0): a bright fresnel rim, a faint body, slow bands
-// rising over the surface and a hit flash. Uses Bevy's default mesh vertex stage. Fades where it
-// meets opaque geometry (soft particles) when the view has a depth prepass.
+// rising over the surface and a hit flash. Uses Bevy's default mesh vertex stage. With the view's
+// depth prepass the body fades where it meets opaque geometry (soft particles) and a bright line
+// glows along the cut (the ground, cars inside the shell).
 
 import bevy_pbr::render::{
     forward_io::VertexOutput,
@@ -12,6 +13,9 @@ import bevy_pbr::prepass::utils as prepass_utils;
 
 // The shell fades out over this distance (u) in front of the scene behind it.
 const SOFT_DEPTH: f32 = 0.3;
+// The contact line: width (u, an exponential falloff) and brightness relative to the rim.
+const CONTACT_U: f32 = 0.06;
+const CONTACT_GLOW: f32 = 1.5;
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> color: vec4<f32>;
 // x: rim exponent, y: rim intensity, z: body intensity, w: hit flash 0..1
@@ -31,7 +35,8 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> @locatio
     @if(DEPTH_PREPASS)
     {
         let scene = depth_ndc_to_view_z(prepass_utils::prepass_depth(in.position, 0u));
-        i *= clamp((depth_ndc_to_view_z(in.position.z) - scene) / SOFT_DEPTH, 0.0, 1.0);
+        let gap = max(depth_ndc_to_view_z(in.position.z) - scene, 0.0);
+        i = i * min(gap / SOFT_DEPTH, 1.0) + params.y * CONTACT_GLOW * exp(-gap / CONTACT_U);
     }
     return vec4<f32>(color.rgb * i, 0.0);
 }

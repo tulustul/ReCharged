@@ -13,6 +13,7 @@
 
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::NotShadowCaster;
+use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial};
 use bevy::prelude::*;
 use bevy::shader::Shader;
 use rc_core::prelude::*;
@@ -80,6 +81,7 @@ struct Params<'w> {
     materials: ResMut<'w, Assets<StandardMaterial>>,
     precips: ResMut<'w, Assets<PrecipMaterial>>,
     bolts: ResMut<'w, Assets<lightning::BoltMaterial>>,
+    decals: ResMut<'w, Assets<ForwardDecalMaterial<StandardMaterial>>>,
 }
 
 /// One never-culled instance of every effect mesh/material pair at `origin`, scoped to `state`.
@@ -91,6 +93,7 @@ fn spawn(mut commands: Commands, params: Params, state: AppState, origin: Vec3) 
         mut materials,
         mut precips,
         mut bolts,
+        mut decals,
     } = params;
     let at = Transform::from_translation(origin).with_scale(Vec3::splat(SCALE));
     let scope = (
@@ -108,21 +111,37 @@ fn spawn(mut commands: Commands, params: Params, state: AppState, origin: Vec3) 
     };
     // Particles, sprites, icons and markers (sprites are never culled anyway).
     commands.spawn((sprite(&assets, &Look::DEFAULT, at), scope.clone()));
-    // Item parts (shadowless), Volt Cube glass, oil slicks (and the name tags: same pipeline).
+    // Item parts (shadowless), Volt Cube glass, the name tags' alpha blend.
+    let blend = materials.add(StandardMaterial {
+        alpha_mode: AlphaMode::Blend,
+        ..default()
+    });
     for (mesh, material) in [
-        (&assets.cylinder, &assets.white),
-        (&assets.cube, &assets.cube_glass),
-        (&assets.decal, &assets.oil),
+        (&assets.cylinder, assets.white.clone()),
+        (&assets.cube, assets.cube_glass.clone()),
+        (&assets.cube, blend),
     ] {
-        commands.spawn((pbr(mesh, material.clone()), NotShadowCaster, scope.clone()));
+        commands.spawn((pbr(mesh, material), NotShadowCaster, scope.clone()));
     }
+    // Oil slicks and skid marks (forward decals).
+    commands.spawn((
+        ForwardDecal,
+        MeshMaterial3d(assets.oil.clone()),
+        at,
+        NoFrustumCulling,
+        NotShadowCaster,
+        scope.clone(),
+    ));
     // The Golden Battery's parts also cast shadows.
     commands.spawn((pbr(&assets.cylinder, assets.gold.clone()), scope.clone()));
-    let skid = (
-        meshes.add(skids::empty_mesh()),
-        materials.add(skids::material()),
-    );
-    commands.spawn((pbr(&skid.0, skid.1), NotShadowCaster, scope.clone()));
+    commands.spawn((
+        Mesh3d(meshes.add(skids::empty_mesh())),
+        MeshMaterial3d(decals.add(skids::material())),
+        at,
+        NoFrustumCulling,
+        NotShadowCaster,
+        scope.clone(),
+    ));
     let bolt = lightning::bolt_mesh(&[(vec![Vec3::ZERO, Vec3::Y], 1.0)], Vec3::Z);
     commands.spawn((
         Mesh3d(meshes.add(bolt)),

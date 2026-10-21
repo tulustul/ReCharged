@@ -1,10 +1,14 @@
 //! Skid marks: ribbons laid behind sliding wheels (rubber on hard floors, torn grass, ruts in dirt
 //! and mud, tracks in snow). All marks share one dynamic mesh rebuilt only when a segment is added
-//! or while marks fade; the segment ring is capped by the particle density setting.
+//! or while marks fade; the segment ring is capped by the particle density setting. The mesh is a
+//! forward decal: each pixel lands on the surface the depth prepass sees within
+//! [`DECAL_DEPTH_U`] of the ribbon, so marks follow curbs and bumps a straight segment cuts
+//! through, and never fight the ground's depth.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::light::NotShadowCaster;
 use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
+use bevy::pbr::decal::{ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::prelude::*;
 use rc_core::prelude::*;
 
@@ -20,8 +24,9 @@ const MAX_GAP_U: f32 = 2.5;
 /// Marks start fading after this many seconds and are gone after `FADE_END_S`.
 const FADE_START_S: f32 = 14.0;
 const FADE_END_S: f32 = 22.0;
-/// Height of marks above the contact patch, u (keeps them out of the ground's depth).
-const LIFT_U: f32 = 0.014;
+/// Marks fade out on surfaces this far from their ribbon (u): they reach into dips and over
+/// crests, and stain no more than the foot of a barrier or a tyre beside them.
+const DECAL_DEPTH_U: f32 = 0.12;
 /// How often fading marks refresh their colours, s.
 const FADE_REFRESH_S: f32 = 0.25;
 
@@ -118,17 +123,21 @@ impl SkidMarks {
     }
 
     /// Fills mesh buffers (cleared first) with the visible segments at time `now`: four vertices
-    /// and two triangles per segment, faded by age.
-    pub fn build(
-        &self,
-        now: f32,
-        positions: &mut Vec<[f32; 3]>,
-        normals: &mut Vec<[f32; 3]>,
-        colors: &mut Vec<[f32; 4]>,
-        indices: &mut Vec<u32>,
-    ) {
+    /// (tangent along the mark, UVs across and along it) and two triangles per segment, faded by
+    /// age.
+    pub fn build(&self, now: f32, out: &mut MarkBuffers) {
+        let MarkBuffers {
+            positions,
+            normals,
+            tangents,
+            uvs,
+            colors,
+            indices,
+        } = out;
         positions.clear();
         normals.clear();
+        tangents.clear();
+        uvs.clear();
         colors.clear();
         indices.clear();
         for s in &self.segs {
@@ -141,14 +150,40 @@ impl SkidMarks {
                 .cross(s.a[1] - s.a[0])
                 .normalize_or(Vec3::Y);
             let n = if n.y < 0.0 { -n } else { n };
-            for p in [s.a[0], s.a[1], s.b[1], s.b[0]] {
+            let along = (s.b[0] + s.b[1] - s.a[0] - s.a[1]).reject_from(n);
+            let t = along.normalize_or(n.any_orthonormal_vector());
+            for (p, uv) in [s.a[0], s.a[1], s.b[1], s.b[0]].into_iter().zip([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.0, 1.0],
+            ]) {
                 positions.push(p.to_array());
                 normals.push(n.to_array());
+                tangents.push(t.extend(1.0).to_array());
+                uvs.push(uv);
                 colors.push([s.color[0], s.color[1], s.color[2], s.color[3] * fade]);
             }
             indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
         }
     }
+}
+
+/// Vertex and index buffers of the marks' mesh.
+#[derive(Debug, Default)]
+pub struct MarkBuffers {
+    /// Positions.
+    pub positions: Vec<[f32; 3]>,
+    /// Normals.
+    pub normals: Vec<[f32; 3]>,
+    /// Tangents (along the mark).
+    pub tangents: Vec<[f32; 4]>,
+    /// UVs.
+    pub uvs: Vec<[f32; 2]>,
+    /// Linear RGBA, alpha faded by age.
+    pub colors: Vec<[f32; 4]>,
+    /// Triangle list.
+    pub indices: Vec<u32>,
 }
 
 /// The open strip of one wheel: where its last segment ended.
@@ -260,7 +295,7 @@ pub(crate) fn build(app: &mut App) {
 fn spawn_mesh(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<ForwardDecalMaterial<StandardMaterial>>>,
     mut state: ResMut<SkidMesh>,
     mut marks: ResMut<SkidMarks>,
 ) {
@@ -293,18 +328,25 @@ pub(crate) fn empty_mesh() -> Mesh {
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; 3])
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0f32, 1.0, 0.0]; 3])
+    .with_inserted_attribute(Mesh::ATTRIBUTE_TANGENT, vec![[1.0f32, 0.0, 0.0, 1.0]; 3])
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0f32; 2]; 3])
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; 3])
     .with_inserted_indices(Indices::U32(vec![0, 1, 2]))
 }
 
 /// The marks' material (vertex colours carry colour and fade).
-pub(crate) fn material() -> StandardMaterial {
-    StandardMaterial {
-        base_color: Color::WHITE,
-        alpha_mode: AlphaMode::Blend,
-        perceptual_roughness: 0.92,
-        reflectance: 0.3,
-        ..default()
+pub(crate) fn material() -> ForwardDecalMaterial<StandardMaterial> {
+    ForwardDecalMaterial {
+        base: StandardMaterial {
+            base_color: Color::WHITE,
+            alpha_mode: AlphaMode::Blend,
+            perceptual_roughness: 0.92,
+            reflectance: 0.3,
+            ..default()
+        },
+        extension: ForwardDecalMaterialExt {
+            depth_fade_factor: DECAL_DEPTH_U,
+        },
     }
 }
 
@@ -347,10 +389,9 @@ fn lay_marks(
             };
             // On the ground the wheel touches (ramps, curbs), across the tyre within that plane.
             let (at, up) = ground_point(&pose, &car.shape, i, w);
-            let centre = at + up * LIFT_U;
             let across = (right - up * right.dot(up)).normalize_or(right);
             let half = across * car.shape.width[i] * 0.45;
-            skids.0[i].advance(centre, half, color, now, &mut marks);
+            skids.0[i].advance(at, half, color, now, &mut marks);
         }
     }
 }
@@ -376,33 +417,52 @@ fn rebuild_mesh(
     marks.dirty = false;
     state.last_build = now;
     // Reuse the mesh's own buffers: no allocation once they reached their peak size.
-    let mut take = |id| match mesh.remove_attribute(id) {
+    let mut take3 = |id| match mesh.remove_attribute(id) {
         Some(VertexAttributeValues::Float32x3(v)) => v,
         _ => Vec::new(),
     };
-    let (mut positions, mut normals) =
-        (take(Mesh::ATTRIBUTE_POSITION), take(Mesh::ATTRIBUTE_NORMAL));
-    let mut colors = match mesh.remove_attribute(Mesh::ATTRIBUTE_COLOR) {
+    let (positions, normals) = (
+        take3(Mesh::ATTRIBUTE_POSITION),
+        take3(Mesh::ATTRIBUTE_NORMAL),
+    );
+    let mut take4 = |id| match mesh.remove_attribute(id) {
         Some(VertexAttributeValues::Float32x4(v)) => v,
         _ => Vec::new(),
     };
-    let mut indices = match mesh.remove_indices() {
+    let (tangents, colors) = (take4(Mesh::ATTRIBUTE_TANGENT), take4(Mesh::ATTRIBUTE_COLOR));
+    let uvs = match mesh.remove_attribute(Mesh::ATTRIBUTE_UV_0) {
+        Some(VertexAttributeValues::Float32x2(v)) => v,
+        _ => Vec::new(),
+    };
+    let indices = match mesh.remove_indices() {
         Some(Indices::U32(v)) => v,
         _ => Vec::new(),
     };
-    marks.build(now, &mut positions, &mut normals, &mut colors, &mut indices);
-    let empty = indices.is_empty();
+    let mut b = MarkBuffers {
+        positions,
+        normals,
+        tangents,
+        uvs,
+        colors,
+        indices,
+    };
+    marks.build(now, &mut b);
+    let empty = b.indices.is_empty();
     if empty {
         // A degenerate triangle: Bevy warns about meshes without vertices.
-        positions.extend([[0.0; 3]; 3]);
-        normals.extend([[0.0, 1.0, 0.0]; 3]);
-        colors.extend([[0.0; 4]; 3]);
-        indices.extend([0, 1, 2]);
+        b.positions.extend([[0.0; 3]; 3]);
+        b.normals.extend([[0.0, 1.0, 0.0]; 3]);
+        b.tangents.extend([[1.0, 0.0, 0.0, 1.0]; 3]);
+        b.uvs.extend([[0.0; 2]; 3]);
+        b.colors.extend([[0.0; 4]; 3]);
+        b.indices.extend([0, 1, 2]);
     }
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    mesh.insert_indices(Indices::U32(indices));
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, b.positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, b.normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, b.tangents);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, b.uvs);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, b.colors);
+    mesh.insert_indices(Indices::U32(b.indices));
     if let Ok(mut v) = visibility.get_mut(entity) {
         v.set_if_neq(if empty {
             Visibility::Hidden
@@ -478,17 +538,24 @@ mod tests {
         let mut marks = SkidMarks::new(10);
         marks.push(seg(0.0));
         marks.push(seg(10.0));
-        let (mut p, mut n, mut c, mut i) = (vec![], vec![], vec![], vec![]);
-        marks.build(10.0, &mut p, &mut n, &mut c, &mut i);
-        assert_eq!((p.len(), i.len()), (8, 12));
-        assert!(n.iter().all(|n| n[1] > 0.99), "normals face up");
-        assert_eq!(i[6..], [4, 5, 6, 4, 6, 7]);
+        let mut b = MarkBuffers::default();
+        marks.build(10.0, &mut b);
+        assert_eq!((b.positions.len(), b.indices.len()), (8, 12));
+        assert!(b.normals.iter().all(|n| n[1] > 0.99), "normals face up");
+        assert_eq!(b.indices[6..], [4, 5, 6, 4, 6, 7]);
+        assert_eq!((b.tangents.len(), b.uvs.len()), (8, 8));
+        let t = Vec3::from_slice(&b.tangents[0]);
+        assert!(
+            (t.length() - 1.0).abs() < 1e-5 && t.y.abs() < 1e-5,
+            "along the mark: {t}"
+        );
         // 18 s later the first is half faded, the second still full.
-        marks.build(18.0, &mut p, &mut n, &mut c, &mut i);
+        marks.build(18.0, &mut b);
+        let c = &b.colors;
         assert!((c[0][3] - 0.25).abs() < 1e-5 && c[4][3] == 0.5, "{c:?}");
         // After the fade the first one is gone from the mesh.
-        marks.build(23.0, &mut p, &mut n, &mut c, &mut i);
-        assert_eq!(p.len(), 4);
+        marks.build(23.0, &mut b);
+        assert_eq!(b.positions.len(), 4);
         assert!(marks.fading(20.0) && !marks.fading(5.0));
     }
 

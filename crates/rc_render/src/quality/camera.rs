@@ -11,7 +11,7 @@ use bevy::camera::Hdr;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::light::{ShadowFilteringMethod, VolumetricFog};
-use bevy::pbr::{ContactShadows, ScreenSpaceAmbientOcclusion};
+use bevy::pbr::{ContactShadows, ScreenSpaceAmbientOcclusion, ScreenSpaceTransmission};
 use bevy::post_process::bloom::Bloom;
 use bevy::post_process::motion_blur::MotionBlur;
 use bevy::prelude::*;
@@ -97,15 +97,15 @@ fn mark<C: Component>(add: On<Add<C>>, mut commands: Commands) {
 }
 
 fn decorate(add: On<Add<QualityCamera>>, mut commands: Commands) {
-    commands
-        .entity(add.entity)
-        .insert((
-            Hdr,
-            Tonemapping::TonyMcMapface,
-            Msaa::Off,
-            DepthPrepass,
-            OcclusionCulling,
-        ));
+    commands.entity(add.entity).insert((
+        Hdr,
+        Tonemapping::TonyMcMapface,
+        Msaa::Off,
+        DepthPrepass,
+        OcclusionCulling,
+        // The opaque scene copy water reads (made only when a transmissive mesh is drawn).
+        ScreenSpaceTransmission::default(),
+    ));
 }
 
 /// Number of player views: game cameras on screen (menus: 1). While Loading, before the game

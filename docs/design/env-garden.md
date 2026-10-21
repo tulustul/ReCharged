@@ -102,8 +102,8 @@ windows (`lamp_window`) and the lantern panes glow at night and are dimmed by da
 - **Night:** porch lantern (1200 lm, shadows) by the kitchen door, two fairy-light point lights
   over the deck, glowing kitchen/French-door/bedroom windows; the lawn is very dark — a slightly
   stronger cool moon fill would help the racing line read.
-- Wet weather: the puddle polygons (Water) read as dark blue sheets; a lighter, sky-reflecting
-  water material would sell them better.
+- Puddles (Water polygons) use rc_render's `WaterMaterial`: the muddy bed through the water,
+  the fence, plants and cars mirrored, foam clumps along the shore (`docs/design/rc_render.md`).
 
 ## Validation
 - Plots: `cargo run -p rc_track --example plot -- backyard_bash [--rev] [--mirror]` — all four

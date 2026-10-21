@@ -10,6 +10,7 @@
 mod coat_fix;
 mod paint;
 mod surface;
+mod water;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -23,10 +24,12 @@ use serde::{Deserialize, Serialize};
 
 pub use paint::{CarPaint, paint_material};
 pub use surface::{SurfaceExtension, SurfaceMaterial};
+pub use water::WaterMaterial;
 
 pub(crate) fn build(app: &mut App) {
     coat_fix::build(app);
     surface::build(app);
+    water::build(app);
     app.add_systems(Startup, load_textures);
 }
 
@@ -259,6 +262,7 @@ pub struct MaterialLibrary {
     surfaces: HashMap<SurfaceKind, Handle<SurfaceMaterial>>,
     named: HashMap<String, Handle<SurfaceMaterial>>,
     paints: HashMap<(CarId, PaintId), CarPaint>,
+    water: Handle<WaterMaterial>,
 }
 
 impl MaterialLibrary {
@@ -266,6 +270,11 @@ impl MaterialLibrary {
     /// session's environment is built).
     pub fn surface(&self, kind: SurfaceKind) -> Handle<SurfaceMaterial> {
         self.surfaces.get(&kind).cloned().unwrap_or_default()
+    }
+
+    /// The material of water ground areas (the same in every environment).
+    pub fn water(&self) -> Handle<WaterMaterial> {
+        self.water.clone()
     }
 
     /// A named material of the current environment's list (`materials` in its RON file), e.g.
@@ -428,11 +437,15 @@ fn load_textures(
     server: Res<AssetServer>,
     paths: Option<Res<UserPaths>>,
     mut materials: ResMut<Assets<SurfaceMaterial>>,
+    mut water: ResMut<Assets<WaterMaterial>>,
 ) {
     let root = paths
         .map(|p| p.assets_dir.clone())
         .unwrap_or_else(|| "assets".into());
-    let mut library = MaterialLibrary::default();
+    let mut library = MaterialLibrary {
+        water: water.add(water::water_material()),
+        ..default()
+    };
     for &(name, tile_u) in TEXTURE_SETS {
         let file = |map: &str| format!("textures/{name}/{map}.ktx2");
         let maps = ["albedo", "normal", "rough"].map(file);
