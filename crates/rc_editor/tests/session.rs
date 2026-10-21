@@ -108,6 +108,7 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
         value: Some(FieldValue::Vector {
             value: moved.to_array().to_vec(),
         }),
+        live: false,
     });
     for _ in 0..3 {
         step(&mut app, 1);
@@ -133,6 +134,7 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
         item: None,
         key: "width".into(),
         value: Some(FieldValue::Number { value: 1.0 }),
+        live: false,
     });
     step(&mut app, 1);
     let status = app.world().resource::<EditorStatus>();
@@ -163,6 +165,7 @@ fn an_edit_updates_the_session_in_place_a_bad_one_is_rejected_and_undo_restores(
         item: None,
         key: "indoor".into(),
         value: Some(FieldValue::Toggle { value: true }),
+        live: false,
     });
     step(&mut app, 2);
     assert!(app.world().resource::<EditorStatus>().loading, "reloading");
@@ -251,6 +254,7 @@ fn lighting_edits_apply_in_place_and_undo() {
         item: Some(look),
         key: key.into(),
         value: Some(FieldValue::Number { value }),
+        live: false,
     };
     app.world_mut().trigger(set("exposure", 11.0));
     step(&mut app, 2);
@@ -285,4 +289,55 @@ fn lighting_edits_apply_in_place_and_undo() {
     step(&mut app, 2);
     assert!(app.world().resource::<EditorStatus>().loading, "reloading");
     step_until(&mut app, "the reloaded session", in_race_setup);
+}
+
+/// A slider drag: an in-place field (exposure) reaches the session every frame and undoes as one
+/// step; a layout field (a point's width) changes the layout only on release (the drag shows it
+/// as the road preview).
+#[test]
+fn slider_drags_show_live_and_undo_as_one_step() {
+    let mut app = editor_app("live");
+    step_until(&mut app, "the editing session", in_race_setup);
+    let env = |app: &App| app.world().resource::<EnvironmentDraft>().def.clone();
+    let before = env(&app).noon.exposure;
+    let look = EditorItem::Look {
+        time: UiTimeOfDay::Noon,
+    };
+    let exposure = |value: f32, live: bool| EditorSet {
+        item: Some(look),
+        key: "exposure".into(),
+        value: Some(FieldValue::Number { value }),
+        live,
+    };
+    for v in [10.0, 10.5, 11.0] {
+        app.world_mut().trigger(exposure(v, true));
+        step(&mut app, 1);
+        assert_eq!(env(&app).noon.exposure, v, "live");
+    }
+    app.world_mut().trigger(exposure(11.0, false));
+    step(&mut app, 1);
+    app.world_mut().trigger(EditorCommandMsg {
+        command: EditorCommand::Undo,
+    });
+    step(&mut app, 2);
+    assert_eq!(env(&app).noon.exposure, before, "the drag is one undo step");
+    assert!(!app.world().resource::<EditorStatus>().can_undo);
+
+    let point = EditorItem::Point { index: 3 };
+    app.world_mut().trigger(EditorSelect { item: Some(point) });
+    let width = |value: f32, live: bool| EditorSet {
+        item: None,
+        key: "width".into(),
+        value: Some(FieldValue::Number { value }),
+        live,
+    };
+    // (The road preview is built by `EditorViewPlugin`, not in this headless app.)
+    app.world_mut().trigger(width(16.0, true));
+    step(&mut app, 2);
+    let draft = |app: &App| app.world().resource::<TrackDraft>().def.points[3].width;
+    assert_eq!(draft(&app), None, "the layout waits for the release");
+    app.world_mut().trigger(width(16.0, false));
+    step(&mut app, 2);
+    assert_eq!(draft(&app), Some(16.0));
+    assert!(in_race_setup(app.world()), "in place");
 }

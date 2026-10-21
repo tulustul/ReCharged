@@ -5,7 +5,7 @@
 use bevy::math::{Vec2, Vec3};
 use rc_core::prelude::*;
 use rc_track::{BoundsDef, DEFAULT_OFFROAD_MARGIN_U, DEFAULT_WIDTH_U, Dir, RibbonStyle, Track};
-use rc_ui::editor::{EditorField, EditorItem, FieldValue};
+use rc_ui::editor::{EditorField, EditorItem, FieldRange, FieldValue};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -18,21 +18,7 @@ const STYLES: [RibbonStyle; 4] = [
     RibbonStyle::CarpetRunner,
     RibbonStyle::Invisible,
 ];
-// ponytail: listed by hand; a new SurfaceKind is missing from the dropdown until added here.
-const SURFACES: [SurfaceKind; 12] = [
-    SurfaceKind::Asphalt,
-    SurfaceKind::Stone,
-    SurfaceKind::ToyTrack,
-    SurfaceKind::Wood,
-    SurfaceKind::Tile,
-    SurfaceKind::Carpet,
-    SurfaceKind::Cardboard,
-    SurfaceKind::Grass,
-    SurfaceKind::Dirt,
-    SurfaceKind::Ice,
-    SurfaceKind::Oil,
-    SurfaceKind::Water,
-];
+const SURFACES: [SurfaceKind; 12] = SurfaceKind::ALL;
 /// Bounds switched on without a built track: this square (u).
 const DEFAULT_BOUNDS_U: f32 = 100.0;
 
@@ -131,6 +117,57 @@ impl Pick for StringPick<'_> {
     }
 }
 
+/// Any number of enum variants (a list in the file).
+pub(crate) struct Flags<'a, T: 'static> {
+    pub(crate) value: &'a mut Vec<T>,
+    pub(crate) options: &'static [T],
+    /// An empty list means every option (shown and saved that way).
+    pub(crate) empty_is_all: bool,
+}
+
+/// [`Flags`] without its variant type.
+pub(crate) trait Many {
+    fn shown(&self) -> Vec<String>;
+    fn options(&self) -> Vec<String>;
+    fn set(&mut self, names: &[String]) -> Result<(), String>;
+}
+
+impl<T: Serialize + DeserializeOwned + PartialEq + Clone> Many for Flags<'_, T> {
+    fn shown(&self) -> Vec<String> {
+        let all = self.empty_is_all && self.value.is_empty();
+        let on = |o: &&T| all || self.value.contains(o);
+        self.options.iter().filter(on).map(name).collect()
+    }
+    fn options(&self) -> Vec<String> {
+        self.options.iter().map(name).collect()
+    }
+    fn set(&mut self, names: &[String]) -> Result<(), String> {
+        for n in names {
+            parse::<T>(n)?;
+        }
+        let on = |o: &&T| names.contains(&name(*o));
+        let chosen: Vec<T> = self.options.iter().filter(on).cloned().collect();
+        let all = self.empty_is_all && chosen.len() == self.options.len();
+        *self.value = if all { Vec::new() } else { chosen };
+        Ok(())
+    }
+}
+
+pub(crate) fn flags<'a, T>(
+    value: &'a mut Vec<T>,
+    options: &'static [T],
+    empty_is_all: bool,
+) -> Slot<'a>
+where
+    T: Serialize + DeserializeOwned + PartialEq + Clone,
+{
+    Slot::Flags(Box::new(Flags {
+        value,
+        options,
+        empty_is_all,
+    }))
+}
+
 /// A value edited as its RON text (lists, unlock rules).
 pub(crate) trait RonText {
     fn text(&self) -> String;
@@ -173,6 +210,7 @@ pub(crate) enum Slot<'a> {
     OptText(&'a mut Option<String>),
     Bounds(&'a mut Option<BoundsDef>, Option<(Vec3, Vec3)>),
     Pick(Box<dyn Pick + 'a>),
+    Flags(Box<dyn Many + 'a>),
 }
 
 // ponytail: listed by hand like SURFACES.
@@ -254,11 +292,11 @@ fn slots<'a>(
                     ("music", pick(&mut info.music, &MUSIC)),
                     (
                         "allowed_times",
-                        Slot::Ron(Box::new(&mut info.allowed_times)),
+                        flags(&mut info.allowed_times, &TimeOfDay::ALL, false),
                     ),
                     (
                         "allowed_weather",
-                        Slot::Ron(Box::new(&mut info.allowed_weather)),
+                        flags(&mut info.allowed_weather, &WeatherKind::ALL, false),
                     ),
                     ("unlock", Slot::Ron(Box::new(&mut info.unlock))),
                     ("preview", Slot::Text(&mut info.preview)),
@@ -405,7 +443,53 @@ fn field(key: &str, optional: bool, set: bool, value: FieldValue) -> EditorField
         value,
         optional,
         set,
+        range: None,
     }
+}
+
+/// The slider of field `key` (`points`: how many control points the track has).
+fn range(key: &str, points: usize) -> Option<FieldRange> {
+    let (min, max, step, log) = match key {
+        "start" | "from" | "to" => (0.0, points.saturating_sub(1) as f32, 1.0, false),
+        "count" => (1.0, 20.0, 1.0, false),
+        "difficulty" => (1.0, 5.0, 1.0, false),
+        "default_laps" => (1.0, 9.0, 1.0, false),
+        "width" => (1.0, 40.0, 0.5, false),
+        "offroad_margin" => (0.0, 30.0, 0.5, false),
+        "bank_deg" => (-45.0, 45.0, 0.5, false),
+        "kill_height" => (-30.0, 10.0, 0.5, false),
+        "wall_height" => (0.0, 5.0, 0.1, false),
+        "yaw" | "rot" => (-180.0, 180.0, 1.0, false),
+        "azimuth" => (0.0, 360.0, 1.0, false),
+        "elevation" => (-10.0, 90.0, 1.0, false),
+        "angle" | "lamp_spot_angle" => (0.0, 90.0, 1.0, false),
+        "range" | "lamp_range" => (1.0, 200.0, 1.0, false),
+        "lamp_spacing" => (5.0, 100.0, 1.0, false),
+        "lamp_fixture" => (0.0, 30.0, 0.5, false),
+        "lumens" | "lamp_lumens" => (10.0, 200_000.0, 10.0, true),
+        "lux" => (1.0, 150_000.0, 1.0, true),
+        "env_light" => (1.0, 50_000.0, 1.0, true),
+        "fog_visibility" => (10.0, 10_000.0, 10.0, true),
+        "exposure" => (0.0, 16.0, 0.05, false),
+        "ambient" => (0.0, 5.0, 0.05, false),
+        "temperature" | "tint" | "lift" => (-0.2, 0.2, 0.005, false),
+        "saturation" | "post_saturation" | "contrast" | "gain" | "lamps" | "practicals" => {
+            (0.0, 2.0, 0.01, false)
+        }
+        "bloom" => (0.0, 1.0, 0.01, false),
+        "color" | "ambient_color" | "fog_color" | "lamp_color" | "clouds_lit" | "clouds_shade" => {
+            (0.0, 1.0, 0.01, false)
+        }
+        // HDR: a lit window glows past white.
+        "window" => (0.0, 8.0, 0.05, false),
+        _ => return None,
+    };
+    Some(FieldRange {
+        min,
+        max,
+        step,
+        log,
+    })
 }
 
 fn read(key: &'static str, slot: &Slot) -> Vec<EditorField> {
@@ -472,6 +556,10 @@ fn read(key: &'static str, slot: &Slot) -> Vec<EditorField> {
                 options: p.options(),
             },
         )],
+        Slot::Flags(f) => plain(FieldValue::Flags {
+            value: f.shown(),
+            options: f.options(),
+        }),
     }
 }
 
@@ -483,15 +571,16 @@ pub fn fields(
     choices: &Choices,
     track: Option<&Track>,
 ) -> Option<(String, Vec<EditorField>)> {
+    let points = doc.def.points.len();
     let mut doc = doc.clone();
     let (title, slots) = slots(&mut doc, item, choices, track)?;
-    Some((
-        title,
-        slots
-            .iter()
-            .flat_map(|(key, slot)| read(key, slot))
-            .collect(),
-    ))
+    let mut fields: Vec<EditorField> = (slots.iter())
+        .flat_map(|(key, slot)| read(key, slot))
+        .collect();
+    for f in &mut fields {
+        f.range = range(&f.key, points);
+    }
+    Some((title, fields))
 }
 
 fn number(value: Option<FieldValue>) -> Result<Option<f32>, String> {
@@ -602,6 +691,10 @@ pub fn set_field(
             Some(FieldValue::Choice { value, .. }) => p.set(Some(&value))?,
             Some(other) => return Err(format!("expected a choice, got {other:?}")),
         },
+        Slot::Flags(mut f) => match value {
+            Some(FieldValue::Flags { value, .. }) => f.set(&value)?,
+            other => return Err(format!("expected a list of options, got {other:?}")),
+        },
     }
     Ok(())
 }
@@ -685,5 +778,45 @@ mod tests {
         .unwrap();
         assert_eq!(doc.def.bounds.unwrap().min, Vec2::new(-40.0, -90.0));
         assert_eq!(get(&doc, EditorItem::Track, "bounds_max").key, "bounds_max");
+    }
+
+    #[test]
+    fn flags_keep_option_order_and_sliders_span_the_points() {
+        let mut doc = oval();
+        let kinds = choices();
+        let times = |v: &[&str]| {
+            Some(FieldValue::Flags {
+                value: v.iter().map(|s| (*s).to_owned()).collect(),
+                options: Vec::new(),
+            })
+        };
+        let track = EditorItem::Track;
+        set_field(
+            &mut doc,
+            track,
+            "allowed_times",
+            times(&["Night", "Morning"]),
+            &kinds,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            doc.info.allowed_times,
+            [TimeOfDay::Morning, TimeOfDay::Night]
+        );
+        assert!(
+            set_field(
+                &mut doc,
+                track,
+                "allowed_times",
+                times(&["Dusk"]),
+                &kinds,
+                None
+            )
+            .is_err()
+        );
+        let start = get(&doc, track, "start").range.unwrap();
+        assert_eq!(start.max, (doc.def.points.len() - 1) as f32);
+        assert!(get(&doc, track, "name").range.is_none());
     }
 }

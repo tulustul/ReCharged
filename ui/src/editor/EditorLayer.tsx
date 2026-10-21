@@ -2,28 +2,25 @@
 // state, undo/redo, save, session time and weather, test-drive layout, test drive), the left pane
 // (tabs), the error toast under the toolbar, and the right pane (the selection's fields and
 // actions; none when nothing is selected). Test drives show the game's race UI instead.
-import { useState } from "react";
-
 import type { EditorStatus } from "../bevy";
 import { bevy } from "../bevy";
 import { editorStrings as words } from "../strings/editor";
-import { text } from "../theme/styles";
 import { color, space } from "../theme/tokens";
-import { command, Cycle, Field, panel, select, solid, Tool } from "./controls";
+import { command, Field, panel, Radio, select, solid, Tool, ui } from "./controls";
 import { LeftPane } from "./LeftPane";
 import { SwapPicker } from "./Library";
 
 export function EditorLayer({ status }: { status: EditorStatus }) {
   return (
-    <node style={{ width: "100%", height: "100%", flexDirection: "column", padding: space.m, gap: space.m }}>
+    <node style={{ width: "100%", height: "100%", flexDirection: "column", padding: space.s, gap: space.s }}>
       <Toolbar status={status} />
-      <node style={{ flexGrow: 1, flexDirection: "row", alignItems: "flexStart", gap: space.m, minHeight: 0 }}>
+      <node style={{ flexGrow: 1, flexDirection: "row", alignItems: "flexStart", gap: space.s, minHeight: 0 }}>
         <LeftPane status={status} />
         <node style={{ flexGrow: 1, flexDirection: "column", alignItems: "center" }}>
           {status.error !== null && (
             // hoverStyle: the toast owns the pointer (a placing click on it does not place).
             <node style={{ ...solid, padding: { horizontal: space.m, vertical: space.s }, maxWidth: 700, borderColor: color.danger }} hoverStyle={{}}>
-              <text style={{ ...text.small, color: color.text }}>{status.error}</text>
+              <text style={ui.text}>{status.error}</text>
             </node>
           )}
         </node>
@@ -38,22 +35,23 @@ function Toolbar({ status }: { status: EditorStatus }) {
   const setOptions = (change: Partial<typeof o>) => bevy.editor.options({ options: { ...o, ...change } });
   const state = status.baking ?? (status.loading ? words.rebuilding : status.dirty ? words.unsaved : words.saved);
   return (
-    <node style={{ ...solid, flexDirection: "row", alignItems: "center", gap: space.s, padding: { horizontal: space.l, vertical: space.s } }} hoverStyle={{}}>
-      <node style={{ flexDirection: "column", flexGrow: 1 }}>
-        <text style={text.caps}>{words.title}</text>
-        <text style={text.h3}>{status.name}</text>
+    <node style={{ ...solid, flexDirection: "row", alignItems: "center", gap: space.xs, padding: { horizontal: space.m, vertical: space.xs } }} hoverStyle={{}}>
+      <node style={{ flexDirection: "row", alignItems: "center", gap: space.s, flexGrow: 1 }}>
+        <text style={ui.caps}>{words.title}</text>
+        <text style={ui.title}>{status.name}</text>
       </node>
       {status.staleBake.length > 0 && status.baking === null && (
-        <text style={{ ...text.label, color: color.warning, margin: { right: space.m } }}>{words.bakeStale}</text>
+        <text style={{ ...ui.text, color: color.warning, margin: { right: space.s } }}>{words.bakeStale}</text>
       )}
-      <text style={{ ...text.label, color: status.baking !== null ? color.cyan : status.dirty || status.loading ? color.warning : color.textDim, margin: { right: space.m } }}>{state}</text>
+      <text style={{ ...ui.text, color: status.baking !== null ? color.cyan : status.dirty || status.loading ? color.warning : color.textDim, margin: { right: space.s } }}>{state}</text>
       <Tool label={words.undo} onPress={() => command({ kind: "undo" })} disabled={!status.canUndo} />
       <Tool label={words.redo} onPress={() => command({ kind: "redo" })} disabled={!status.canRedo} />
       <Tool label={words.save} onPress={() => command({ kind: "save" })} />
       <node style={{ width: space.m }} />
-      <Cycle label={words.time} value={o.time} options={status.times} onChange={(time) => setOptions({ time })} />
-      <Cycle label={words.weather} value={o.weather} options={status.weathers} onChange={(weather) => setOptions({ weather })} />
-      <text style={{ ...text.small, margin: { left: space.s } }}>{words.driveAs}</text>
+      <Radio value={o.time} options={status.times} onPick={(time) => setOptions({ time })} />
+      <node style={{ width: space.s }} />
+      <Radio value={o.weather} options={status.weathers} onPick={(weather) => setOptions({ weather })} />
+      <text style={{ ...ui.dim, margin: { left: space.s } }}>{words.driveAs}</text>
       <Tool label={words.reverse} hot={o.reverse} onPress={() => setOptions({ reverse: !o.reverse })} />
       <Tool label={words.mirror} hot={o.mirror} onPress={() => setOptions({ mirror: !o.mirror })} />
       <Tool label={words.drive} hot onPress={() => command({ kind: "drive" })} />
@@ -62,7 +60,6 @@ function Toolbar({ status }: { status: EditorStatus }) {
 }
 
 function Inspector({ status }: { status: EditorStatus }) {
-  const [active, setActive] = useState<string | null>(null);
   const sel = status.selection;
   if (!sel) return null;
   const item = sel.item;
@@ -72,19 +69,17 @@ function Inspector({ status }: { status: EditorStatus }) {
   // The track, a time's sun and its look always exist.
   const deletable = kind !== "track" && kind !== "sun" && kind !== "look";
   return (
-    <node style={{ ...panel, width: 520, maxHeight: "100%", overflowY: "scroll" }} hoverStyle={{}}>
-      <text style={text.h3}>{sel.title}</text>
+    <node style={{ ...panel, width: 400, maxHeight: "100%", overflowY: "scroll" }} hoverStyle={{}}>
+      <text style={ui.title}>{sel.title}</text>
       {sel.asset !== null && <SwapPicker key={JSON.stringify(item)} asset={sel.asset} />}
       {sel.fields.map((f) => (
         <Field
           key={`${kind}.${f.key}`}
           field={f}
-          active={active === f.key}
-          onActivate={(open) => setActive(open ? f.key : null)}
-          onSet={(value) => bevy.editor.set({ item: null, key: f.key, value })}
+          onSet={(value, live) => bevy.editor.set({ item: null, key: f.key, value, live })}
         />
       ))}
-      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.s, margin: { top: space.s } }}>
+      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs, margin: { top: space.xs } }}>
         {insertable && <Tool label={words.insert} onPress={() => command({ kind: "insert" })} />}
         {kind === "point" && <Tool label={words.jumpHere} onPress={() => command({ kind: "add", what: "gap" })} />}
         {item.kind === "vertex" && <Tool label={words.wholeArea} onPress={() => select({ kind: "ground", index: item.ground })} />}

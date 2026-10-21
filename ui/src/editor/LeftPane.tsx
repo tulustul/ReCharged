@@ -2,14 +2,11 @@
 // add jump / ground area / shortcut, lints) and Lighting (the previewed time's look and the room's
 // lamp grid, probes, bake). The open tab lives in Bevy (`editor.tab`): the Track tab shows the
 // layout handles.
-import { useState } from "react";
-
 import type { EditorAdd, EditorStatus, EditorTab } from "../bevy";
 import { bevy } from "../bevy";
 import { editorStrings as words } from "../strings/editor";
-import { text } from "../theme/styles";
 import { color, space } from "../theme/tokens";
-import { command, Field, panel, select, Tool } from "./controls";
+import { command, Field, panel, select, Tool, ui } from "./controls";
 import { Library } from "./Library";
 
 const TABS: EditorTab[] = ["assets", "track", "lighting"];
@@ -17,7 +14,7 @@ const add = (what: EditorAdd) => command({ kind: "add", what });
 
 export function LeftPane({ status }: { status: EditorStatus }) {
   return (
-    <node style={{ ...panel, width: 330, maxHeight: "100%", overflowY: "scroll" }} hoverStyle={{}}>
+    <node style={{ ...panel, width: 320, maxHeight: "100%", overflowY: "scroll" }} hoverStyle={{}}>
       <node style={{ flexDirection: "row", gap: space.xs }}>
         {TABS.map((tab) => (
           <Tool key={tab} label={words.tabs[tab]} hot={status.tab === tab} onPress={() => bevy.editor.tab({ tab })} />
@@ -26,13 +23,13 @@ export function LeftPane({ status }: { status: EditorStatus }) {
       {status.tab === "assets" && <Library status={status} />}
       {status.tab === "track" && <Track status={status} />}
       {status.tab === "lighting" && <Lighting status={status} />}
-      <text style={{ ...text.small, color: color.textFaint, margin: { top: space.m } }}>{words.controls}</text>
+      <text style={{ ...ui.dim, color: color.textFaint, margin: { top: space.s } }}>{words.controls}</text>
     </node>
   );
 }
 
 function Header({ label, tone = color.textDim }: { label: string; tone?: string }) {
-  return <text style={{ ...text.caps, color: tone, margin: { top: space.s } }}>{label}</text>;
+  return <text style={{ ...ui.caps, color: tone, margin: { top: space.xs } }}>{label}</text>;
 }
 
 function Track({ status }: { status: EditorStatus }) {
@@ -41,16 +38,16 @@ function Track({ status }: { status: EditorStatus }) {
     <>
       <Tool label={words.track} hot={status.selection?.item.kind === "track"} onPress={() => select({ kind: "track" })} />
       <Header label={words.addHeader} />
-      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.s }}>
+      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
         <Tool label={words.addGap} onPress={() => add("gap")} />
         <Tool label={words.addGround} onPress={() => add("ground")} />
         <Tool label={words.addShortcut} onPress={() => add("shortcut")} />
       </node>
-      <text style={text.small}>{words.trackHint}</text>
+      <text style={ui.dim}>{words.trackHint}</text>
       {/* Lints name a distance along the track, not an item: text only. */}
       <Header label={lints.length > 0 ? words.lints(lints.length) : words.noLints} tone={lints.length > 0 ? color.warning : color.textDim} />
       {lints.map((line, i) => (
-        <text key={i} style={text.small}>
+        <text key={i} style={ui.dim}>
           {line}
         </text>
       ))}
@@ -60,12 +57,11 @@ function Track({ status }: { status: EditorStatus }) {
 
 function Lighting({ status }: { status: EditorStatus }) {
   const baking = status.baking !== null;
-  const [active, setActive] = useState<string | null>(null);
   const look = status.look;
   return (
     <>
-      <text style={text.label}>{words.previewing(status.options.time)}</text>
-      <text style={text.small}>{words.lightingHint}</text>
+      <text style={ui.text}>{words.previewing(status.options.time)}</text>
+      <text style={ui.dim}>{words.lightingHint}</text>
       {look !== null && (
         <>
           <Header label={look.title} />
@@ -73,21 +69,19 @@ function Lighting({ status }: { status: EditorStatus }) {
             <Field
               key={`look.${f.key}`}
               field={f}
-              active={active === f.key}
-              onActivate={(open) => setActive(open ? f.key : null)}
-              onSet={(value) => bevy.editor.set({ item: look.item, key: f.key, value })}
+              onSet={(value, live) => bevy.editor.set({ item: look.item, key: f.key, value, live })}
             />
           ))}
         </>
       )}
       <Header label={words.bakeHeader} />
-      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.s }}>
+      <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
         <Tool label={words.probes(status.probes)} hot={status.probes === false} onPress={() => command({ kind: "toggleProbes" })} disabled={status.probes === null} />
         <Tool label={words.bake} onPress={() => command({ kind: "bake", all: false })} disabled={baking} />
         <Tool label={words.bakeAll} onPress={() => command({ kind: "bake", all: true })} disabled={baking} />
       </node>
-      {status.baking !== null && <text style={{ ...text.small, color: color.cyan }}>{status.baking}</text>}
-      {status.staleBake.length > 0 && <text style={{ ...text.small, color: color.warning }}>{words.staleVolumes(status.staleBake)}</text>}
+      {status.baking !== null && <text style={{ ...ui.dim, color: color.cyan }}>{status.baking}</text>}
+      {status.staleBake.length > 0 && <text style={{ ...ui.dim, color: color.warning }}>{words.staleVolumes(status.staleBake)}</text>}
     </>
   );
 }

@@ -9,7 +9,8 @@
 //!   variant's `Track` and `TrackSummary` (built by the validation, for a layout edit) and clears
 //!   the drag previews, and rc_track / rc_render diff against what they built (an environment
 //!   edit: rc_render copies the draft into the session's environment and diffs its lights).
-//! - **Point drags:** at most one `Track::build` of the dragged layout in flight on the
+//! - **Point drags** (and slider drags of layout fields, [`crate::Editor::live_set`]): at most one
+//!   `Track::build` of the dragged layout in flight on the
 //!   `AsyncComputeTaskPool`; the latest pose wins, results older than the last commit are dropped,
 //!   a failed build keeps the last good preview and shows its error.
 
@@ -131,7 +132,10 @@ pub(crate) fn preview_track(
     mut build: ResMut<PreviewBuild>,
     preview: Option<Res<TrackPreview>>,
 ) {
-    let live = gizmo.layout_preview(&editor.doc).map(|d| d.def);
+    let field = editor.live.as_ref().and_then(|l| l.layout.as_ref());
+    let live = (field.cloned())
+        .or_else(|| gizmo.layout_preview(&editor.doc))
+        .map(|d| d.def);
     let Some(def) = live else {
         if build.count > 0 {
             info!(

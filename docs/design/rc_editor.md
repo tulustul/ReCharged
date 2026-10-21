@@ -513,12 +513,22 @@ under `--user-data-dir`, `<dir>/settings.ron` — an automation dir, harmless). 
 ## Editing scope (P4)
 | Item | Handles | Inspector |
 |---|---|---|
-| Track (+ catalog entry) | — | style, start, kill/wall height, bounds; name, environment, indoor, difficulty, laps, music, allowed times/weather and unlock (RON text), preview, hidden |
+| Track (+ catalog entry) | — | style, start, kill/wall height, bounds; name, environment, indoor, difficulty, laps, music, allowed times/weather (checkbox chips), unlock (RON text), preview, hidden |
 | Control points | yes | pos, width, bank, surface, walls, offroad margin (inherited fields show what they inherit; × unsets), label |
 | Jumps (gaps) | red segment, handle at its middle (does not move) | from, to, dir; "Jump from here" on a point adds one |
 | Ground areas / vertices | vertices; a vertex's "Whole area" selects the area | surface, height, dir; vertex x/z |
 | Item rows, props, Golden Battery, decor | yes | pos, count / kind (all prop kinds) / yaw / model, rot, scale (P6: per axis), dir |
 | Shortcuts / path points | path points; a path point's "Whole shortcut" selects the shortcut | width, dir; point pos |
+
+Inspector controls: numbers are sliders over a per-key range (`fields::range`; lux, lumens,
+env light and fog logarithmic) or, unbounded (positions, ground height, scale), dragged left /
+right (Shift fine). A drag is live (`editor.set` with `live`, `Editor::live_set`): fields the
+session takes in place (lighting, looks, lights, decor, the catalog entry) apply every frame as one
+undo step; layout fields (width, bank, heights, prop pose …) show as the off-thread road preview
+(`TrackPreview`, as a point drag; a prop follows through `DragPreview`) and are validated and
+committed on release; reload-list fields wait for the release. Enums are radio
+chips, enum lists (`FieldValue::Flags`) checkbox chips, short integer spans radio chips, toggles
+switches. Only names, the preview path, labels and unlock rules are typed.
 
 Add (Assets tab: prop, decor, item row, battery; Track tab: jump, ground area, shortcut) puts the
 item at the view's focus — the first fixed collider under the

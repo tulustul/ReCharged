@@ -202,7 +202,11 @@ optional: boolean,
 /**
  * Set explicitly (always true for non-optional fields).
  */
-set: boolean, };
+set: boolean, 
+/**
+ * What a slider covers (numbers, each vector component); `None`: unbounded, dragged.
+ */
+range: FieldRange | null, };
 export type EditorGizmo = "move" | "rotate" | "scale";
 export type EditorItem = { "kind": "track" } | { "kind": "point", index: number, } | { "kind": "gap", index: number, } | { "kind": "ground", index: number, } | { "kind": "vertex", ground: number, index: number, } | { "kind": "itemRow", index: number, } | { "kind": "prop", index: number, } | { "kind": "shortcut", index: number, } | { "kind": "pathPoint", shortcut: number, index: number, } | { "kind": "battery" } | { "kind": "decor", index: number, } | { "kind": "light", index: number, } | { "kind": "sun", time: UiTimeOfDay, } | { "kind": "fill", time: UiTimeOfDay, } | { "kind": "look", time: UiTimeOfDay, };
 export type EditorLibrary = { 
@@ -270,7 +274,11 @@ key: string,
 /**
  * New value.
  */
-value: FieldValue | null, };
+value: FieldValue | null, 
+/**
+ * A drag frame, not the final value.
+ */
+live: boolean, };
 export type EditorSetOptions = { 
 /**
  * The options.
@@ -360,7 +368,24 @@ placing: EditorAsset | null,
  */
 look: EditorSelection | null, };
 export type EditorTab = "assets" | "track" | "lighting";
-export type FieldValue = { "type": "number", value: number, } | { "type": "integer", value: number, } | { "type": "toggle", value: boolean, } | { "type": "choice", value: string, options: Array<string>, } | { "type": "vector", value: Array<number>, } | { "type": "text", value: string, };
+export type FieldRange = { 
+/**
+ * Lowest value.
+ */
+min: number, 
+/**
+ * Highest value.
+ */
+max: number, 
+/**
+ * Smallest change.
+ */
+step: number, 
+/**
+ * Spaced logarithmically (spans of several orders of magnitude: lux, lumens).
+ */
+log: boolean, };
+export type FieldValue = { "type": "number", value: number, } | { "type": "integer", value: number, } | { "type": "toggle", value: boolean, } | { "type": "choice", value: string, options: Array<string>, } | { "type": "flags", value: Array<string>, options: Array<string>, } | { "type": "vector", value: Array<number>, } | { "type": "text", value: string, };
 export type GamepadAxisChange = { gamepad: number, axis: GamepadAxisName, value: number, };
 export type GamepadAxisName = "leftStickX" | "leftStickY" | "leftZ" | "rightStickX" | "rightStickY" | "rightZ" | { "other": number };
 export type GamepadButtonChange = { gamepad: number, button: GamepadButtonName, 

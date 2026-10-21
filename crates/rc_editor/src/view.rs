@@ -479,7 +479,8 @@ fn draw(
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     mut gizmos: Gizmos,
 ) {
-    let preview = gizmo.preview(&editor.doc);
+    let field = editor.live.as_ref().and_then(|l| l.layout.clone());
+    let preview = gizmo.preview(&editor.doc).or(field);
     let doc = preview.as_ref().unwrap_or(&editor.doc);
     let layout = editor.tab == EditorTab::Track;
     let selected = editor.selection;

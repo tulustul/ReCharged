@@ -167,6 +167,7 @@ impl Plugin for EditorPlugin {
             stale: Vec::new(),
             bake: None,
             placing: None,
+            live: None,
         })
         .insert_resource(self.library.clone())
         .init_resource::<EditorStatus>()
@@ -270,6 +271,18 @@ pub(crate) struct Editor {
     bake: Option<baking::BakeRun>,
     /// Placement mode is armed with this library asset ([`placement`]).
     pub(crate) placing: Option<EditorAsset>,
+    /// A slider drag of a field ([`Editor::live_set`]).
+    pub(crate) live: Option<LiveField>,
+}
+
+/// The field a slider drag is changing.
+#[derive(Debug)]
+pub(crate) struct LiveField {
+    pub(crate) item: EditorItem,
+    key: String,
+    /// A layout change: the document as the drag has it (the road preview's; the document
+    /// itself changes on release, when it is validated).
+    pub(crate) layout: Option<Doc>,
 }
 
 impl Editor {
@@ -277,6 +290,49 @@ impl Editor {
     /// every variant builds. A rejected edit leaves everything as it was and shows why.
     pub(crate) fn edit(
         &mut self,
+        edit: impl FnOnce(&mut Doc, &mut Option<EditorItem>) -> Result<(), String>,
+    ) {
+        self.live = None;
+        self.apply_edit(false, edit);
+    }
+
+    /// A slider drag's frame of field `key` of `item`: a layout change becomes the road preview
+    /// (built off-thread, [`live::preview_track`]); a change the session takes in place is applied
+    /// now, one undo step for the whole drag; one that reloads waits for the release.
+    pub(crate) fn live_set(
+        &mut self,
+        item: EditorItem,
+        key: &str,
+        set: impl FnOnce(&mut Doc, &mut Option<EditorItem>) -> Result<(), String>,
+    ) {
+        let same = |l: &LiveField| l.item == item && l.key == key;
+        let merge = self.live.as_ref().is_some_and(same);
+        let mut doc = self.doc.clone();
+        let mut selection = self.selection;
+        if self.bake.is_some() || set(&mut doc, &mut selection).is_err() {
+            return; // the release shows why
+        }
+        let layout = if doc.def != self.doc.def {
+            Some(doc)
+        } else {
+            if !live::reloads(&self.doc, &doc) {
+                self.apply_edit(merge, |d, _| {
+                    *d = doc;
+                    Ok(())
+                });
+            }
+            None
+        };
+        self.live = Some(LiveField {
+            item,
+            key: key.into(),
+            layout,
+        });
+    }
+
+    fn apply_edit(
+        &mut self,
+        merge: bool,
         edit: impl FnOnce(&mut Doc, &mut Option<EditorItem>) -> Result<(), String>,
     ) {
         if self.bake.is_some() {
@@ -308,11 +364,14 @@ impl Editor {
                 if let Some(track) = built {
                     let old = std::mem::replace(&mut self.doc, doc);
                     self.changed(&old, track);
-                    self.undo.push(old);
-                    if self.undo.len() > UNDO_DEPTH {
-                        self.undo.remove(0);
+                    // A drag's later frames: undo goes back to before the drag.
+                    if !merge {
+                        self.undo.push(old);
+                        if self.undo.len() > UNDO_DEPTH {
+                            self.undo.remove(0);
+                        }
+                        self.redo.clear();
                     }
-                    self.redo.clear();
                 }
                 self.selection = selection;
                 self.error = None;
@@ -353,6 +412,7 @@ impl Editor {
     }
 
     fn step(&mut self, back: bool) {
+        self.live = None;
         let popped = if back {
             self.undo.pop()
         } else {
@@ -394,6 +454,13 @@ impl Editor {
 
     pub(crate) fn select(&mut self, item: Option<EditorItem>) {
         self.selection = item.filter(|i| self.doc.exists(*i));
+        if self
+            .live
+            .as_ref()
+            .is_some_and(|l| Some(l.item) != self.selection)
+        {
+            self.live = None;
+        }
     }
 
     /// The time of day being previewed (its sun, fill and look are the ones edited).
@@ -738,10 +805,18 @@ fn reload(
 fn on_set(msg: On<EditorSet>, track: Option<Res<Track>>, mut editor: ResMut<Editor>) {
     let choices = editor.choices.clone();
     let track = track.as_deref();
-    editor.edit(|doc, sel| {
-        let item = msg.item.or(*sel).ok_or("nothing is selected")?;
+    let Some(item) = msg.item.or(editor.selection) else {
+        editor.error = Some("nothing is selected".into());
+        return;
+    };
+    let set = |doc: &mut Doc, _: &mut Option<EditorItem>| {
         fields::set_field(doc, item, &msg.key, msg.value.clone(), &choices, track)
-    });
+    };
+    if msg.live {
+        editor.live_set(item, &msg.key, set);
+    } else {
+        editor.edit(set);
+    }
 }
 
 fn on_options(msg: On<EditorSetOptions>, mut editor: ResMut<Editor>) {

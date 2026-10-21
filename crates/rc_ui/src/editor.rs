@@ -86,6 +86,11 @@ pub enum FieldValue {
         value: String,
         options: Vec<String>,
     },
+    /// Any number of `options` (times of day, weathers), in `options` order.
+    Flags {
+        value: Vec<String>,
+        options: Vec<String>,
+    },
     /// 2 or 3 components.
     Vector {
         value: Vec<f32>,
@@ -108,6 +113,21 @@ pub struct EditorField {
     pub optional: bool,
     /// Set explicitly (always true for non-optional fields).
     pub set: bool,
+    /// What a slider covers (numbers, each vector component); `None`: unbounded, dragged.
+    pub range: Option<FieldRange>,
+}
+
+/// A slider's span.
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, Copy, PartialEq)]
+pub struct FieldRange {
+    /// Lowest value.
+    pub min: f32,
+    /// Highest value.
+    pub max: f32,
+    /// Smallest change.
+    pub step: f32,
+    /// Spaced logarithmically (spans of several orders of magnitude: lux, lumens).
+    pub log: bool,
 }
 
 /// The selected item and its fields.
@@ -407,7 +427,9 @@ pub struct EditorSelect {
 }
 
 /// React → Bevy message `editor.set`: set a field of the selection, or of `item` (`null` = unset
-/// an optional field). Rejected (with `error`) when the layout would not build.
+/// an optional field). Rejected (with `error`) when the layout would not build. `live`: a frame of
+/// a slider drag, shown at once (one undo step per drag); the release sends the final value
+/// without it.
 #[react_message(name = "editor.set")]
 #[derive(Debug, Clone)]
 pub struct EditorSet {
@@ -417,6 +439,9 @@ pub struct EditorSet {
     pub key: String,
     /// New value.
     pub value: Option<FieldValue>,
+    /// A drag frame, not the final value.
+    #[serde(default)]
+    pub live: bool,
 }
 
 /// React → Bevy message `editor.options`: session time and weather, test-drive layout.

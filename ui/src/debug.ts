@@ -140,14 +140,17 @@ export function useDebugRoutes() {
       const v = arg.split(" ")[2] ?? "";
       if (o) bevy.editor.options({ options: { ...o, [kind]: kind === "time" || kind === "weather" ? v : v === "on" } });
     } else if (verb === "set") {
-      // `editor set look <time> <key> <value…>` or `editor set sel <key> <value…>`.
+      // `editor set look <time> <key> <value…> [live]` or `editor set sel <key> <value…> [live]`
+      // (live: a slider drag's frame, uncommitted).
       const words = arg.split(" ").slice(2);
+      const live = words[words.length - 1] === "live";
+      if (live) words.pop();
       const item = kind === "look" ? ({ kind, time: words.shift() } as EditorItem) : null;
       const key = words.shift() ?? "";
       const nums = words.map(Number);
       const value: FieldValue =
         words[0] === "on" || words[0] === "off" ? { type: "toggle", value: words[0] === "on" } : nums.length === 1 ? { type: "number", value: nums[0] } : { type: "vector", value: nums };
-      bevy.editor.set({ item, key, value });
+      bevy.editor.set({ item, key, value, live });
     }
     else if (verb === "tab") bevy.editor.tab({ tab: kind as EditorTab });
     else if (verb === "lookAt") bevy.editor.command({ command: { kind: "lookAt", from: v, at: [n[3], n[4], n[5]] } });

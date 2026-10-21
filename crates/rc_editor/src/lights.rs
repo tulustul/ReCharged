@@ -15,7 +15,7 @@ use rc_ui::content::UiTimeOfDay;
 use rc_ui::editor::{EditorAsset, EditorItem};
 
 use crate::doc::{Doc, Pose, Turn, tidy};
-use crate::fields::Slot;
+use crate::fields::{Slot, flags};
 
 /// A placed point light hangs this far above where it was dropped (u) …
 const POINT_LIFT_U: f32 = 3.0;
@@ -304,7 +304,7 @@ pub(crate) fn slots(doc: &mut Doc, item: EditorItem) -> Option<Slots<'_>> {
                 ("color", Slot::Arr3(&mut l.color)),
                 ("lumens", Slot::Num(&mut l.lumens)),
                 ("range", Slot::Num(&mut l.range)),
-                ("times", Slot::Ron(Box::new(&mut l.times))),
+                ("times", flags(&mut l.times, &TimeOfDay::ALL, true)),
             ]);
             let kind = if spot { "Spot light" } else { "Point light" };
             (format!("{kind} {index}"), slots)

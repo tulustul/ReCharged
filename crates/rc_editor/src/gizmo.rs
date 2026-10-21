@@ -554,17 +554,23 @@ pub(crate) fn sync(
     }
     let moved = gizmo.drag.filter(|d| d.live != d.start);
     env.set_if_neq(EnvPreview(moved.and_then(|d| env_drag(d.item, &d.live))));
-    let shown = moved.and_then(|d| {
-        let source = match d.item {
+    // A slider drag of a prop's pose field moves it the same way.
+    let slid = (editor.live.as_ref()).and_then(|l| {
+        let (pose, ..) = l.layout.as_ref()?.pose(l.item)?;
+        Some((l.item, pose))
+    });
+    let posed = moved.map(|d| (d.item, d.live)).or(slid);
+    let shown = posed.and_then(|(item, live)| {
+        let source = match item {
             EditorItem::Prop { index } => DragSource::Prop(index as usize),
             EditorItem::Decor { index } => DragSource::Decor(index as usize),
             _ => return None,
         };
         Some((
             source,
-            Transform::from_translation(d.live.pos)
-                .with_rotation(d.live.rot)
-                .with_scale(d.live.scale),
+            Transform::from_translation(live.pos)
+                .with_rotation(live.rot)
+                .with_scale(live.scale),
         ))
     });
     preview.set_if_neq(DragPreview(shown));
