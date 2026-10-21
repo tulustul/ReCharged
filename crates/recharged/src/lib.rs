@@ -119,8 +119,11 @@ pub fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App 
         ReactPlugins.set(rc_ui::with_fonts(
             ReactUiPlugin::new(bundle)
                 .hot_reload(cfg!(debug_assertions))
-                // The F12 devtools keep their layout in the user-data dir, not in the cwd.
+                // The devtools keep their layout in the user-data dir, not in the cwd; F12 / F11
+                // belong to the profiler (rc_ui), so they toggle on F10 and pause on F9.
                 .devtools(bevy_react::DevtoolsConfig {
+                    toggle_key: KeyCode::F10,
+                    pause_key: KeyCode::F9,
                     settings_path: Some(paths.data_dir.join("devtools.json")),
                     ..default()
                 }),

@@ -59,3 +59,12 @@ export function layoutLabel(reverse: boolean, mirror: boolean, words: { forward:
   const base = reverse ? words.reverse : words.forward;
   return mirror ? `${base} · ${words.mirror}` : base;
 }
+
+/** A diagnostic's value in a few characters: `0.42`, `61.3`, `1840`, `18.4k`, `2.1M`. */
+export function compactNumber(v: number): string {
+  const a = Math.abs(v);
+  if (a >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  if (a >= 1e4) return `${(v / 1e3).toFixed(1)}k`;
+  if (a >= 100) return v.toFixed(0);
+  return v.toFixed(a >= 10 ? 1 : 2);
+}

@@ -14,6 +14,7 @@ crate; `lib.rs` registers both).
 | `weather_fx.rs` | the frame's `Look` = env time look × `WeatherState`; surface wetness/snow |
 | `materials/` | `MaterialLibrary`, `SurfaceMaterial` (world-space extension), car paints, `with_world_uvs`, Bevy clear-coat fix (`coat_fix.rs`) |
 | `showroom/` | menu garage set, turntable, `CarModel` swap without gaps, `ShowroomReady` |
+| `profiling.rs` | diagnostics for rc_ui's F12 profiler: Bevy's frame-time, entity-count and render-pass (`RenderDiagnosticsPlugin`) ones, plus `rc_core::perf` — main-world CPU ms (`First` → `Last`), entities the cameras draw (`VisibleEntities` of active cameras, summed; not `ViewVisibility`, which also counts shadow views and every bounds-less hierarchy node), whole-frame GPU ms (a `frame` timestamp span opened and closed by exclusive `RenderGraph` systems, so it nests the passes recorded on the render thread and times the uninstrumented ones too), draw calls of camera and shadow views (counted from every `ViewBinnedRenderPhases` / `ViewSortedRenderPhases` after `RenderSystems::Render`: one per multidraw batch set, batchable bin, unbatchable entity and non-empty sorted batch; the indirect commands inside a multidraw are Bevy-private, so not counted) |
 
 Shaders (WESL, `assets/shaders/render/`): `surface.wesl` (macro variation, wetness/puddles, snow),
 `car_status.wesl` (status effects on car bodies),

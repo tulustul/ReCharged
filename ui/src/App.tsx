@@ -1,9 +1,9 @@
 // The front end: one screen at a time per app state (menus, loading, race), dialogs and toasts on
-// top, the FPS meter above all. Every screen sits in an ErrorBoundary that reports to Bevy
+// top, the FPS meter / profiler above all. Every screen sits in an ErrorBoundary that reports to Bevy
 // (`ui.error`) and offers a way back.
 import { useEffect, useState } from "react";
 
-import { bevy } from "./bevy";
+import { bevy, type UiPerf } from "./bevy";
 import { Backdrop } from "./components/Backdrop";
 import { Button } from "./components/Button";
 import { DialogHost } from "./components/Dialog";
@@ -12,6 +12,7 @@ import { useDebugRoutes } from "./debug";
 import { EditorLayer } from "./editor/EditorLayer";
 import { SplitContext, useEvent } from "./hooks";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { compactNumber } from "./format";
 import { ScreenName, useNav } from "./nav/input";
 import { back, menuMorph, morphStyle, router, type Route } from "./nav/routes";
 import { top } from "./nav/router";
@@ -36,7 +37,7 @@ import { useStore } from "./state/useStore";
 import { appStrings } from "./strings/app";
 import { hint } from "./strings/common";
 import { fill, text } from "./theme/styles";
-import { color, radius, space } from "./theme/tokens";
+import { color, radius, size, space } from "./theme/tokens";
 
 export function App() {
   useEffect(() => {
@@ -58,7 +59,7 @@ export function App() {
         </ErrorBoundary>
         <DialogHost />
         <ToastHost />
-        <FpsMeter />
+        <PerfMeter />
       </node>
     </SplitContext.Provider>
   );
@@ -150,24 +151,60 @@ function ScreenFor({ route }: { route: Route }) {
   }
 }
 
-/** The FPS meter setting's readout: `ui.fps` arrives twice a second while it is on. */
-function FpsMeter() {
-  const shown = useStore(settings)?.gameplay.fpsMeter ?? false;
-  const [fps, setFps] = useState<number | null>(null);
-  useEvent("ui.fps", (e) => setFps(e.fps));
-  if (!shown || fps === null) return null;
+/** Top right: the FPS meter setting's frame rate, or the F12 profiler (F11 adds every Bevy
+ * diagnostic). `ui.perf` arrives twice a second while either is on. */
+function PerfMeter() {
+  const meter = useStore(settings)?.gameplay.fpsMeter ?? false;
+  const [perf, setPerf] = useState<UiPerf | null>(null);
+  useEvent("ui.perf", setPerf);
+  if (!perf || (!perf.profiler && !meter)) return null;
+  const p = perf.profiler;
+  // The full list wraps into columns below the readout (≈ 140 rows fit at 1080 UI px).
+  const ms = (v: number | null) => (v === null ? "—" : `${v.toFixed(1)} ms`);
   return (
     <node
       style={{
         positionType: "absolute",
         top: space.xs,
         right: space.s,
+        flexDirection: "column",
+        alignItems: "flexEnd",
         padding: { horizontal: space.s, vertical: 2 },
         borderRadius: radius.s,
-        backgroundColor: color.scrim,
+        backgroundColor: p?.diagnostics.length ? color.glassFlat : color.scrim,
       }}
     >
-      <text style={{ ...text.caps, color: color.text }}>{`${fps} FPS`}</text>
+      <text style={{ ...text.caps, color: color.text }}>{`${perf.fps} FPS`}</text>
+      {p && (
+        <>
+          <text style={text.caps}>{`CPU ${ms(p.cpuMs)}`}</text>
+          <text style={text.caps}>{`GPU ${ms(p.gpuMs)}`}</text>
+          <text style={text.caps}>{`VISIBLE ${p.visible ?? "—"}`}</text>
+          <text style={text.caps}>{`DRAWS ${p.draws ?? "—"}`}</text>
+          <text style={text.caps}>{`SHADOW DRAWS ${p.shadowDraws ?? "—"}`}</text>
+        </>
+      )}
+      {p && p.diagnostics.length > 0 && (
+        <node
+          style={{
+            flexDirection: "column",
+            flexWrap: "wrap",
+            height: 940,
+            gap: space.l,
+            rowGap: 0,
+            margin: { top: space.s },
+          }}
+        >
+          {p.diagnostics.map((d) => (
+            <node key={d.path} style={{ width: 600, justifyContent: "spaceBetween" }}>
+              <text style={{ fontSize: size.tiny, color: color.textDim, lineBreak: "noWrap" }}>{d.path}</text>
+              <text style={{ fontSize: size.tiny, color: color.text, lineBreak: "noWrap" }}>
+                {`${compactNumber(d.value)}${d.suffix ? ` ${d.suffix}` : ""}`}
+              </text>
+            </node>
+          ))}
+        </node>
+      )}
     </node>
   );
 }

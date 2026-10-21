@@ -1,8 +1,9 @@
 //! `ui.*` channels: readiness and render errors of the React app, the screen it shows
 //! (`ui.screen`, logged and waited on by `--input-script`), UI sound cues and music stingers, menu
-//! navigation (`ui.nav`), toasts and the FPS meter's frame rate (`ui.fps`), plus the readiness
-//! watchdog.
+//! navigation (`ui.nav`), toasts, the FPS meter and the F12 profiler (`ui.perf`), plus the
+//! readiness watchdog.
 
+use bevy::diagnostic::DiagnosticsStore;
 use bevy::input::gamepad::Gamepad;
 use bevy::prelude::*;
 use bevy::window::{CursorMoved, CursorOptions, PrimaryWindow};
@@ -19,7 +20,7 @@ pub const READY_TIMEOUT_SECS: f32 = 15.0;
 /// The same cue within this many seconds plays once (a fast pointer sweep over a list).
 const CUE_RETRIGGER_SECS: f64 = 0.04;
 
-/// The FPS meter averages the frames of this many seconds (and updates as often).
+/// The FPS meter and the profiler average this many seconds (and update as often).
 const FPS_WINDOW_SECS: f64 = 0.5;
 
 /// React → Bevy message `ui.ready`: the React app mounted (again after a full hot reload).
@@ -161,13 +162,70 @@ pub enum UiNotice {
     },
 }
 
-/// Bevy → React event `ui.fps`: the frame rate, every [`FPS_WINDOW_SECS`] while the FPS meter
-/// setting is on.
-#[react_event(name = "ui.fps")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UiFps {
+/// Bevy → React event `ui.perf`: every [`FPS_WINDOW_SECS`] while the FPS meter setting or the
+/// profiler is on, and at once when F12 / F11 toggle the profiler.
+#[react_event(name = "ui.perf")]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq)]
+pub struct UiPerf {
     /// Frames per second over the last window, rounded.
     pub fps: u16,
+    /// The profiler's readout; `null` while it is closed (the FPS meter shows `fps` alone).
+    pub profiler: Option<UiProfiler>,
+}
+
+/// The profiler: F12 opens the compact readout, F11 expands it to every Bevy diagnostic.
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct UiProfiler {
+    /// Main-world CPU time per frame, ms (`rc_core::perf::CPU_FRAME_MS`).
+    pub cpu_ms: Option<f32>,
+    /// GPU time per frame, ms (`null` without timestamp queries).
+    pub gpu_ms: Option<f32>,
+    /// Entities the active cameras draw (summed over cameras; shadow views excluded).
+    pub visible: Option<u32>,
+    /// Draw calls of the camera views (`rc_core::perf::DRAW_CALLS`).
+    pub draws: Option<u32>,
+    /// Draw calls of the shadow views.
+    pub shadow_draws: Option<u32>,
+    /// Every Bevy diagnostic by path; empty unless expanded.
+    pub diagnostics: Vec<UiDiagnostic>,
+}
+
+/// One Bevy diagnostic: its average over the recorded history.
+#[derive(serde::Serialize, ts_rs::TS, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct UiDiagnostic {
+    /// `render/frame/elapsed_gpu`, `fps` …
+    pub path: String,
+    /// The value.
+    pub value: f32,
+    /// Unit (`ms`, `%` or empty).
+    pub suffix: String,
+}
+
+/// What the profiler shows: F12 toggles it, F11 toggles the full diagnostics list.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum ProfilerView {
+    #[default]
+    Closed,
+    Compact,
+    Full,
+}
+
+impl ProfilerView {
+    fn toggled(self, key: KeyCode) -> Self {
+        match (key, self) {
+            (KeyCode::F12, Self::Closed) => Self::Compact,
+            (KeyCode::F12, _) => Self::Closed,
+            (KeyCode::F11, Self::Full) => Self::Compact,
+            (KeyCode::F11, _) => Self::Full,
+            (_, view) => view,
+        }
+    }
 }
 
 /// Health of the React UI; automation runs exit non-zero when it is not ready or has errors.
@@ -196,7 +254,7 @@ pub(crate) fn register(app: &mut App) {
         )
         .add_react_event::<NavEvent>()
         .add_react_event::<UiNotice>()
-        .add_react_event::<UiFps>();
+        .add_react_event::<UiPerf>();
 }
 
 fn on_ready(_: On<UiReady>, status: Option<ResMut<UiStatus>>) {
@@ -319,26 +377,74 @@ pub(crate) fn forward_notices(
     }
 }
 
-/// Counts frames and sends `ui.fps` at the end of each window while the FPS meter is on (frames
-/// are counted either way, so the first value after switching it on is a full window's).
-pub(crate) fn push_fps(
+/// Counts frames and sends `ui.perf` at the end of each window while the FPS meter or the
+/// profiler is on (frames are counted either way, so the first value after switching the meter on
+/// is a full window's), and at once when F12 / F11 change the profiler.
+pub(crate) fn push_perf(
     time: Res<Time<Real>>,
     settings: Option<Res<Settings>>,
-    mut window: Local<(u32, f64)>,
+    keys: Option<Res<ButtonInput<KeyCode>>>,
+    store: Option<Res<DiagnosticsStore>>,
+    mut view: Local<ProfilerView>,
+    mut window: Local<(u32, f64, u16)>,
     events: ReactEvents,
 ) {
+    let before = *view;
+    if let Some(keys) = keys {
+        for key in keys.get_just_pressed() {
+            *view = view.toggled(*key);
+        }
+    }
     window.0 += 1;
     let now = time.elapsed_secs_f64();
     let secs = now - window.1;
-    if secs < FPS_WINDOW_SECS {
+    if secs >= FPS_WINDOW_SECS {
+        let fps = (f64::from(window.0) / secs).round() as u16;
+        *window = (0, now, fps);
+    } else if *view == before {
         return;
     }
-    let fps = f64::from(window.0) / secs;
-    *window = (0, now);
-    if settings.is_some_and(|s| s.gameplay.fps_meter) {
-        events.send(&UiFps {
-            fps: fps.round() as u16,
-        });
+    let meter = settings.is_some_and(|s| s.gameplay.fps_meter);
+    if !meter && *view == ProfilerView::Closed && before == ProfilerView::Closed {
+        return;
+    }
+    events.send(&UiPerf {
+        fps: window.2,
+        profiler: (*view != ProfilerView::Closed)
+            .then(|| profiler(store.as_deref(), *view == ProfilerView::Full)),
+    });
+}
+
+fn profiler(store: Option<&DiagnosticsStore>, full: bool) -> UiProfiler {
+    let average = |path| {
+        store
+            .and_then(|s| s.get(path))
+            .and_then(|d| d.average())
+            .filter(|v| v.is_finite())
+            .map(|v| v as f32)
+    };
+    let mut diagnostics: Vec<UiDiagnostic> = match store {
+        Some(store) if full => store
+            .iter()
+            .filter_map(|d| {
+                let value = d.average().filter(|v| v.is_finite())?;
+                Some(UiDiagnostic {
+                    path: d.path().as_str().to_owned(),
+                    value: value as f32,
+                    suffix: d.suffix.to_string(),
+                })
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    diagnostics.sort_by(|a, b| a.path.cmp(&b.path));
+    UiProfiler {
+        cpu_ms: average(&perf::CPU_FRAME_MS),
+        gpu_ms: average(&perf::GPU_FRAME_MS),
+        visible: average(&perf::VISIBLE_ENTITIES).map(|v| v.round() as u32),
+        draws: average(&perf::DRAW_CALLS).map(|v| v.round() as u32),
+        shadow_draws: average(&perf::SHADOW_DRAW_CALLS).map(|v| v.round() as u32),
+        diagnostics,
     }
 }
 
@@ -365,6 +471,18 @@ pub(crate) fn watchdog(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn f12_toggles_the_profiler_and_f11_its_full_view() {
+        use ProfilerView::*;
+        let press = |keys: &[KeyCode]| keys.iter().fold(Closed, |v, k| v.toggled(*k));
+        assert_eq!(press(&[KeyCode::F12]), Compact);
+        assert_eq!(press(&[KeyCode::F12, KeyCode::F12]), Closed);
+        assert_eq!(press(&[KeyCode::F11]), Full, "F11 opens it expanded");
+        assert_eq!(press(&[KeyCode::F12, KeyCode::F11, KeyCode::F11]), Compact);
+        assert_eq!(press(&[KeyCode::F11, KeyCode::F12]), Closed);
+        assert_eq!(press(&[KeyCode::KeyA]), Closed);
+    }
 
     #[test]
     fn the_cursor_hides_on_key_and_pad_navigation_and_shows_when_the_mouse_moves() {

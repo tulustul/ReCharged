@@ -12,7 +12,8 @@
 //!   `DeviceEvent`, `RebindResult`, `LoadingTasks`, `Catalog`, `Settings`, `LocalPlayers`,
 //!   `LobbyState`, `RaceConfig`, `RaceResults`, the race state (`RaceStatus`, `Standings`, racer
 //!   components, item entities, `RaceEvent`, `HitEvent`, `TrackSummary`, `PlayerViewports`); rc_game's `Profile`, `CupRun`, `VersusSession`,
-//!   `RaceOutcome`, `GameNotice`; `AutomationConfig`, `UserPaths`.
+//!   `RaceOutcome`, `GameNotice`; `AutomationConfig`, `UserPaths`; F12 / F11 and Bevy's
+//!   `DiagnosticsStore` (the profiler, `ui.perf`).
 //! - **Outputs:** React events, `GameCommand`s, `UiSound`, `MusicStinger`, `RebindRequest`,
 //!   `MenuBackdrop` (sole writer), `UiScale` (sole writer), the primary window's `CursorOptions`
 //!   (sole writer: hidden after keyboard/pad input until the mouse moves), [`UiStatus`], the HUD's
@@ -104,7 +105,7 @@ impl Plugin for GameUiPlugin {
                     ui::forward_nav,
                     ui::cursor_visibility,
                     ui::forward_notices,
-                    ui::push_fps,
+                    ui::push_perf,
                     ui::watchdog,
                     input::forward_devices,
                     input::forward_rebinds,

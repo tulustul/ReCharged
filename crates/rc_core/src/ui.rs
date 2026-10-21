@@ -158,3 +158,23 @@ pub struct MenuBackdrop {
     /// Camera framing.
     pub focus: BackdropFocus,
 }
+
+/// Profiler diagnostics published by rc_render and shown by rc_ui's F12 overlay.
+pub mod perf {
+    use bevy::diagnostic::DiagnosticPath;
+
+    /// Milliseconds the main world's update took (simulation, game flow, UI; not the render
+    /// world).
+    pub const CPU_FRAME_MS: DiagnosticPath = DiagnosticPath::const_new("perf/cpu_frame_ms");
+    /// Milliseconds the GPU spent on the whole frame (a `frame` span around the render graph;
+    /// absent without timestamp queries).
+    pub const GPU_FRAME_MS: DiagnosticPath = DiagnosticPath::const_new("render/frame/elapsed_gpu");
+    /// Draw calls of the camera views (every pass: prepass, opaque, transparent, 2D, UI); one per
+    /// multidraw batch set, whose meshes the GPU draws from indirect commands.
+    pub const DRAW_CALLS: DiagnosticPath = DiagnosticPath::const_new("perf/draw_calls");
+    /// Draw calls of the shadow views (cascades, spot lights, six faces per point light).
+    pub const SHADOW_DRAW_CALLS: DiagnosticPath =
+        DiagnosticPath::const_new("perf/shadow_draw_calls");
+    /// Entities the active cameras draw this frame, summed over cameras (shadow views excluded).
+    pub const VISIBLE_ENTITIES: DiagnosticPath = DiagnosticPath::const_new("perf/visible_entities");
+}

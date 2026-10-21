@@ -14,7 +14,8 @@
 //!   diffed) and [`EnvPreview`].
 //! - **Outputs:** visual entities only (proxies, lights, sky, showroom), camera rendering
 //!   components, the window's mode/size/vsync, [`MaterialLibrary`], [`ActiveEnvironment`],
-//!   [`PipelineQueue`], `ShowroomReady`, `LoadingDone("visuals")` / `LoadingFailed`.
+//!   [`PipelineQueue`], `ShowroomReady`, `LoadingDone("visuals")` / `LoadingFailed`; the
+//!   profiler diagnostics (`rc_core::perf`, Bevy's frame-time, entity-count and render passes).
 //! - **Must never:** write simulation state or rapier bodies, touch the split-screen
 //!   `OverlayCamera`, or load assets per frame.
 
@@ -24,6 +25,7 @@ mod content;
 mod lighting;
 mod materials;
 mod preprocess_fix;
+mod profiling;
 mod props;
 mod proxy;
 mod quality;
@@ -70,6 +72,7 @@ impl Plugin for GraphicsPlugin {
         weather_fx::build(app);
         showroom::build(app);
         preprocess_fix::build(app);
+        profiling::build(app);
         app.add_plugins(content::ContentVisualsPlugin);
     }
 }

@@ -921,6 +921,19 @@ cup: string,
  */
 trophy: UiTrophy, };
 export type UiDeviceKind = "keyboardA" | "keyboardB" | "gamepad" | "mouse";
+export type UiDiagnostic = { 
+/**
+ * `render/frame/elapsed_gpu`, `fps` …
+ */
+path: string, 
+/**
+ * The value.
+ */
+value: number, 
+/**
+ * Unit (`ms`, `%` or empty).
+ */
+suffix: string, };
 export type UiDifficulty = "rookie" | "pro" | "elite" | "elitePlus";
 export type UiDisplayMode = "windowed" | "borderless";
 export type UiDotValues = { 
@@ -943,11 +956,6 @@ message: string,
  * Component stack, if React provided one.
  */
 stack?: string, };
-export type UiFps = { 
-/**
- * Frames per second over the last window, rounded.
- */
-fps: number, };
 export type UiGameplay = { speedUnit: UiSpeedUnit, cameraMode: UiCameraMode, cameraShake: boolean, hudScale: number, minimap: boolean, fpsMeter: boolean, split: UiSplit, aiCatchUp: boolean, aiDifficulty: UiDifficulty, hints: boolean, };
 export type UiGraphics = { preset: UiQuality, displayMode: UiDisplayMode, windowSize: [number, number], vsync: boolean, fovDeg: number, shadows: UiShadows, antiAliasing: UiAntiAliasing, ambientOcclusion: boolean, bloom: boolean, motionBlur: boolean, particles: UiParticles, volumetricFog: boolean, };
 export type UiHint = "driftCharge" | "boostReady" | "itemReady" | "holdReset" | "wrongWay";
@@ -1221,6 +1229,15 @@ accent: [number, number, number],
 set: UiPaintSet, };
 export type UiPaintSet = "base" | "neon" | "carbon" | "gold" | "chrome";
 export type UiParticles = "low" | "medium" | "high";
+export type UiPerf = { 
+/**
+ * Frames per second over the last window, rounded.
+ */
+fps: number, 
+/**
+ * The profiler's readout; `null` while it is closed (the FPS meter shows `fps` alone).
+ */
+profiler: UiProfiler | null, };
 export type UiPlayerChoice = { 
 /**
  * Slot 0–3.
@@ -1377,6 +1394,31 @@ goldMedals: number,
  * Career statistics.
  */
 stats: UiStats, };
+export type UiProfiler = { 
+/**
+ * Main-world CPU time per frame, ms (`rc_core::perf::CPU_FRAME_MS`).
+ */
+cpuMs: number | null, 
+/**
+ * GPU time per frame, ms (`null` without timestamp queries).
+ */
+gpuMs: number | null, 
+/**
+ * Entities the active cameras draw (summed over cameras; shadow views excluded).
+ */
+visible: number | null, 
+/**
+ * Draw calls of the camera views (`rc_core::perf::DRAW_CALLS`).
+ */
+draws: number | null, 
+/**
+ * Draw calls of the shadow views.
+ */
+shadowDraws: number | null, 
+/**
+ * Every Bevy diagnostic by path; empty unless expanded.
+ */
+diagnostics: Array<UiDiagnostic>, };
 export type UiQuality = "low" | "medium" | "high" | "ultra" | "custom";
 export type UiRaceEvent = { "kind": "countdown", 
 /**
@@ -2055,8 +2097,8 @@ export interface ReactEvents {
   "race.setup": UiHudSetup;
   resize: Resize;
   toast: UiNotice;
-  "ui.fps": UiFps;
   "ui.nav": NavEvent;
+  "ui.perf": UiPerf;
   "versus.score": UiVersusScore;
   viewports: UiViewports;
 }
