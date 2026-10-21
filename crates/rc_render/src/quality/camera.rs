@@ -1,6 +1,6 @@
 //! Camera decoration: rc_camera spawns bare `GameCamera` / `MenuCamera`s; this adds HDR, filmic
-//! tonemapping, `Msaa::Off`, a depth prepass (soft particles) and the per-quality post-processing,
-//! and re-applies it live whenever
+//! tonemapping, `Msaa::Off`, a depth prepass (soft particles, GPU occlusion culling) and the
+//! per-quality post-processing, and re-applies it live whenever
 //! the settings or the number of player views change. The split-screen `OverlayCamera` is never
 //! touched.
 
@@ -16,6 +16,7 @@ use bevy::post_process::bloom::Bloom;
 use bevy::post_process::motion_blur::MotionBlur;
 use bevy::prelude::*;
 use bevy::render::camera::{MipBias, TemporalJitter};
+use bevy::render::occlusion_culling::OcclusionCulling;
 use rc_core::prelude::*;
 
 use super::{AaMode, ViewQuality, view_quality};
@@ -98,7 +99,13 @@ fn mark<C: Component>(add: On<Add<C>>, mut commands: Commands) {
 fn decorate(add: On<Add<QualityCamera>>, mut commands: Commands) {
     commands
         .entity(add.entity)
-        .insert((Hdr, Tonemapping::TonyMcMapface, Msaa::Off, DepthPrepass));
+        .insert((
+            Hdr,
+            Tonemapping::TonyMcMapface,
+            Msaa::Off,
+            DepthPrepass,
+            OcclusionCulling,
+        ));
 }
 
 /// Number of player views: game cameras on screen (menus: 1). While Loading, before the game

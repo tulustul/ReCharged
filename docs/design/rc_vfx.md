@@ -46,11 +46,13 @@ rapier body. Session entities (particle slots, skid mesh, precipitation, name at
   thin out with distance to the nearest camera (100 % within 25 u → 15 % at 90 u).
 - Randomness is a local SplitMix64 (`FxRng`): presentation-only, it must not consume rc_core's
   gameplay RNG streams.
-- **Soft particles:** billboards (facing mode 0) fade out where they meet opaque geometry, over
-  half their size in front of the scene depth (`soft_fade` in `particle.wesl`, from the view's
-  depth prepass), so big puffs no longer cut a hard line into the ground. Axial and flat
-  particles keep their edges (sparks, ground rings lie on the ground by design). Views without
-  a depth prepass (no SSAO, TAA or motion blur: Low quality) skip it.
+- **Soft particles:** camera-facing particles (billboards, sparks, droplets) fade out where they
+  meet opaque geometry, over half their size (width of stretched ones) in front of the scene
+  depth (`soft_fade` in `particle.wesl`), so puffs no longer cut a hard line into the ground.
+  EMP/orb shells (`bubble.wesl`, 0.3 u), rain and snow (`precip.wesl`, 0.25 u) and sky bolts
+  (`bolt.wesl`, `BoltMaterial`, 4 u) fade the same way. Flat particles, skid marks and oil keep
+  their edges (they lie on the ground by design). Every rc_render view has a depth prepass
+  (`quality/camera.rs`), whatever the quality.
 
 ## Driving (`cars.rs`, `car_events.rs`, `skids.rs`)
 Wheel contact patches come from each model's `models/cars/<car>.wheels.ron` (art contract; loaded
@@ -191,7 +193,5 @@ never exceed the budget; each camera sees only its own precipitation.
 - Far splashes know only the track's ribbon and ground polygons (no physics queries): none appear
   on prop surfaces (ramps, table tops without a ground polygon) more than 3 u from the car.
 - Name tags are occluded by geometry.
-- Soft particles need the view's depth prepass: at Low quality (no SSAO, TAA or motion blur)
-  puffs keep a hard edge where they meet the ground.
 - The lab, not a race, demonstrates effects a quick race does not produce on demand (every item,
   confetti, respawns).
