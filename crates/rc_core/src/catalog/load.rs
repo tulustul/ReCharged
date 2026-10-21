@@ -398,7 +398,7 @@ mod tests {
     fn catalog_file_loads_and_validates() {
         let c = catalog();
         assert_eq!(c.cars.len(), 8);
-        assert_eq!(c.tracks.iter().filter(|t| !t.hidden).count(), 6);
+        assert_eq!(c.tracks.iter().filter(|t| !t.hidden).count(), 7);
         assert!(c.track(&"test_oval".into()).is_some_and(|t| t.hidden));
         assert_eq!(
             c.cups.iter().map(|cup| cup.races.len()).collect::<Vec<_>>(),

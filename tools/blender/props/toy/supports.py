@@ -8,9 +8,10 @@ with its own active gaps; pillars that exist in both directions get `dir: Both`.
 outside each edge (clear of the barrier), its bracket under the ribbon's flat bottom; the
 prop's origin is the bracket top and its column runs down into the floor. Pillars that would
 pierce a lower part of the track, or a keep-out circle (the castle inside the helix), are
-skipped.
+skipped (default: the castle circle on toy_town's track, none elsewhere; `--keep-out x,z,r`,
+repeatable, replaces it).
 
-    python3 tools/blender/props/toy/supports.py [assets/maps/toy_town/track.ron]
+    python3 tools/blender/props/toy/supports.py [assets/maps/<map>/track.ron] [--keep-out x,z,r ...]
 """
 import math
 import os
@@ -29,7 +30,7 @@ TIP = 0.2             # bracket tip: half width + this
 MIN_CLEAR = 0.5       # support only where the bottom is this far above the floor
 FLOOR = 0.05          # play-mat height
 SPACING = 9.0         # target pillar spacing along the centreline (u)
-KEEP_OUT = [((-40.0, -25.0), 10.3)]  # (centre x, z), radius: the castle inside the helix
+CASTLE = [((-40.0, -25.0), 10.3)]  # (centre x, z), radius: toy_town's castle inside the helix
 
 
 def sub(a, b): return [a[i] - b[i] for i in range(3)]
@@ -123,7 +124,7 @@ def centreline(pts, gaps):
     return at, gap, dense
 
 
-def supports(track, rev):
+def supports(track, rev, keep_out):
     pts = resolve(track)
     n = len(pts)
     gaps = [(g['from'], g['to']) for g in track.get('gaps', [])
@@ -148,7 +149,7 @@ def supports(track, rev):
                     continue
                 c = add(p, mul(flat, side * (hw + PILLAR) * math.cos(bank)))
                 c[1] = top
-                if any(math.hypot(c[0] - x, c[2] - z) < r for (x, z), r in KEEP_OUT):
+                if any(math.hypot(c[0] - x, c[2] - z) < r for (x, z), r in keep_out):
                     continue
                 if pierces(c, dense, s_here):
                     continue
@@ -182,10 +183,18 @@ def merge(fwd, rev):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'assets', 'maps',
-                                                              'toy_town', 'track.ron')
+    args = sys.argv[1:]
+    keep_out = []
+    while '--keep-out' in args:
+        k = args.index('--keep-out')
+        x, z, r = (float(v) for v in args[k + 1].split(','))
+        keep_out.append(((x, z), r))
+        del args[k:k + 2]
+    path = args[0] if args else os.path.join(ROOT, 'assets', 'maps', 'toy_town', 'track.ron')
+    if not keep_out and os.path.basename(os.path.dirname(os.path.abspath(path))) == 'toy_town':
+        keep_out = CASTLE
     track = toy_ron.load(path)
-    lines = merge(supports(track, False), supports(track, True))
+    lines = merge(supports(track, False, keep_out), supports(track, True, keep_out))
     body = [f'        (kind: "{KIND}", pos: ({c[0]:.2f}, {c[1]:.2f}, {c[2]:.2f}), '
             f'yaw: {yaw:.1f}' + ('' if d == 'Both' else f', dir: {d}') + '),'
             for c, yaw, d in lines]

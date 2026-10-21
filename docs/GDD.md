@@ -293,8 +293,8 @@ Items can be disabled (Quick Race / Versus); Time Trial has none.
 ## 7. Tracks
 
 ### 7.1 Track list [TRK-1]
-Six environments; each has a **Forward** and a **Reverse** layout, and any layout can be
-**Mirrored** once unlocked → 24 variants.
+Seven tracks in six environments; each has a **Forward** and a **Reverse** layout, and any layout
+can be **Mirrored** once unlocked → 28 variants.
 
 | Track | Environment | Indoor | Diff. | Lap length | Default laps | Surfaces | Signature features |
 |---|---|---|---|---|---|---|---|
@@ -304,6 +304,7 @@ Six environments; each has a **Forward** and a **Reverse** layout, and any layou
 | **Aisle Rush** | Supermarket after closing | yes | ★★ | ~800 u | 3 | Tile (vinyl), Ice (freezer), Cardboard | long aisle straights; icy freezer section; cardboard-box ramps; knockable can pyramids; checkout lanes |
 | **Wrench Works** | Auto-repair workshop | yes | ★★★ | ~700 u | 4 | Asphalt (concrete), Oil, Carpet (rubber mats), Wood (plywood ramps), Water (wash bay) | drive under cars on lifts; plywood ramp onto the workbench and jump; tyre-stack chicane; oil-stain slides; wash bay; paint-booth haze |
 | **Maple Street** | Suburban street & front lawns | no | ★★★ | ~900 u | 3 | Asphalt, Grass (lawns), Stone (sidewalk) | drive under parked (giant) cars; curb hops; lawn shortcut; storm-drain dip; street lamps at night |
+| **Toybox Twister** | Toy store, the big hall | yes | ★★★ | ~1170 u | 3 | Plastic toy track, Carpet (play-mat), Wood | double helix up to an elevated bridge and a drop jump; esses; four jumps; the hall divided into rooms, crossed through nine light-up archways; rainbow tunnels and light arches; rounded corners; dollhouse drive-through; party lighting |
 
 Racing width ≥ 8 u; chokepoints ≥ 5 u, at most 2 per lap. Time Trial always uses 3 laps.
 
@@ -319,7 +320,7 @@ Allowed presets:
 
 | Track | Times of day | Weather |
 |---|---|---|
-| Sofa Circuit, Toy Town, Wrench Works | Morning, Noon, Sunset, Night | Clear, Cloudy, Rain, Storm (outside weather) |
+| Sofa Circuit, Toy Town, Toybox Twister, Wrench Works | Morning, Noon, Sunset, Night | Clear, Cloudy, Rain, Storm (outside weather) |
 | Aisle Rush | Sunset, Night | Clear |
 | Backyard Bash, Maple Street | Morning, Noon, Sunset, Night | all six |
 

@@ -265,3 +265,44 @@ def relief(bm, poly2d, center, normal, up, size, height, mat):
 def digit_bars(text, h):
     """Rounded-bar outlines (CCW) of a blocky number of height h, centred (no slant)."""
     return [geo.ccw(b) for b in geo.number_bars(text, h, t=0.2, slant=0.0)]
+
+
+# ---------------------------------------------------------------------------------------------
+# Interior walls (toy_wall*): 20 u tall, 0.8 u thick plaster with a beech skirting and crown
+# and a painted rainbow stripe band at 4-5.2 u on both faces.
+
+WALL_H, WALL_T = 20.0, 0.8
+RAINBOW = [RED, ORANGE, YELLOW, GREEN, BLUE, PURPLE]
+# (half thickness, z0, z1, material): stacked from the core outward; each layer encloses the
+# core over its height, so the visible face is the outermost one. The core stops just short of
+# the crown top and (wall_sweep) of the path ends, so no caps coincide.
+WALL_LAYERS = [(0.4, 0.0, WALL_H - 0.01, 'plaster'), (0.48, 0.0, 0.6, 'skirting'),
+               (0.47, 19.2, 19.6, 'crown'), (0.55, 19.6, WALL_H, 'crown')] + \
+              [(0.41, 4.0 + 0.2 * k, 4.2 + 0.2 * k, f'stripe{k}') for k in range(6)]
+
+
+def wall_materials():
+    """Plaster (the room's warm white), beech skirting/crown, the six stripe paints."""
+    core.material('plaster', (1.0, 0.97, 0.94), 0.0, 0.88)
+    wood('skirting')
+    wood('crown', seed=3)
+    for k, c in enumerate(RAINBOW):
+        painted(f'stripe{k}', c, 0.45)
+
+
+def wall_sweep(bm, path, layers=None):
+    """Sweep the wall cross-section (WALL_LAYERS or a subset) along a plan polyline (x, y) at
+    the floor; each layer is a closed loft (capped at the path ends). Returns the bmesh."""
+    pts = [V((p[0], p[1], 0.0)) for p in path]
+    n = len(pts)
+    for half, z0, z1, mat in layers or WALL_LAYERS:
+        rings = []
+        for i, p in enumerate(pts):
+            t = (pts[min(i + 1, n - 1)] - pts[max(i - 1, 0)]).normalized()
+            side = V((-t.y, t.x, 0.0))
+            if mat == 'plaster' and i in (0, n - 1):
+                p = p + t * (0.01 if i == 0 else -0.01)
+            rings.append([p - side * half + V((0, 0, z0)), p + side * half + V((0, 0, z0)),
+                          p + side * half + V((0, 0, z1)), p - side * half + V((0, 0, z1))])
+        geo.loft(bm, rings, core.mi(mat))
+    return box_uv(bm, 0.5)

@@ -57,6 +57,12 @@ cargo run -p recharged -- --user-data-dir target/agent-data/T16-toy --unlock-all
 | `toy_stacking_rings`, `toy_duck`, `toy_crayons`, `toy_foam_tiles` | … | 3 680 / 1 928 / 1 436 / 1 608 | small floor toys |
 | `toy_cubby` | cubby | 2 300 | low cubby shelf with fabric bins (fits under the 3.5 u window sills) |
 | decor: bunting, sign | bunting / sign | 366 / 1 868 | `decor/toy_town.ron`: pennants under the ceiling, hanging aisle signs (origins at the ceiling) |
+| `toy_tunnel` | tunnel | 7 078 | hero; rainbow pop-up play tunnel the track drives through: 12 u long, arch r 6.6–7.0 centred at the floor, navy hoops every 2 u with glowing LED strips (`lamp_*`), two coloured lights inside; six rotated boxes approximate the arch |
+| `toy_light_arch` | light_arch | 4 568 | carnival marquee arch across the track: striped posts at x ±7.4, red board peaking at 8.5 u (≥ 6.5 u clear between x ±6) with 30 coloured bulbs (`lamp_*`) and a star; three coloured lights |
+| `toy_wall` | wall | 110 | interior wall panel 12 × 20 × 0.8 u: warm-white plaster, beech skirting (0.6 u) and crown, rainbow stripe band at 4–5.2 u on both faces (section shared via `toykit.wall_sweep`) |
+| `toy_wall_gate` | wall_gate | 6 932 | hero; 24 u wall panel with a round-topped archway (x ±7.5, jambs to 5 u, r 7.5, top 12.5 u), rainbow archivolt and coloured bulbs (`lamp_*`, mirrored rainbow order) on both faces; two coloured lights |
+| `toy_wall_curve` | wall_curve | 2 280 | 90° arc of wall (−45°..45° around −Z), origin at the circle centre, inner face r 20, outer 20.8, 32 segments; nine rotated boxes follow it |
+| decor: fairy_lights, balloons | fairy_lights / balloons | 3 444 / 3 960 | multicoloured bulb string (30 u span, 2 u sag, origin at the attachment height) and a bunch of six balloons against the ceiling with curly ribbons (origin at the ceiling contact) |
 
 Forward layout: 249 placements (70 shelves, 25 cubbies, 74 pillars, 29 dynamic blocks) ≈ 0.83 M
 triangles if everything were in view (shelves ≈ 0.5 M), + 15 decor items (11.5 k).
@@ -88,6 +94,37 @@ Features per direction:
 Intended lines: the racing line takes the raised banked turns at speed and threads the dollhouse
 in the middle; the shortcut is shorter but slower and blocked by blocks on lap 1; the
 battery line trades time for the collectible.
+
+## Layout (`toybox_twister`)
+
+Second toy-store track (catalog `toybox_twister`, ★★★, 3 laps, unlocked from the start): 1171 u,
+16 checkpoints, 6 item rows, reference lap 45.6 s, one chokepoint (dollhouse, 7 u). Lint-free in
+all four variants; the Elite AI finishes every variant (medals.ron, measured with
+`--headless-race --mode tt --car phantom --seed 1..3`). Hall 220 × 190 u, ceiling 20 u.
+
+| | Forward (clockwise) | Reverse |
+|---|---|---|
+| Jumps | start-straight hop through a light arch (8°, 10 u gap); bridge drop from 11.6 u (5° kicker, 12 u gap, 0.71 s air); east hop (8°, 9 u gap) | infield hop (8°, 8 u gap) |
+| Turns | raised banked T1, esses (±12°, raised 1.2), 2¼-turn double helix around the castle (12°, +9.9 u), raised NE turn, flat hairpin, banked U-turn, S-bend, raised final hairpin | same, reversed |
+| Tunnels / gates | two rainbow tunnels on the west straight, one after the east hop, one into the final hairpin; the dollhouse; the archway gate in the east partition | same |
+| Shortcut / GB | U-turn interior past two block gates; Golden Battery on the play table up the ramp | shortcut only |
+
+- **Rooms**: full-height walls divide the hall into a start hall, the tunnel wing, the U-turn
+  court, the helix tower, two north galleries, the east wing and the south-east room. Every
+  crossing of the track is a light-up `toy_wall_gate` archway on a straight where the ribbon is
+  low (≤ 4.4 u: the arch is 9.9 u high at the ribbon's edges): west straight, the centre wall's
+  three (start, dollhouse and infield straights), the descent, the east straight (×2), the
+  infield straight and the hairpin's north straight. `toy_wall` panels fill the lines (padded into
+  the room walls and archway jambs; leftover overlaps are offset ±0.03 u so no faces coincide);
+  `toy_wall_curve` rounds the four corners and stands as a curved display wall behind the ball
+  pits. Shelves, cubbies and windows keep clear of the junctions; bunting and fairy-light rows are
+  stretched (decor `scale`) to span each room.
+- **Colour**: party spots (magenta, cyan, lime, violet, orange, red, blue, yellow) are always on;
+  `practicals` 1.0 at every time keeps the tunnels', arches' and archways' lights and bulbs at
+  full strength all day (lamp emission 24–30, saturated colours). Decor: bunting and fairy-light rows, balloon bunches, aisle signs.
+- **Generated**: pillars by `supports.py --keep-out -64,-62,10.3` (the castle). Not baked: a noon
+  bake (`cargo run -p rc_editor -- toybox_twister --bake-time noon`) left the 20 u ceiling black
+  in the game (Toy Town's 16 u one stays lit) — the irradiance bake needs a look first.
 
 ## Lighting wishes (`assets/maps/toy_town/environment.ron`, rendering agent)
 

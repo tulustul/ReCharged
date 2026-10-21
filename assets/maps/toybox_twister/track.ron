@@ -1,0 +1,589 @@
+// Toybox Twister — the toy store's big hall (GDD §7.1, art bible §3.2). ~1170 u, 3 laps, indoor ★★★.
+// Format and conventions: docs/design/rc_track.md; environment notes: docs/design/env-toy.md.
+//   cargo run -p rc_track --example plot -- toybox_twister [--rev] [--mirror]
+// The orange ToyTrack ribbon (top at y = 0.3) on the teal play-mat (y = 0.05) of a 220 × 190 u
+// hall (20 u ceiling, rounded corners) divided into rooms; the track crosses each wall through a
+// light-up archway. Forward = clockwise. Lap: start
+// straight (west) with a hop through a light-up arch → raised banked T1 → two rainbow tunnels →
+// raised esses → a 2¼-turn double helix around the play castle climbing to 11.1 u → the bridge
+// along the north wall and its drop jump → descent into the raised NE turn → the east straight
+// through the archway gate, a hop and a third tunnel → flat hairpin → infield straight (the Rev
+// jump) → banked U-turn with the shortcut and the Golden Battery table → the dollhouse → S-bend →
+// fourth tunnel → raised final hairpin. Pillars under raised stretches are generated:
+//   python3 tools/blender/props/toy/supports.py assets/maps/toybox_twister/track.ron --keep-out -64,-62,10.3
+// Out-of-reach decor (bunting, fairy lights, balloons, signs) is in decor.ron.
+(
+    style: ToyTrack,
+    start: 0,
+    kill_height: -5,
+    wall_height: 1.2,
+    bounds: (min: (-110, -95), max: (110, 95)),
+    points: [
+        (pos: (40, 0.3, 72), width: 10, surface: ToyTrack, wall_left: true, wall_right: true, offroad_margin: 6, label: "start / finish"), // 0
+        (pos: (25, 0.3, 72)), // 1
+        (pos: (10, 0.3, 72)), // 2
+        (pos: (1, 0.3, 72), label: "Fwd hop: ramp foot"), // 3
+        (pos: (-13, 2.3, 72), label: "Fwd hop: lip"), // 4
+        (pos: (-23, 1, 72), label: "Fwd hop: landing"), // 5
+        (pos: (-37, 0.8, 72)), // 6
+        (pos: (-52, 1.3, 72), label: "rising into the raised T1"), // 7
+        (pos: (-62, 1.3, 72), bank_deg: 10), // 8
+        (pos: (-72, 1.8, 69.321), bank_deg: 20), // 9
+        (pos: (-79.321, 1.8, 62), bank_deg: 20), // 10
+        (pos: (-82, 1.3, 52), bank_deg: 10), // 11
+        (pos: (-82, 0.3, 40)), // 12
+        (pos: (-82, 0.3, 25)), // 13
+        (pos: (-82, 0.3, 10), label: "rainbow tunnel"), // 14
+        (pos: (-82, 1.2, 0), bank_deg: -6, label: "esses"), // 15
+        (pos: (-84.01, 1.2, -7.5), bank_deg: -12), // 16
+        (pos: (-89.5, 1.2, -12.99)), // 17
+        (pos: (-94.99, 1.2, -18.481), bank_deg: 12), // 18
+        (pos: (-97, 1.2, -25.981), bank_deg: 12), // 19
+        (pos: (-94.99, 1.2, -33.481), bank_deg: 12), // 20
+        (pos: (-89.5, 1.2, -38.971)), // 21
+        (pos: (-84.01, 1.2, -44.462), bank_deg: -12), // 22
+        (pos: (-82, 1.2, -51.962), bank_deg: -6), // 23
+        (pos: (-82, 1.2, -62), bank_deg: 6, label: "helix entry"), // 24
+        (pos: (-79.588, 1.567, -71), bank_deg: 12), // 25
+        (pos: (-73, 1.933, -77.588), bank_deg: 12), // 26
+        (pos: (-64, 2.3, -80), bank_deg: 12), // 27
+        (pos: (-55, 2.667, -77.588), bank_deg: 12), // 28
+        (pos: (-48.412, 3.033, -71), bank_deg: 12), // 29
+        (pos: (-46, 3.4, -62), bank_deg: 12), // 30
+        (pos: (-48.412, 3.767, -53), bank_deg: 12), // 31
+        (pos: (-55, 4.133, -46.412), bank_deg: 12), // 32
+        (pos: (-64, 4.5, -44), bank_deg: 12), // 33
+        (pos: (-73, 4.867, -46.412), bank_deg: 12), // 34
+        (pos: (-79.588, 5.233, -53), bank_deg: 12), // 35
+        (pos: (-82, 5.6, -62), bank_deg: 12), // 36
+        (pos: (-79.588, 5.967, -71), bank_deg: 12), // 37
+        (pos: (-73, 6.333, -77.588), bank_deg: 12), // 38
+        (pos: (-64, 6.7, -80), bank_deg: 12), // 39
+        (pos: (-55, 7.067, -77.588), bank_deg: 12), // 40
+        (pos: (-48.412, 7.433, -71), bank_deg: 12), // 41
+        (pos: (-46, 7.8, -62), bank_deg: 12), // 42
+        (pos: (-48.412, 8.167, -53), bank_deg: 12), // 43
+        (pos: (-55, 8.533, -46.412), bank_deg: 12), // 44
+        (pos: (-64, 8.9, -44), bank_deg: 12), // 45
+        (pos: (-73, 9.267, -46.412), bank_deg: 12), // 46
+        (pos: (-79.588, 9.633, -53), bank_deg: 12), // 47
+        (pos: (-82, 10, -62), bank_deg: 12), // 48
+        (pos: (-79.588, 10.367, -71), bank_deg: 12), // 49
+        (pos: (-73, 10.733, -77.588), bank_deg: 12), // 50
+        (pos: (-64, 11.1, -80), bank_deg: 6), // 51
+        (pos: (-46, 11.1, -80)), // 52
+        (pos: (-28, 11.1, -80)), // 53
+        (pos: (-10, 11.1, -80), label: "bridge"), // 54
+        (pos: (-4, 11.6, -80), label: "Bridge drop: lip"), // 55
+        (pos: (8, 8.1, -80), label: "Bridge drop: landing"), // 56
+        (pos: (27.333, 6, -80)), // 57
+        (pos: (46.667, 3.9, -80)), // 58
+        (pos: (66, 1.8, -80)), // 59
+        (pos: (74, 1.8, -80), bank_deg: 10, label: "raised NE turn"), // 60
+        (pos: (83, 1.8, -77.588), bank_deg: 20), // 61
+        (pos: (89.588, 1.8, -71), bank_deg: 20), // 62
+        (pos: (92, 1.8, -62), bank_deg: 10), // 63
+        (pos: (92, 1.8, -49)), // 64
+        (pos: (92, 0.3, -39), label: "east straight"), // 65
+        (pos: (92, 0.3, -31), label: "East hop: ramp foot"), // 66
+        (pos: (92, 2.3, -17), label: "East hop: lip"), // 67
+        (pos: (92, 1.3, -8), label: "East hop: landing"), // 68
+        (pos: (92, 0.3, 4)), // 69
+        (pos: (92, 0.3, 20), label: "flat hairpin"), // 70
+        (pos: (90.392, 0.3, 26)), // 71
+        (pos: (86, 0.3, 30.392)), // 72
+        (pos: (80, 0.3, 32)), // 73
+        (pos: (74, 0.3, 30.392)), // 74
+        (pos: (69.608, 0.3, 26)), // 75
+        (pos: (68, 0.3, 20)), // 76
+        (pos: (68, 0.3, 0)), // 77
+        (pos: (66.124, 0.3, -7)), // 78
+        (pos: (61, 0.3, -12.124)), // 79
+        (pos: (54, 0.3, -14)), // 80
+        (pos: (40, 0.3, -14), label: "infield straight"), // 81
+        (pos: (30, 1.3, -14), label: "Rev jump landing"), // 82
+        (pos: (22, 2.3, -14), label: "Rev jump lip"), // 83
+        (pos: (8, 0.3, -14), label: "Rev jump ramp foot"), // 84
+        (pos: (-8, 0.3, -14)), // 85
+        (pos: (-24, 0.3, -14), wall_left: false, offroad_margin: 16, label: "shortcut entry opening"), // 86
+        (pos: (-34, 1.35, -11.321), wall_left: true, bank_deg: -15), // 87
+        (pos: (-41.321, 1.35, -4), bank_deg: -15), // 88
+        (pos: (-44, 1.35, 6), bank_deg: -15), // 89
+        (pos: (-41.321, 1.35, 16), bank_deg: -15), // 90
+        (pos: (-34, 1.35, 23.321), bank_deg: -15), // 91
+        (pos: (-24, 0.3, 26), wall_left: false, label: "shortcut exit opening"), // 92
+        (pos: (-12, 0.3, 26), wall_left: true, offroad_margin: 6), // 93
+        (pos: (0, 0.3, 26), width: 7, wall_left: false, wall_right: false, label: "dollhouse"), // 94
+        (pos: (12, 0.3, 26)), // 95
+        (pos: (20, 0.3, 26), width: 10, wall_left: true, wall_right: true), // 96
+        (pos: (30, 0.3, 26), label: "S-bend"), // 97
+        (pos: (36, 0.3, 27.608)), // 98
+        (pos: (40.392, 0.3, 32)), // 99
+        (pos: (42, 0.3, 38)), // 100
+        (pos: (43.608, 0.3, 44)), // 101
+        (pos: (48, 0.3, 48.392)), // 102
+        (pos: (54, 0.3, 50)), // 103
+        (pos: (70, 0.3, 50)), // 104
+        (pos: (78, 1.35, 50), bank_deg: 7.5, label: "final hairpin"), // 105
+        (pos: (83.5, 1.35, 51.474), bank_deg: 15), // 106
+        (pos: (87.526, 1.35, 55.5), bank_deg: 15), // 107
+        (pos: (89, 1.35, 61), bank_deg: 15), // 108
+        (pos: (87.526, 1.35, 66.5), bank_deg: 15), // 109
+        (pos: (83.5, 1.35, 70.526), bank_deg: 15), // 110
+        (pos: (78, 1.35, 72), bank_deg: 7.5), // 111
+        (pos: (64, 0.4, 72)), // 112
+        (pos: (52, 0.3, 72), label: "the grid stays level"), // 113
+    ],
+    gaps: [
+        (from: 4, to: 5, dir: Fwd),
+        (from: 55, to: 56, dir: Fwd),
+        (from: 67, to: 68, dir: Fwd),
+        (from: 82, to: 83, dir: Rev),
+    ],
+    ground: [
+        // Beech floor of the store and the teal play-mat on it.
+        (surface: Wood, height: 0, points: [(-110, -95), (110, -95), (110, 95), (-110, 95)]),
+        (surface: Carpet, height: 0.05, points: [(-102, -88), (102, -88), (102, 88), (-102, 88)]),
+    ],
+    item_rows: [
+        (pos: (30, 0.3, 72)), // start straight, before the hop
+        (pos: (-82, 0.3, 10)), // out of the rainbow tunnel
+        (pos: (-34, 11.1, -80)), // the bridge
+        (pos: (92, 0.3, -43)), // east straight, before the hop
+        (pos: (-8, 0.3, -14)), // infield straight
+        (pos: (40, 0.3, 50)), // out of the S-bend
+    ],
+    shortcuts: [
+        // Through the U-turn's interior, past two block gates (both directions).
+        (path: [(-24, 0.3, -14), (-31, 0.05, -6), (-33, 0.05, 6), (-31, 0.05, 18), (-24, 0.3, 26)], width: 6, dir: Both),
+    ],
+    // On the play table: reach it up the toy-track ramp (forward only), drop off the far side.
+    golden_battery: (pos: (-24, 3.55, 6)),
+    props: [
+        // --- hero pieces -------------------------------------------------------------------------
+        (kind: "toy_start_arch", pos: (40, 0.05, 72), yaw: 90), // across the start line
+        (kind: "toy_robot", pos: (43.5, 0.05, 80.6)), // the starter, flag over the line
+        (kind: "toy_castle", pos: (-64, 0.05, -62), yaw: -135), // inside the double helix
+        (kind: "toy_dollhouse", pos: (6, 0.05, 26), yaw: 90), // the drive-through on the dollhouse straight
+        (kind: "toy_play_table", pos: (-24, 0.05, 6)), // Golden Battery perch inside the U-turn
+        (kind: "toy_track_ramp", pos: (-24, 0.05, -2.9), yaw: 180, dir: Fwd), // up onto the table
+        // --- rainbow tunnels ---------------------------------------------------------------------
+        (kind: "toy_tunnel", pos: (-82, 0.05, 34)), // west straight, two modules
+        (kind: "toy_tunnel", pos: (-82, 0.05, 22)),
+        (kind: "toy_tunnel", pos: (92, 0.05, 14)), // after the east hop
+        (kind: "toy_tunnel", pos: (62, 0.05, 50), yaw: 90), // into the final hairpin
+        // --- light-up arches ---------------------------------------------------------------------
+        (kind: "toy_light_arch", pos: (-6, 0.05, 72), yaw: 90), // over the start hop
+        (kind: "toy_light_arch", pos: (92, 0.05, -13)), // over the east hop
+        (kind: "toy_light_arch", pos: (30, 0.05, -14), yaw: 90), // over the Rev jump landing
+        (kind: "toy_light_arch", pos: (-16, 0.05, 26), yaw: 90), // dollhouse approach
+        (kind: "toy_light_arch", pos: (-82, 0.05, 4)), // into the esses
+        // --- knockable jumbo blocks (dynamic, 1.4 u grid) ----------------------------------------
+        (kind: "toy_block_cube", pos: (-33.9, 0.05, 0)),
+        (kind: "toy_block_cube", pos: (-31.1, 0.05, 0), yaw: 90),
+        (kind: "toy_block_cube", pos: (-33.9, 1.45, 0)),
+        (kind: "toy_block_cube", pos: (-31.1, 1.45, 0), yaw: 90),
+        (kind: "toy_block_plank", pos: (-32.5, 2.85, 0)),
+        (kind: "toy_block_roof", pos: (-32.5, 3.55, 0)),
+        (kind: "toy_block_pillar", pos: (-33.9, 0.05, 12)),
+        (kind: "toy_block_pillar", pos: (-31.1, 0.05, 12)),
+        (kind: "toy_block_pillar", pos: (-33.9, 1.45, 12)),
+        (kind: "toy_block_pillar", pos: (-31.1, 1.45, 12)),
+        (kind: "toy_block_plank", pos: (-32.5, 2.85, 12)),
+        (kind: "toy_block_roof", pos: (-32.5, 3.55, 12)),
+        (kind: "toy_block_cube", pos: (28.6, 0.05, 40)),
+        (kind: "toy_block_cube", pos: (30, 0.05, 40), yaw: 90),
+        (kind: "toy_block_cube", pos: (31.4, 0.05, 40), yaw: 180),
+        (kind: "toy_block_cube", pos: (29.3, 1.45, 40), yaw: 270),
+        (kind: "toy_block_cube", pos: (30.7, 1.45, 40)),
+        (kind: "toy_block_cube", pos: (30, 2.85, 40), yaw: 90),
+        (kind: "toy_block_cube", pos: (-40.7, 11.1, -76.4)),
+        (kind: "toy_block_cube", pos: (-39.3, 11.1, -76.4), yaw: 180),
+        (kind: "toy_block_cube", pos: (-40, 12.5, -76.4), yaw: 90),
+        (kind: "toy_block_arch", pos: (-7, 0.05, 19.6), yaw: 90),
+        (kind: "toy_block_arch", pos: (-7, 1.45, 19.6), yaw: 90),
+        (kind: "toy_block_arch", pos: (-7, 0.05, 32.4), yaw: 90),
+        (kind: "toy_block_arch", pos: (-7, 1.45, 32.4), yaw: 90),
+        (kind: "toy_block_cube", pos: (-7, 2.85, 19.6)),
+        (kind: "toy_block_cube", pos: (-7, 2.85, 32.4)),
+        // --- displays and toys on the open floor (static) ----------------------------------------
+        (kind: "toy_ball_pit", pos: (10, 0.05, -60), yaw: 30),
+        (kind: "toy_ball_pit", pos: (24, 0.05, -66), yaw: -20),
+        (kind: "toy_ball_pit", pos: (30, 0.05, -55), yaw: 60),
+        (kind: "toy_bear", pos: (-28, 0.05, -50), yaw: 170),
+        (kind: "toy_bear", pos: (-22, 0.05, -40), yaw: 200),
+        (kind: "toy_bear", pos: (62, 0.05, -46), yaw: 135),
+        (kind: "toy_bear", pos: (-36, 0.05, 38), yaw: 30),
+        (kind: "toy_bear", pos: (100, 0.05, -70), yaw: -110),
+        (kind: "toy_bear", pos: (-100, 0.05, 82), yaw: 40),
+        (kind: "toy_bear", pos: (100, 0.05, 84), yaw: -140),
+        (kind: "toy_rocking_horse", pos: (-10, 0.05, -24), yaw: 180),
+        (kind: "toy_rocking_horse", pos: (-5, 0.05, -24), yaw: 180),
+        (kind: "toy_rocking_horse", pos: (0, 0.05, -24), yaw: 180),
+        (kind: "toy_rocking_horse", pos: (5, 0.05, -24), yaw: 180),
+        (kind: "toy_train", pos: (44, 0.05, -30), yaw: 90),
+        (kind: "toy_train", pos: (-10, 0.05, 50), yaw: -60),
+        (kind: "toy_train", pos: (-60, 0.05, 30), yaw: 20),
+        (kind: "toy_train", pos: (20, 0.05, 44), yaw: 15),
+        (kind: "toy_stacking_rings", pos: (70, 0.05, -20)),
+        (kind: "toy_stacking_rings", pos: (-58, 0.05, 14)),
+        (kind: "toy_stacking_rings", pos: (-4, 0.05, 40)),
+        (kind: "toy_stacking_rings", pos: (30, 0.05, -46)),
+        (kind: "toy_duck", pos: (68, 0.05, -16), yaw: 30),
+        (kind: "toy_duck", pos: (-60, 0.05, 18), yaw: 120),
+        (kind: "toy_duck", pos: (102, 0.05, 60), yaw: -90),
+        (kind: "toy_duck", pos: (-100, 0.05, -88), yaw: 45),
+        (kind: "toy_crayons", pos: (-6, 0.05, 44), yaw: 20),
+        (kind: "toy_crayons", pos: (34, 0.05, 60), yaw: 160),
+        (kind: "toy_crayons", pos: (72, 0.05, -24), yaw: -50),
+        (kind: "toy_crayons", pos: (-56, 0.05, 52), yaw: 80),
+        (kind: "toy_foam_tiles", pos: (-62, 0.05, 22), yaw: 10),
+        (kind: "toy_foam_tiles", pos: (16, 0.05, -46), yaw: -15),
+        (kind: "toy_foam_tiles", pos: (6, 0.05, 56), yaw: 30),
+        (kind: "toy_foam_tiles", pos: (60, 0.05, 30), yaw: 45),
+        (kind: "toy_block_pile", pos: (-16, 0.05, -64), yaw: 20),
+        (kind: "toy_block_pile", pos: (52, 0.05, -40), yaw: -40),
+        (kind: "toy_block_pile", pos: (80, 0.05, -10), yaw: 70),
+        (kind: "toy_block_pile", pos: (-62, 0.05, 58), yaw: 15),
+        (kind: "toy_block_pile", pos: (-102, 0.05, 40), yaw: 50),
+        (kind: "toy_block_pile", pos: (8, 0.05, -24)),
+        (kind: "toy_block_pile", pos: (102, 0.05, 30), yaw: 80),
+        (kind: "toy_play_table", pos: (54, 0.05, -64), yaw: 90), // display island; cars fit under it
+        (kind: "toy_play_table", pos: (-4, 0.05, -50)),
+        (kind: "toy_box", pos: (-13.55, 0.05, 86)),
+        (kind: "toy_box", pos: (-10.45, 0.05, 86)),
+        (kind: "toy_box", pos: (-12, 2.25, 86)),
+        (kind: "toy_box", pos: (18.45, 0.05, 86)),
+        (kind: "toy_box", pos: (21.55, 0.05, 86)),
+        (kind: "toy_box", pos: (20, 2.25, 86)),
+        (kind: "toy_box", pos: (66.45, 0.05, 86)),
+        (kind: "toy_box", pos: (69.55, 0.05, 86)),
+        (kind: "toy_box", pos: (68, 2.25, 86)),
+        (kind: "toy_box", pos: (-61.55, 0.05, -88), yaw: 180),
+        (kind: "toy_box", pos: (-58.45, 0.05, -88), yaw: 180),
+        (kind: "toy_box", pos: (-60, 2.25, -88), yaw: 180),
+        (kind: "toy_box", pos: (28.45, 0.05, -90), yaw: 180),
+        (kind: "toy_box", pos: (31.55, 0.05, -90), yaw: 180),
+        (kind: "toy_box", pos: (30, 2.25, -90), yaw: 180),
+        (kind: "toy_box", pos: (101, 0.05, -41.55), yaw: 90),
+        (kind: "toy_box", pos: (101, 0.05, -38.45), yaw: 90),
+        (kind: "toy_box", pos: (101, 2.25, -40), yaw: 90),
+        (kind: "toy_box", pos: (24.45, 0.05, 58)),
+        (kind: "toy_box", pos: (27.55, 0.05, 58)),
+        (kind: "toy_box", pos: (26, 2.25, 58)),
+        (kind: "toy_box", pos: (-47.55, 0.05, 54)),
+        (kind: "toy_box", pos: (-44.45, 0.05, 54)),
+        (kind: "toy_box", pos: (-46, 2.25, 54)),
+        (kind: "toy_box", pos: (64.45, 0.05, -48)),
+        (kind: "toy_box", pos: (67.55, 0.05, -48)),
+        (kind: "toy_box", pos: (66, 2.25, -48)),
+        // --- room walls (static, 20 u to the ceiling): rounded corners, partitions, a gateway ----
+        (kind: "toy_wall_curve", pos: (-90, 0.05, -75), yaw: 45), // rounded room corners (arc centre, facing the corner)
+        (kind: "toy_wall_curve", pos: (90, 0.05, -75), yaw: -45),
+        (kind: "toy_wall_curve", pos: (-90, 0.05, 75), yaw: 135),
+        (kind: "toy_wall_curve", pos: (90, 0.05, 75), yaw: -135),
+        (kind: "toy_wall_curve", pos: (24, 0.05, -55), yaw: 180), // curved display wall behind the ball pits
+        (kind: "toy_wall_gate", pos: (-82, 0.05, 46)), // start hall | tunnel wing and U-turn court (archway on the west straight)
+        (kind: "toy_wall", pos: (-112, 0.05, 46)),
+        (kind: "toy_wall", pos: (-100, 0.05, 46)),
+        (kind: "toy_wall", pos: (-64, 0.05, 46)),
+        (kind: "toy_wall", pos: (-52, 0.05, 46)),
+        (kind: "toy_wall", pos: (-40, 0.05, 46)),
+        (kind: "toy_wall", pos: (-28, 0.05, 46)),
+        (kind: "toy_wall", pos: (-16, 0.05, 46)),
+        (kind: "toy_wall", pos: (-4, 0.05, 46)),
+        (kind: "toy_wall", pos: (8, 0.05, 46)),
+        (kind: "toy_wall_gate", pos: (14, 0.05, -14), yaw: 90), // centre wall: archways on the infield, dollhouse and start straights
+        (kind: "toy_wall_gate", pos: (14, 0.05, 26), yaw: 90),
+        (kind: "toy_wall_gate", pos: (14, 0.05, 72), yaw: 90),
+        (kind: "toy_wall", pos: (14, 0.05, -31.22), yaw: 90),
+        (kind: "toy_wall", pos: (14, 0.05, 0), yaw: 90),
+        (kind: "toy_wall", pos: (14, 0.05, 12), yaw: 90),
+        (kind: "toy_wall", pos: (14, 0.05, 43), yaw: 90),
+        (kind: "toy_wall", pos: (14, 0.05, 55), yaw: 90),
+        (kind: "toy_wall", pos: (14, 0.05, 90), yaw: 90),
+        (kind: "toy_wall", pos: (-64, 0.05, -30)), // north gallery | U-turn court
+        (kind: "toy_wall", pos: (-52, 0.05, -30)),
+        (kind: "toy_wall", pos: (-40, 0.05, -30)),
+        (kind: "toy_wall", pos: (-28, 0.05, -30)),
+        (kind: "toy_wall", pos: (-16, 0.05, -30)),
+        (kind: "toy_wall", pos: (-4, 0.05, -30)),
+        (kind: "toy_wall", pos: (8, 0.05, -30)),
+        (kind: "toy_wall", pos: (-56.03, 0.05, -24), yaw: 90), // tunnel wing | U-turn court
+        (kind: "toy_wall", pos: (-55.97, 0.05, -13.333), yaw: 90),
+        (kind: "toy_wall", pos: (-56.03, 0.05, -2.667), yaw: 90),
+        (kind: "toy_wall", pos: (-55.97, 0.05, 8), yaw: 90),
+        (kind: "toy_wall", pos: (-56.03, 0.05, 18.667), yaw: 90),
+        (kind: "toy_wall", pos: (-55.97, 0.05, 29.333), yaw: 90),
+        (kind: "toy_wall", pos: (-56.03, 0.05, 40), yaw: 90),
+        (kind: "toy_wall", pos: (-36, 0.05, -60), yaw: 90), // helix tower | north gallery
+        (kind: "toy_wall", pos: (-36, 0.05, -48), yaw: 90),
+        (kind: "toy_wall", pos: (-36, 0.05, -36), yaw: 90),
+        (kind: "toy_wall_gate", pos: (40, 0.05, -80), yaw: 90), // north gallery: archway on the descent
+        (kind: "toy_wall", pos: (40, 0.05, -98), yaw: 90),
+        (kind: "toy_wall", pos: (40, 0.05, -62), yaw: 90),
+        (kind: "toy_wall_gate", pos: (92, 0.05, -36)), // east wing | north-east (archway on the east straight)
+        (kind: "toy_wall", pos: (51.6, 0.05, -36.03)),
+        (kind: "toy_wall", pos: (63.6, 0.05, -35.97)),
+        (kind: "toy_wall", pos: (75.6, 0.05, -36.03)),
+        (kind: "toy_wall", pos: (110, 0.05, -36)),
+        (kind: "toy_wall_gate", pos: (46, 0.05, -14), yaw: 90), // east wing | centre (archway on the infield straight)
+        (kind: "toy_wall", pos: (46, 0.05, -30), yaw: 90),
+        (kind: "toy_wall", pos: (46, 0.05, 0.4), yaw: 90),
+        (kind: "toy_wall_gate", pos: (68, 0.05, 6)), // east wing | south-east (twin archways)
+        (kind: "toy_wall_gate", pos: (92, 0.05, 6)),
+        (kind: "toy_wall", pos: (52, 0.05, 6)),
+        (kind: "toy_wall", pos: (110, 0.05, 6)),
+        (kind: "toy_wall", pos: (-30, 0.05, 89), yaw: 90), // stub wall off the south wall
+        // --- store fittings: gondola shelves along the walls, cubbies under the windows ----------
+        (kind: "toy_shelf_a", pos: (-84.7, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-84.7, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-79.25, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-79.25, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-73.8, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (-73.8, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-68.35, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-68.35, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-62.9, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-62.9, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-57.45, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (-57.45, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-52, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-52, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-46.55, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-46.55, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-41.1, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (-41.1, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-35.65, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-35.65, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-30.2, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-24.75, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (-24.75, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-19.3, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-19.3, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-13.85, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-13.85, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (-8.4, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (-8.4, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (-2.95, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (-2.95, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (2.5, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (2.5, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (7.95, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (7.95, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (13.4, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (18.85, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (18.85, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (24.3, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (24.3, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (29.75, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (29.75, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (35.2, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (35.2, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (40.65, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (46.1, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (46.1, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (51.55, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (51.55, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (57, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (57, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (62.45, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (62.45, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (67.9, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (67.9, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (73.35, 0.05, 93.7)),
+        (kind: "toy_shelf_b", pos: (73.35, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (78.8, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (78.8, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_a", pos: (84.25, 0.05, 93.7)),
+        (kind: "toy_shelf_a", pos: (84.25, 0.05, -93.7), yaw: 180),
+        (kind: "toy_shelf_b", pos: (108.7, 0.05, -2.3), yaw: 90),
+        (kind: "toy_shelf_b", pos: (108.7, 0.05, 14.05), yaw: 90),
+        (kind: "toy_shelf_b", pos: (108.7, 0.05, 19.5), yaw: 90),
+        (kind: "toy_shelf_a", pos: (108.7, 0.05, 63.1), yaw: 90),
+        (kind: "toy_shelf_a", pos: (108.7, 0.05, 68.55), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -70.4), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -65.5), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -60.6), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -55.7), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -50.8), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -45.9), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -29.4), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -24.5), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -19.6), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -14.7), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, -9.8), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, 27.6), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, 32.5), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, 37.4), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, 42.3), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, 47.2), yaw: 90),
+        (kind: "toy_cubby", pos: (109, 0.05, 52.1), yaw: 90),
+        (kind: "toy_shelf_a", pos: (-108.7, 0.05, -35), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-108.7, 0.05, -29.55), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-108.7, 0.05, -24.1), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-108.7, 0.05, -18.65), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-108.7, 0.05, 19.5), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-108.7, 0.05, 24.95), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-108.7, 0.05, 30.4), yaw: -90),
+        (kind: "toy_shelf_b", pos: (-108.7, 0.05, 35.85), yaw: -90),
+        (kind: "toy_shelf_a", pos: (-108.7, 0.05, 41.3), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -69.4), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -64.5), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -59.6), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -54.7), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -49.8), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -44.9), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -12.4), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -7.5), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, -2.6), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 2.3), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 7.2), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 12.1), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 54.6), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 59.5), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 64.4), yaw: -90),
+        (kind: "toy_cubby", pos: (-109, 0.05, 69.3), yaw: -90),
+        // supports:begin
+        (kind: "toy_track_support", pos: (-5.81, 0.90, 78.65), yaw: -0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (-5.81, 0.90, 65.35), yaw: 180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (-23.00, 0.74, 78.65), yaw: -0.0),
+        (kind: "toy_track_support", pos: (-23.00, 0.74, 65.35), yaw: 180.0),
+        (kind: "toy_track_support", pos: (-29.97, 0.60, 78.65), yaw: 0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (-29.97, 0.60, 65.35), yaw: -180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (-44.66, 0.78, 78.65), yaw: -0.0),
+        (kind: "toy_track_support", pos: (-44.66, 0.78, 65.35), yaw: 180.0),
+        (kind: "toy_track_support", pos: (-52.00, 1.04, 78.65), yaw: 0.0),
+        (kind: "toy_track_support", pos: (-52.00, 1.04, 65.35), yaw: -180.0),
+        (kind: "toy_track_support", pos: (-62.83, 1.95, 78.50), yaw: -7.2),
+        (kind: "toy_track_support", pos: (-75.08, 3.33, 74.76), yaw: -29.5),
+        (kind: "toy_track_support", pos: (-84.76, 3.33, 65.07), yaw: -60.5),
+        (kind: "toy_track_support", pos: (-88.50, 1.95, 52.78), yaw: -83.2),
+        (kind: "toy_track_support", pos: (-75.44, 1.48, -0.83), yaw: 97.2),
+        (kind: "toy_track_support", pos: (-78.38, 2.03, -10.76), yaw: 120.0),
+        (kind: "toy_track_support", pos: (-94.20, 0.94, -8.29), yaw: -45.0),
+        (kind: "toy_track_support", pos: (-84.80, 0.94, -17.69), yaw: 135.0),
+        (kind: "toy_track_support", pos: (-100.62, 2.03, -15.23), yaw: -60.0),
+        (kind: "toy_track_support", pos: (-103.50, 2.03, -25.98), yaw: -90.0),
+        (kind: "toy_track_support", pos: (-100.62, 2.03, -36.74), yaw: -120.0),
+        (kind: "toy_track_support", pos: (-94.20, 0.94, -43.67), yaw: -135.0),
+        (kind: "toy_track_support", pos: (-84.80, 0.94, -34.27), yaw: 45.0),
+        (kind: "toy_track_support", pos: (-78.38, 2.03, -41.21), yaw: 60.0),
+        (kind: "toy_track_support", pos: (-75.44, 1.48, -51.10), yaw: 82.5),
+        (kind: "toy_track_support", pos: (-88.56, 1.48, -62.85), yaw: -97.4),
+        (kind: "toy_track_support", pos: (-85.25, 2.39, -74.21), yaw: -119.5),
+        (kind: "toy_track_support", pos: (-76.30, 2.76, -83.19), yaw: -149.5),
+        (kind: "toy_track_support", pos: (-64.05, 3.13, -86.50), yaw: -179.5),
+        (kind: "toy_track_support", pos: (-63.95, 0.79, -73.50), yaw: 0.5),
+        (kind: "toy_track_support", pos: (-51.79, 3.49, -83.25), yaw: 150.5),
+        (kind: "toy_track_support", pos: (-58.21, 1.16, -71.93), yaw: -29.5),
+        (kind: "toy_track_support", pos: (-42.81, 3.86, -74.30), yaw: 120.5),
+        (kind: "toy_track_support", pos: (-54.02, 1.52, -67.70), yaw: -59.5),
+        (kind: "toy_track_support", pos: (-39.50, 4.23, -62.05), yaw: 90.5),
+        (kind: "toy_track_support", pos: (-52.50, 1.89, -61.95), yaw: -89.5),
+        (kind: "toy_track_support", pos: (-42.75, 4.59, -49.79), yaw: 60.5),
+        (kind: "toy_track_support", pos: (-54.07, 2.26, -56.21), yaw: -119.5),
+        (kind: "toy_track_support", pos: (-51.70, 4.96, -40.81), yaw: 30.5),
+        (kind: "toy_track_support", pos: (-58.30, 2.62, -52.02), yaw: -149.5),
+        (kind: "toy_track_support", pos: (-63.95, 5.33, -37.50), yaw: 0.5),
+        (kind: "toy_track_support", pos: (-64.05, 2.99, -50.50), yaw: -179.5),
+        (kind: "toy_track_support", pos: (-76.21, 5.69, -40.75), yaw: -29.5),
+        (kind: "toy_track_support", pos: (-69.79, 3.36, -52.07), yaw: 150.5),
+        (kind: "toy_track_support", pos: (-73.98, 3.72, -56.30), yaw: 120.5),
+        (kind: "toy_track_support", pos: (-85.25, 6.79, -74.21), yaw: -119.5),
+        (kind: "toy_track_support", pos: (-73.93, 4.46, -67.79), yaw: 60.5),
+        (kind: "toy_track_support", pos: (-76.30, 7.16, -83.19), yaw: -149.5),
+        (kind: "toy_track_support", pos: (-69.70, 4.82, -71.98), yaw: 30.5),
+        (kind: "toy_track_support", pos: (-64.05, 7.53, -86.50), yaw: -179.5),
+        (kind: "toy_track_support", pos: (-63.95, 5.19, -73.50), yaw: 0.5),
+        (kind: "toy_track_support", pos: (-51.79, 7.89, -83.25), yaw: 150.5),
+        (kind: "toy_track_support", pos: (-58.21, 5.56, -71.93), yaw: -29.5),
+        (kind: "toy_track_support", pos: (-42.81, 8.26, -74.30), yaw: 120.5),
+        (kind: "toy_track_support", pos: (-54.02, 5.92, -67.70), yaw: -59.5),
+        (kind: "toy_track_support", pos: (-39.50, 8.63, -62.05), yaw: 90.5),
+        (kind: "toy_track_support", pos: (-52.50, 6.29, -61.95), yaw: -89.5),
+        (kind: "toy_track_support", pos: (-42.75, 8.99, -49.79), yaw: 60.5),
+        (kind: "toy_track_support", pos: (-54.07, 6.66, -56.21), yaw: -119.5),
+        (kind: "toy_track_support", pos: (-51.70, 9.36, -40.81), yaw: 30.5),
+        (kind: "toy_track_support", pos: (-58.30, 7.02, -52.02), yaw: -149.5),
+        (kind: "toy_track_support", pos: (-63.95, 9.73, -37.50), yaw: 0.5),
+        (kind: "toy_track_support", pos: (-64.05, 7.39, -50.50), yaw: -179.5),
+        (kind: "toy_track_support", pos: (-76.21, 10.09, -40.75), yaw: -29.5),
+        (kind: "toy_track_support", pos: (-69.79, 7.76, -52.07), yaw: 150.5),
+        (kind: "toy_track_support", pos: (-73.98, 8.12, -56.30), yaw: 120.5),
+        (kind: "toy_track_support", pos: (-85.25, 11.19, -74.21), yaw: -119.5),
+        (kind: "toy_track_support", pos: (-73.93, 8.86, -67.79), yaw: 60.5),
+        (kind: "toy_track_support", pos: (-76.30, 11.56, -83.19), yaw: -149.5),
+        (kind: "toy_track_support", pos: (-69.70, 9.22, -71.98), yaw: 30.5),
+        (kind: "toy_track_support", pos: (-64.87, 11.38, -86.56), yaw: -172.4),
+        (kind: "toy_track_support", pos: (-63.13, 10.21, -73.44), yaw: 7.6),
+        (kind: "toy_track_support", pos: (-55.23, 11.15, -86.88), yaw: 178.5),
+        (kind: "toy_track_support", pos: (-46.00, 10.84, -86.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (-37.00, 10.84, -86.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (-37.00, 10.84, -73.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (-28.00, 10.84, -86.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (-28.00, 10.84, -73.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (-18.40, 10.77, -86.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (-18.40, 10.77, -73.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (-10.00, 10.84, -86.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (-10.00, 10.84, -73.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (8.00, 7.84, -86.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (8.00, 7.84, -73.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (17.67, 6.79, -86.65), yaw: 180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (17.67, 6.79, -73.35), yaw: -0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (27.33, 5.74, -86.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (27.33, 5.74, -73.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (37.00, 4.69, -86.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (37.00, 4.69, -73.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (46.67, 3.64, -86.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (46.67, 3.64, -73.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (56.86, 2.43, -86.65), yaw: 180.0),
+        (kind: "toy_track_support", pos: (56.86, 2.43, -73.35), yaw: -0.0),
+        (kind: "toy_track_support", pos: (66.00, 1.54, -86.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (66.00, 1.54, -73.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (74.86, 2.45, -86.49), yaw: 172.5),
+        (kind: "toy_track_support", pos: (86.13, 3.33, -83.00), yaw: 150.0),
+        (kind: "toy_track_support", pos: (95.00, 3.33, -74.12), yaw: 120.0),
+        (kind: "toy_track_support", pos: (98.49, 2.45, -62.85), yaw: 97.5),
+        (kind: "toy_track_support", pos: (98.65, 1.54, -49.00), yaw: 90.0),
+        (kind: "toy_track_support", pos: (85.35, 1.54, -49.00), yaw: -90.0),
+        (kind: "toy_track_support", pos: (98.65, 0.90, -24.24), yaw: 90.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (85.35, 0.90, -24.24), yaw: -90.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (98.65, 1.04, -8.00), yaw: 90.0),
+        (kind: "toy_track_support", pos: (85.35, 1.04, -8.00), yaw: -90.0),
+        (kind: "toy_track_support", pos: (30.00, 1.04, -7.35), yaw: -0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (30.00, 1.04, -20.65), yaw: 180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (22.00, 2.04, -7.35), yaw: 0.0),
+        (kind: "toy_track_support", pos: (22.00, 2.04, -20.65), yaw: -180.0),
+        (kind: "toy_track_support", pos: (15.31, 1.16, -7.35), yaw: 0.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (15.31, 1.16, -20.65), yaw: -180.0, dir: Fwd),
+        (kind: "toy_track_support", pos: (-37.14, 2.44, -16.93), yaw: -150.7),
+        (kind: "toy_track_support", pos: (-46.88, 2.44, -7.21), yaw: -120.0),
+        (kind: "toy_track_support", pos: (-50.42, 2.44, 6.00), yaw: -90.0),
+        (kind: "toy_track_support", pos: (-46.88, 2.44, 19.21), yaw: -60.0),
+        (kind: "toy_track_support", pos: (-37.13, 2.44, 28.93), yaw: -29.2),
+        (kind: "toy_track_support", pos: (78.81, 1.77, 43.46), yaw: 173.0),
+        (kind: "toy_track_support", pos: (86.71, 2.44, 45.91), yaw: 150.0),
+        (kind: "toy_track_support", pos: (93.09, 2.44, 52.29), yaw: 120.0),
+        (kind: "toy_track_support", pos: (95.42, 2.44, 61.00), yaw: 90.0),
+        (kind: "toy_track_support", pos: (93.09, 2.44, 69.71), yaw: 60.0),
+        (kind: "toy_track_support", pos: (86.71, 2.44, 76.09), yaw: 30.0),
+        (kind: "toy_track_support", pos: (78.83, 1.77, 78.54), yaw: 7.2),
+        (kind: "toy_track_support", pos: (71.15, 0.97, 78.81), yaw: -1.7),
+        (kind: "toy_track_support", pos: (-5.96, 1.15, 78.65), yaw: -0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (-5.96, 1.15, 65.35), yaw: 180.0, dir: Rev),
+        (kind: "toy_track_support", pos: (-13.00, 2.04, 78.65), yaw: -0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (-13.00, 2.04, 65.35), yaw: 180.0, dir: Rev),
+        (kind: "toy_track_support", pos: (-4.00, 11.34, -86.65), yaw: 180.0, dir: Rev),
+        (kind: "toy_track_support", pos: (-4.00, 11.34, -73.35), yaw: -0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (17.36, 6.63, -86.65), yaw: 180.0, dir: Rev),
+        (kind: "toy_track_support", pos: (17.36, 6.63, -73.35), yaw: -0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (98.65, 1.13, -24.05), yaw: 90.0, dir: Rev),
+        (kind: "toy_track_support", pos: (85.35, 1.13, -24.05), yaw: -90.0, dir: Rev),
+        (kind: "toy_track_support", pos: (98.65, 2.04, -17.00), yaw: 90.0, dir: Rev),
+        (kind: "toy_track_support", pos: (85.35, 2.04, -17.00), yaw: -90.0, dir: Rev),
+        (kind: "toy_track_support", pos: (15.06, 0.92, -7.35), yaw: 0.0, dir: Rev),
+        (kind: "toy_track_support", pos: (15.06, 0.92, -20.65), yaw: -180.0, dir: Rev),
+        // supports:end
+    ],
+)

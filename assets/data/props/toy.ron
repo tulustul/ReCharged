@@ -115,6 +115,76 @@
                 Cylinder(radius: 0.38, half_height: 3.6, offset: (6.8, 3.6, 0)),
             ],
         ),
+        // Giant rainbow pop-up play tunnel the track drives through: 12 u long along z, arched
+        // (inner radius 6.6, outer 7.0, centred at the floor); six boxes approximate the arch.
+        // LED strips on the hoops glow (lamp_*); two coloured lights inside.
+        "toy_tunnel": (
+            model: "models/props/toy/tunnel.glb",
+            colliders: [
+                Box(half: (1.72, 0.2, 6), offset: (6.344, 1.7, 0), rot: (0, 0, -75)),
+                Box(half: (1.76, 0.2, 6), offset: (4.644, 4.644, 0), rot: (0, 0, -45)),
+                Box(half: (1.76, 0.2, 6), offset: (1.7, 6.344, 0), rot: (0, 0, -15)),
+                Box(half: (1.76, 0.2, 6), offset: (-1.7, 6.344, 0), rot: (0, 0, 15)),
+                Box(half: (1.76, 0.2, 6), offset: (-4.644, 4.644, 0), rot: (0, 0, 45)),
+                Box(half: (1.72, 0.2, 6), offset: (-6.344, 1.7, 0), rot: (0, 0, 75)),
+            ],
+            lights: [
+                (offset: (0, 4.5, -3), color: (1.0, 0.25, 0.85), lumens: 900, range: 16, spot_deg: 0),
+                (offset: (0, 4.5, 3), color: (0.2, 0.85, 1.0), lumens: 900, range: 16, spot_deg: 0),
+            ],
+        ),
+        // Carnival marquee light arch: striped posts 14.8 u apart (outside the barriers), a red
+        // board studded with coloured bulbs (lamp_*) peaking at 8.5 u, ≥ 6.5 u clear between
+        // x = ±6; spans x (place it across the track).
+        "toy_light_arch": (
+            model: "models/props/toy/light_arch.glb",
+            colliders: [
+                Cylinder(radius: 0.38, half_height: 3.5, offset: (-7.4, 3.5, 0)),
+                Cylinder(radius: 0.38, half_height: 3.5, offset: (7.4, 3.5, 0)),
+            ],
+            lights: [
+                (offset: (-4, 7.5, 0), color: (1.0, 0.3, 0.7), lumens: 700, range: 18, spot_deg: 0),
+                (offset: (0, 8.2, 0), color: (1.0, 0.85, 0.3), lumens: 700, range: 18, spot_deg: 0),
+                (offset: (4, 7.5, 0), color: (0.3, 0.8, 1.0), lumens: 700, range: 18, spot_deg: 0),
+            ],
+        ),
+        // --- interior walls: plaster, beech skirting and crown, rainbow stripes at 4–5.2 u,
+        // floor to the 20 u ceiling, 0.8 u thick (faces at z = ±0.4) -------------------------
+        // Straight panel, 12 u long (x −6..6); panels butt end to end.
+        "toy_wall": (
+            model: "models/props/toy/wall.glb",
+            colliders: [Box(half: (6, 10, 0.4), offset: (0, 10, 0))],
+        ),
+        // 24 u panel with a light-up archway (x −7.5..7.5, jambs to 5 u, semicircle r 7.5, top
+        // 12.5 u) ringed by a rainbow archivolt and coloured bulbs on both faces.
+        "toy_wall_gate": (
+            model: "models/props/toy/wall_gate.glb",
+            colliders: [
+                Box(half: (2.25, 10, 0.4), offset: (-9.75, 10, 0)),
+                Box(half: (2.25, 10, 0.4), offset: (9.75, 10, 0)),
+                Box(half: (7.5, 3.75, 0.4), offset: (0, 16.25, 0)),
+            ],
+            lights: [
+                (offset: (0, 11.5, -1.2), color: (1.0, 0.35, 0.8), lumens: 700, range: 18, spot_deg: 0),
+                (offset: (0, 11.5, 1.2), color: (0.3, 0.8, 1.0), lumens: 700, range: 18, spot_deg: 0),
+            ],
+        ),
+        // 90° arc of wall; the origin is the arc's circle centre on the floor, the wall spans
+        // −45°..45° around −Z (inner face r 20, outer 20.8); nine boxes follow it.
+        "toy_wall_curve": (
+            model: "models/props/toy/wall_curve.glb",
+            colliders: [
+                Box(half: (1.8, 10, 0.4), offset: (13.113, 10, -15.627), rot: (0, -40, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (10.2, 10, -17.667), rot: (0, -30, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (6.977, 10, -19.17), rot: (0, -20, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (3.542, 10, -20.09), rot: (0, -10, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (0, 10, -20.4)),
+                Box(half: (1.8, 10, 0.4), offset: (-3.542, 10, -20.09), rot: (0, 10, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (-6.977, 10, -19.17), rot: (0, 20, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (-10.2, 10, -17.667), rot: (0, 30, 0)),
+                Box(half: (1.8, 10, 0.4), offset: (-13.113, 10, -15.627), rot: (0, 40, 0)),
+            ],
+        ),
         // Giant plush teddy bear (1.5 m), sitting, legs toward the front; ~5.3 u tall.
         "toy_bear": (
             model: "models/props/toy/bear.glb",

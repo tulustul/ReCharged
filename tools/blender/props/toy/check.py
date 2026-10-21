@@ -4,8 +4,9 @@
 Per catalog kind (assets/data/props/toy.ron): the glb parses (glTF 2.0 binary), triangle budget
 (kit 5 k, hero 15 k), named materials, no texture without UVs (texCoord -1), ground contact
 (lowest point at 0 except the support pillar), every collider primitive inside the visual
-bounds (+2 cm), dynamic kinds have a mass. Also: decor models (assets/maps/toy_town/decor.ron)
-parse, the track places only known kinds and at most 40 dynamic bodies, no orphan glb.
+bounds (+2 cm), dynamic kinds have a mass. Also, per toy-store map (`MAPS`, missing ones
+skipped): decor models (assets/maps/<map>/decor.ron) parse, the track places only known kinds
+and at most 40 dynamic bodies; no orphan glb.
 
     python3 tools/blender/props/toy/check.py
 """
@@ -20,9 +21,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 from lib import toy_ron  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..'))
-HERO = {'toy_dollhouse', 'toy_castle', 'toy_shelf_a', 'toy_shelf_b', 'toy_rocking_horse'}
+HERO = {'toy_dollhouse', 'toy_castle', 'toy_shelf_a', 'toy_shelf_b', 'toy_rocking_horse',
+        'toy_tunnel', 'toy_wall_gate'}
 BELOW = {'toy_track_support': 8.0}   # may reach below its origin (u)
 TOL = 0.02
+MAPS = ['toy_town', 'toybox_twister']  # toy-store maps (decor + layout)
 
 
 def read_glb(path):
@@ -53,21 +56,29 @@ def mesh_info(g):
     return lo, hi, tris
 
 
+def rotate(v, rot):
+    """Rotate v by rot = (pitch about X, yaw about Y, roll about Z) degrees, EulerRot::YXZ."""
+    p, y, r = (math.radians(a) for a in rot)
+    x0, y0, z0 = v
+    x1, y1 = x0 * math.cos(r) - y0 * math.sin(r), x0 * math.sin(r) + y0 * math.cos(r)  # Z
+    y2, z1 = y1 * math.cos(p) - z0 * math.sin(p), y1 * math.sin(p) + z0 * math.cos(p)  # X
+    return [x1 * math.cos(y) + z1 * math.sin(y), y2, -x1 * math.sin(y) + z1 * math.cos(y)]  # Y
+
+
 def collider_box(c):
-    """Axis-aligned bounds (min, max) of a collider primitive in prop space (yaw-only rotations
-    rotate the footprint; other rotations are bounded by the enclosing sphere)."""
+    """Axis-aligned bounds (min, max) of a collider primitive in prop space (rotated boxes and
+    wedges by their corners; a rotated cylinder by its enclosing sphere)."""
     o = c.get('offset', [0, 0, 0])
     rot = c.get('rot', [0, 0, 0])
     if c['_name'] in ('Box', 'Wedge'):
-        h = list(c['half'])
-        if rot[0] == 0 and rot[2] == 0 and rot[1] % 90 == 0:
-            if rot[1] % 180:
-                h[0], h[2] = h[2], h[0]
-        elif any(rot):
-            r = math.sqrt(sum(v * v for v in h))
-            h = [r, r, r]
-    elif c['_name'] == 'Cylinder':
+        hx, hy, hz = c['half']
+        corners = [rotate((sx * hx, sy * hy, sz * hz), rot)
+                   for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
+        h = [max(abs(q[i]) for q in corners) for i in range(3)]
+    elif c['_name'] == 'Cylinder' and not any(rot):
         h = [c['radius'], c['half_height'], c['radius']]
+    elif c['_name'] == 'Cylinder':
+        h = [math.hypot(c['radius'], c['half_height'])] * 3
     else:
         h = [c['radius']] * 3
     return [o[i] - h[i] for i in range(3)], [o[i] + h[i] for i in range(3)]
@@ -118,22 +129,25 @@ def main():
         for e in errs:
             print(f'  {kind}: {e}')
         failed |= bool(errs)
-    decor = os.path.join(ROOT, 'assets', 'maps', 'toy_town', 'decor.ron')
-    for item in toy_ron.load(decor)['decor'] if os.path.exists(decor) else []:
-        used.add(os.path.normpath(item['model']))
-        try:
-            read_glb(os.path.join(ROOT, 'assets', item['model']))
-        except (OSError, ValueError) as e:
-            print(f'  decor {item["model"]}: {e}')
+    for m in MAPS:
+        decor = os.path.join(ROOT, 'assets', 'maps', m, 'decor.ron')
+        for item in toy_ron.load(decor)['decor'] if os.path.exists(decor) else []:
+            used.add(os.path.normpath(item['model']))
+            try:
+                read_glb(os.path.join(ROOT, 'assets', item['model']))
+            except (OSError, ValueError) as e:
+                print(f'  decor {item["model"]}: {e}')
+                failed = True
+        path = os.path.join(ROOT, 'assets', 'maps', m, 'track.ron')
+        if not os.path.exists(path):
+            continue
+        kinds = [p['kind'] for p in toy_ron.load(path)['props']]
+        unknown = sorted({k for k in kinds if k.startswith('toy_') and k not in cat})
+        dynamic = sum(1 for k in kinds if cat.get(k, {}).get('dynamic'))
+        print(f'{m}: {len(kinds)} props, {dynamic} dynamic (max 40)')
+        if unknown or dynamic > 40:
+            print(f'  unknown kinds {unknown}' if unknown else '  too many dynamic props')
             failed = True
-    track = toy_ron.load(os.path.join(ROOT, 'assets', 'maps', 'toy_town', 'track.ron'))
-    kinds = [p['kind'] for p in track['props']]
-    unknown = sorted({k for k in kinds if k.startswith('toy_') and k not in cat})
-    dynamic = sum(1 for k in kinds if cat.get(k, {}).get('dynamic'))
-    print(f'toy_town: {len(kinds)} props, {dynamic} dynamic (max 40)')
-    if unknown or dynamic > 40:
-        print(f'  unknown kinds {unknown}' if unknown else '  too many dynamic props')
-        failed = True
     folder = os.path.join(ROOT, 'assets', 'models', 'props', 'toy')
     orphans = sorted(f for f in os.listdir(folder)
                      if os.path.normpath(f'models/props/toy/{f}') not in used)
