@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
 use rc_core::prelude::*;
+use rc_editor::BakeQuality;
 use rc_render::ENVIRONMENT_FILE;
 use rc_render::EnvironmentDef;
 use rc_track::{PropCatalog, RibbonStyle, TRACK_FILE, map_dir};
@@ -27,6 +28,8 @@ const USAGE: &str = "usage: rc_editor <track> [--assets-dir <dir>] [--user-data-
   --bake                   bake the irradiance volumes (every allowed time, normal and mirror)
                            into assets/maps/<track>/, then quit
   --bake-time <time>       bake one volume (morning, noon, sunset or night; normal layout), then quit
+  --bake-quality <q>       low (default) or high: half the probe spacing, twice the rays (≈ 16×
+                           the bake time)
 
   Keys: F5 test drive / back to editing · Ctrl+S save · Ctrl+Z / Ctrl+Y undo / redo
         Delete · Insert (after the selected point) · Ctrl+D duplicate · T top view · F focus
@@ -51,6 +54,7 @@ struct Args {
     exit_after: Option<f32>,
     /// `--bake` (`Some(None)`) or `--bake-time <t>` (`Some(Some(t))`).
     bake: Option<Option<TimeOfDay>>,
+    bake_quality: BakeQuality,
     window: Option<(u32, u32)>,
 }
 
@@ -58,7 +62,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
     let (mut track, mut assets_dir, mut user_data_dir) = (None, None, None);
     let (mut screenshot, mut screenshot_at, mut exit_after) = (None, None, None);
     let (mut new, mut env, mut name, mut style) = (false, None, None, None);
-    let mut bake = None;
+    let (mut bake, mut bake_quality) = (None, BakeQuality::Low);
     let mut window = None;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -92,6 +96,13 @@ fn parse(args: &[String]) -> Result<Args, String> {
                 };
                 bake = Some(Some(time));
             }
+            "--bake-quality" => {
+                bake_quality = match value()?.as_str() {
+                    "low" => BakeQuality::Low,
+                    "high" => BakeQuality::High,
+                    q => return Err(format!("--bake-quality {q}: low or high")),
+                };
+            }
             "new" if track.is_none() && !new => new = true,
             a if !a.starts_with('-') && track.is_none() => track = Some(a.to_owned()),
             a => return Err(format!("unexpected argument {a}")),
@@ -121,6 +132,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
         }),
         exit_after,
         bake,
+        bake_quality,
         window,
     })
 }
@@ -239,7 +251,7 @@ fn main() -> AppExit {
     }
     app.insert_resource(settings); // boot_saves keeps a `Settings` that is already there
     if let Some(time) = args.bake {
-        rc_editor::bake_on_start(&mut app, time);
+        rc_editor::bake_on_start(&mut app, time, args.bake_quality);
     }
     app.add_plugins((editor, rc_editor::EditorViewPlugin));
     app.run()

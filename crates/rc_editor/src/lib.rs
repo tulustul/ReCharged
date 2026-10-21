@@ -54,7 +54,7 @@ use rc_game::{GameCommand, RaceRequest, TrackPick};
 use rc_render::{BakedGi, BakedLight, EnvironmentDef, EnvironmentDraft, volume_file};
 use rc_track::{PropCatalog, Track, TrackDef, TrackDraft};
 pub use rc_ui::editor::{
-    EditorAdd, EditorAsset, EditorCommand, EditorCommandMsg, EditorGizmo, EditorItem,
+    BakeQuality, EditorAdd, EditorAsset, EditorCommand, EditorCommandMsg, EditorGizmo, EditorItem,
     EditorLibrary, EditorOptions, EditorPlace, EditorSelect, EditorSelection, EditorSet,
     EditorSetOptions, EditorSetTab, EditorStatus, EditorTab,
 };
@@ -65,8 +65,8 @@ pub use crate::view::EditorViewPlugin;
 
 /// Bake once the editing session is up, then quit: `time` = only that time of day (normal
 /// layout), `None` = every allowed time in both layouts.
-pub fn bake_on_start(app: &mut App, time: Option<TimeOfDay>) {
-    app.insert_resource(baking::BakeOnStart(time));
+pub fn bake_on_start(app: &mut App, time: Option<TimeOfDay>, quality: BakeQuality) {
+    app.insert_resource(baking::BakeOnStart(time, quality));
 }
 
 /// Undo steps kept.
@@ -470,15 +470,21 @@ impl Editor {
 
     /// Starts baking (see [`EditorCommand::Bake`]; `time` overrides the session's time of day for
     /// a single bake); `exit` quits when done.
-    pub(crate) fn start_bake(&mut self, all: bool, time: Option<TimeOfDay>, exit: bool) {
+    pub(crate) fn start_bake(
+        &mut self,
+        all: bool,
+        time: Option<TimeOfDay>,
+        quality: BakeQuality,
+        exit: bool,
+    ) {
         if self.bake.is_some() || self.mode != Mode::Editing {
             return;
         }
         let time =
             time.unwrap_or_else(|| fields::parse(&self.options.time).unwrap_or(TimeOfDay::Noon));
-        let run = baking::BakeRun::new(&self.doc.info.allowed_times, time, all, exit);
+        let run = baking::BakeRun::new(&self.doc.info.allowed_times, time, all, quality, exit);
         info!(
-            "editor: baking ({})",
+            "editor: baking ({}, {quality:?} quality)",
             if all {
                 "every time, both layouts"
             } else {
@@ -660,7 +666,7 @@ fn commands(
             continue; // baking: the session is the baker's
         }
         match command {
-            EditorCommand::Bake { all } => editor.start_bake(*all, None, false),
+            EditorCommand::Bake { all, quality } => editor.start_bake(*all, None, *quality, false),
             EditorCommand::ToggleProbes => {
                 if let Some(probes) = session.probes.as_deref_mut() {
                     probes.enabled = !probes.enabled;

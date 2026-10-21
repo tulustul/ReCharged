@@ -5758,6 +5758,7 @@ dependencies = [
  "recharged",
  "ron",
  "serde",
+ "wgpu",
 ]
 
 [[package]]

@@ -20,6 +20,9 @@ bevy-react.workspace = true
 bevy_rapier3d.workspace = true
 serde.workspace = true
 ron.workspace = true
+# The light baker's compute pass, on Bevy's own device (the version and features Bevy already
+# builds: no second copy).
+wgpu = { version = "30", default-features = false, features = ["wgsl"] }
 
 [dev-dependencies]
 rc_testkit.workspace = true

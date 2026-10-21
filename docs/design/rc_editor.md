@@ -557,7 +557,12 @@ with the gizmo (§P6 as built).
 ```sh
 cargo run -p rc_editor -- toy_town --bake      # every allowed time × {normal, mirror}, then quit
 cargo run -p rc_editor -- toy_town --bake-time noon   # one volume (normal layout), then quit
+cargo run -p rc_editor -- toy_town --bake --bake-quality high   # low (default) or high
 ```
+**Quality** (`--bake-quality`, the Lighting tab's **Quality** toggle, `EditorCommand::Bake {
+quality }`): `high` halves the probe spacing on every axis (8× the probes, 8× the file) and
+doubles the rays (1024): ≈ 16× the bake time. Sofa Circuit noon: 14.6 k → 116 k probes,
+0.35 → 2.8 MB. The file has no quality flag; the runtime reads any grid.
 **Probes: on/off** (Lighting tab, **P**) switches the session's volume — and the fill light it replaces —
 to compare the lighting with and without it. Scripted comparisons: `--window 1600x900` and the
 UI-script verb `editor lookAt x y z tx ty tz` (camera pose), then `editor toggleProbes`.
@@ -568,8 +573,19 @@ or **Bake light** (this time, forward) / **Bake all** in the Lighting tab. Files
 
 **How (CPU ray tracing, not rendered cubemaps).** The plan was to render tiny cubemaps with the
 game's renderer; measured against Bevy's cost per camera view (shadow cascades are rendered per
-view) that is hours per track on the Iris Xe. Instead the baker traces the session itself on the
-CPU (`bake.rs`, `baking.rs`):
+view) that is hours per track on the Iris Xe. Instead the baker ray-traces the session itself
+(`bake.rs`, `baking.rs`) — on the GPU (`bake/gpu.rs`, `bake/probe.wgsl`), the CPU as fallback:
+- **GPU:** a compute shader with the CPU tracer's maths, one 64-thread workgroup per probe, over
+  a binned-SAH BVH built on the CPU (boxes padded 0.001 u: a ray along a box face must not skip
+  it). It runs on the editor's own device (Bevy's `RenderDevice` / `RenderQueue`, from the bake
+  thread) in dispatches of ≈ 60 ms, so the window keeps drawing and no GPU watchdog fires. No
+  error scopes — Bevy's wgpu build has no `std`, so they are global to the device and would
+  swallow the renderer's errors; instead the shader is validated with naga and every buffer
+  checked against the device limits first, and any failure bakes on the CPU (a warning says
+  why). A test bakes the same scene both ways: equal to float rounding. On real scenes they
+  differ only where two coplanar triangles of different materials overlap (which one a ray
+  hits is a tie). Probe rays start 0.001 u along their direction on both, so a probe exactly
+  on a surface (round coordinates) sees past it rather than by the sign of a zero.
 - The editor calls `rc_render::keep_cpu_copies()` so meshes, materials and textures stay on the
   CPU. Every opaque mesh in the session — `StandardMaterial` (props, decor) and `SurfaceMaterial`
   (ground, ribbons, walls, the room shell; its `StandardMaterial` base), the ceiling too (editing
@@ -591,8 +607,13 @@ CPU (`bake.rs`, `baking.rs`):
   borrow the sunlit top's light for the underside). RGB9E5, ≈ 0.7–1 MB per volume.
 - Each job reloads the session in its layout and time (clear weather), waits 30 frames, gathers on
   the main thread and traces on a background thread (the window keeps running; edits wait).
-- **Measured on the Iris Xe laptop (dev build):** Toy Town 40 k probes, 0.83 M triangles: 21–36 s
-  per volume, all 8 ≈ 4 min with reloads.
+- **Measured on the Iris Xe laptop (dev build, CPU tracer):** Toy Town 40 k probes, 0.83 M
+  triangles: 21–36 s per volume, all 8 ≈ 4 min with reloads. The GPU path is not yet measured
+  there.
+- **Measured on the desktop (RTX 3070, 16 threads), GPU vs CPU:** Sofa Circuit high (116 k
+  probes) 1.1 s vs 27 s; Maple Street high (770 k probes, 0.56 M triangles) 11 s vs 355 s;
+  Toybox Twister high (669 k probes, 1.43 M triangles, 49 lamps) 19 s on the GPU; low quality
+  ≈ 0.4–2 s everywhere.
 
 **Look (Toy Town normal/noon, the one baked volume; probes on/off in `target/agent-data/probes/`):**
 with the fill baked in, the floor under the elevated deck and under the low helix ribbon goes

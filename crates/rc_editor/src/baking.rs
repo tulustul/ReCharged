@@ -16,6 +16,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::light::NotShadowCaster;
 use bevy::mesh::{Indices, VertexAttributeValues};
 use bevy::prelude::*;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use rc_core::prelude::*;
 use rc_render::{
     ActiveEnvironment, BakedLight, EnvLight, IrradianceGrid, SurfaceMaterial, environment_radiance,
@@ -23,16 +24,17 @@ use rc_render::{
 };
 use rc_track::Track;
 
-use crate::bake::{GridSpec, Lamp, Scene, SceneBuilder, Sun, bake};
-use crate::{Editor, Mode};
+use crate::bake::{GridSpec, Lamp, Scene, SceneBuilder, Sun, bake, bake_gpu};
+use crate::{BakeQuality, Editor, Mode};
 
-/// Rays per probe and pass.
+/// Rays per probe and pass (low quality).
 const RAYS: usize = 512;
 /// Frames the session runs before it is gathered (lights and look settle).
 const SETTLE_FRAMES: u32 = 30;
-/// About this many probe columns (x × z) at most: big outdoor tracks get a coarser grid.
+/// About this many probe columns (x × z) at most (low quality): big outdoor tracks get a coarser
+/// grid.
 const MAX_COLUMNS: f32 = 12_000.0;
-/// Finest spacing (u): horizontal, and the vertical range.
+/// Finest spacing (u, low quality): horizontal, and the vertical range.
 const MIN_SPACING_U: f32 = 2.0;
 const VERTICAL_U: (f32, f32) = (1.5, 4.0);
 /// Layers of probes aimed at (vertical spacing = height / this, within [`VERTICAL_U`]).
@@ -54,6 +56,7 @@ pub(crate) struct BakeRun {
     total: usize,
     settle: u32,
     tracing: Option<Tracing>,
+    quality: BakeQuality,
     /// Quit when done (`--bake`).
     pub exit: bool,
     /// Progress line for the status.
@@ -62,7 +65,8 @@ pub(crate) struct BakeRun {
 
 #[derive(Debug)]
 struct Tracing {
-    thread: JoinHandle<IrradianceGrid>,
+    /// The volume, and where it was traced ("GPU" or "CPU").
+    thread: JoinHandle<(IrradianceGrid, &'static str)>,
     progress: Arc<AtomicUsize>,
     probes: usize,
     started: Instant,
@@ -70,7 +74,13 @@ struct Tracing {
 
 impl BakeRun {
     /// Every allowed time of day, in both layouts (`all`), or just `time` forward.
-    pub(crate) fn new(times: &[TimeOfDay], time: TimeOfDay, all: bool, exit: bool) -> Self {
+    pub(crate) fn new(
+        times: &[TimeOfDay],
+        time: TimeOfDay,
+        all: bool,
+        quality: BakeQuality,
+        exit: bool,
+    ) -> Self {
         let jobs: VecDeque<BakeJob> = if all {
             [false, true]
                 .into_iter()
@@ -88,6 +98,7 @@ impl BakeRun {
             jobs,
             settle: 0,
             tracing: None,
+            quality,
             exit,
             status: String::new(),
         }
@@ -99,9 +110,18 @@ impl BakeRun {
     }
 }
 
+/// Probe density and rays per probe relative to low quality (per axis).
+fn factor(quality: BakeQuality) -> usize {
+    match quality {
+        BakeQuality::Low => 1,
+        BakeQuality::High => 2,
+    }
+}
+
 /// Where the probes of a session go: the track's bounds; indoors floor to ceiling (no seam on tall
-/// walls), outdoors up to the highest drivable point plus headroom.
-pub(crate) fn grid_for(track: &Track, ceiling: Option<f32>) -> GridSpec {
+/// walls), outdoors up to the highest drivable point plus headroom. Higher quality divides the
+/// spacing on every axis.
+pub(crate) fn grid_for(track: &Track, ceiling: Option<f32>, quality: BakeQuality) -> GridSpec {
     let (lo, hi) = track.bounds();
     let mut heights: Vec<f32> = (0..(track.length() / 2.0) as usize)
         .map(|i| track.frame_at(i as f32 * 2.0).position.y)
@@ -113,11 +133,12 @@ pub(crate) fn grid_for(track: &Track, ceiling: Option<f32>) -> GridSpec {
     let area = (hi.x - lo.x) * (hi.z - lo.z);
     let horizontal = (area / MAX_COLUMNS).sqrt().max(MIN_SPACING_U);
     let vertical = ((top - bottom) / LAYERS).clamp(VERTICAL_U.0, VERTICAL_U.1);
+    let f = factor(quality) as f32;
     GridSpec::new(
         Vec3::new(lo.x, bottom, lo.z),
         Vec3::new(hi.x, top, hi.z),
-        horizontal,
-        vertical,
+        horizontal / f,
+        vertical / f,
     )
 }
 
@@ -353,6 +374,8 @@ pub(crate) struct BakeSession<'w, 's> {
     env: Option<Res<'w, ActiveEnvironment>>,
     paths: Res<'w, UserPaths>,
     scene: SceneParams<'w, 's>,
+    device: Option<Res<'w, RenderDevice>>,
+    queue: Option<Res<'w, RenderQueue>>,
 }
 
 /// Drives the bake queue: wait for each job's session, gather, trace, write; restore editing.
@@ -405,7 +428,7 @@ fn step(run: &mut BakeRun, editor: &mut Editor, s: &BakeSession) -> bool {
         }
         let tracing = run.tracing.take().expect("checked");
         let seconds = tracing.started.elapsed().as_secs_f32();
-        let grid = tracing.thread.join().expect("bake thread");
+        let (grid, on) = tracing.thread.join().expect("bake thread");
         let path = volume_file(
             &s.paths.assets_dir,
             editor.track.as_str(),
@@ -414,7 +437,7 @@ fn step(run: &mut BakeRun, editor: &mut Editor, s: &BakeSession) -> bool {
         );
         match write(&path, &grid.to_bytes()) {
             Ok(()) => {
-                info!("editor: baked {} in {seconds:.1} s", path.display());
+                info!("editor: baked {} in {seconds:.1} s ({on})", path.display());
                 editor.baked(job.mirror, job.time);
             }
             Err(e) => {
@@ -445,7 +468,8 @@ fn step(run: &mut BakeRun, editor: &mut Editor, s: &BakeSession) -> bool {
         return false;
     }
     let ceiling = env.def.room.as_ref().map(|r| r.height);
-    let spec = grid_for(track, ceiling);
+    let spec = grid_for(track, ceiling, run.quality);
+    let rays = RAYS * factor(run.quality);
     let (scene, note) = match gather(&s.scene, env) {
         Ok(gathered) => gathered,
         Err(e) => {
@@ -455,14 +479,32 @@ fn step(run: &mut BakeRun, editor: &mut Editor, s: &BakeSession) -> bool {
         }
     };
     info!(
-        "editor: baking {label}: {} probes ({}), {note}",
+        "editor: baking {label}: {} probes ({}), {rays} rays, {note}",
         spec.count(),
         spec.dims
     );
     let progress = Arc::new(AtomicUsize::new(0));
     let counter = progress.clone();
+    // The editor's own GPU device (the bake thread submits between Bevy's frames); the CPU
+    // tracer if it fails (a scene larger than the device binds, no compute).
+    let gpu = s
+        .device
+        .as_ref()
+        .zip(s.queue.as_ref())
+        .map(|(d, q)| (d.wgpu_device().clone(), (***q).clone()));
     run.tracing = Some(Tracing {
-        thread: std::thread::spawn(move || bake(&scene, &spec, RAYS, &counter)),
+        thread: std::thread::spawn(move || {
+            if let Some((device, queue)) = gpu {
+                match bake_gpu(&device, &queue, &scene, &spec, rays, &counter) {
+                    Ok(grid) => return (grid, "GPU"),
+                    Err(e) => {
+                        warn!("editor: {e}; tracing on the CPU");
+                        counter.store(0, Ordering::Relaxed);
+                    }
+                }
+            }
+            (bake(&scene, &spec, rays, &counter), "CPU")
+        }),
         progress,
         probes: spec.count(),
         started: Instant::now(),
@@ -482,9 +524,9 @@ fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 /// `--bake` (`None`: every allowed time, both layouts) or `--bake-time <t>` (that time, the normal
-/// layout): bake once the editing session is up, then quit.
+/// layout), at `--bake-quality`: bake once the editing session is up, then quit.
 #[derive(Resource, Debug)]
-pub(crate) struct BakeOnStart(pub Option<TimeOfDay>);
+pub(crate) struct BakeOnStart(pub Option<TimeOfDay>, pub BakeQuality);
 
 pub(crate) fn bake_on_start(
     mut commands: Commands,
@@ -495,6 +537,6 @@ pub(crate) fn bake_on_start(
     if *state.get() == AppState::InRace && editor.mode == Mode::Editing && editor.session_current()
     {
         commands.remove_resource::<BakeOnStart>();
-        editor.start_bake(order.0.is_none(), order.0, true);
+        editor.start_bake(order.0.is_none(), order.0, order.1, true);
     }
 }

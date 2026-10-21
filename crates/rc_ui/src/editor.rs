@@ -242,6 +242,20 @@ pub enum EditorTab {
     Lighting,
 }
 
+/// How finely the light is baked: `high` halves the probe spacing on every axis (8× the probes)
+/// and doubles the rays per probe — about 16× the bake time, 8× the file.
+#[derive(
+    serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Copy, Default, PartialEq, Eq,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub enum BakeQuality {
+    #[default]
+    Low,
+    High,
+}
+
 /// Session look and test-drive layout (rc_core names: `Noon`, `Rain`).
 #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, Debug, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -377,6 +391,9 @@ pub enum EditorCommand {
     Bake {
         /// Every allowed time, forward and mirrored.
         all: bool,
+        /// Probe spacing and rays (`low` when left out).
+        #[serde(default)]
+        quality: BakeQuality,
     },
     /// Use the session's baked irradiance volume or not (P): compare the lighting with and
     /// without it.

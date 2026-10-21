@@ -18,8 +18,17 @@ use bevy_rapier3d::parry::query::{Ray, RayCast};
 use bevy_rapier3d::parry::shape::{CompositeShapeRef, TriMesh};
 use rc_render::{FACES, IrradianceGrid};
 
+mod gpu;
+
+pub use gpu::bake_gpu;
+
 /// Shadow and bounce rays start this far off the surface (u).
 const EPSILON_U: f32 = 0.02;
+/// Probe rays (and the fill's shadow ray) start this far along their direction (u): a probe
+/// exactly on a surface (the
+/// lattice and the props share round coordinates) would otherwise see it or not by the sign of a
+/// rounded zero — differently on the CPU and the GPU. Now it sees past it.
+const RAY_START_U: f32 = 1e-3;
 /// Rays reach this far (u).
 const FAR_U: f32 = 2000.0;
 /// A probe whose rays meet back faces this often sits inside solid geometry.
@@ -66,6 +75,8 @@ pub struct Scene {
     shadow_mesh: Option<TriMesh>,
     normals: Vec<Vec3>,
     material_of: Vec<u32>,
+    /// Per triangle: casts shadows (the shadow mesh's triangles, for the GPU's single tree).
+    casts: Vec<bool>,
     albedo: Vec<Vec3>,
     double_sided: Vec<bool>,
     /// Directional lights.
@@ -83,6 +94,7 @@ pub struct SceneBuilder {
     shadow_indices: Vec<[u32; 3]>,
     normals: Vec<Vec3>,
     material_of: Vec<u32>,
+    casts: Vec<bool>,
     albedo: Vec<Vec3>,
     double_sided: Vec<bool>,
 }
@@ -111,6 +123,7 @@ impl SceneBuilder {
         }
         self.normals.push(n.normalize());
         self.material_of.push(material);
+        self.casts.push(casts_shadows);
     }
 
     /// Triangles so far.
@@ -141,6 +154,7 @@ impl SceneBuilder {
             shadow_mesh,
             normals: self.normals,
             material_of: self.material_of,
+            casts: self.casts,
             albedo: self.albedo,
             double_sided: self.double_sided,
             suns,
@@ -251,7 +265,8 @@ impl Scene {
         let mut sum = [Vec3::ZERO; 6];
         let mut inside = 0usize;
         for &dir in dirs {
-            let radiance = match self.hit(p, dir, FAR_U) {
+            let origin = p + dir * RAY_START_U;
+            let radiance = match self.hit(origin, dir, FAR_U) {
                 None => self.sky(dir),
                 Some((triangle, t)) => {
                     let material = self.material_of[triangle] as usize;
@@ -260,7 +275,7 @@ impl Scene {
                         n = -n;
                         inside += usize::from(!self.double_sided[material]);
                     }
-                    let at = p + dir * t;
+                    let at = origin + dir * t;
                     let albedo = self.albedo[material];
                     let mut l = albedo * self.direct(at, n) / PI;
                     if let Some(grid) = bounce {
@@ -280,7 +295,7 @@ impl Scene {
         let mut cube = sum.map(|s| s * (4.0 / dirs.len() as f32));
         // The fill's own light, where the probe sees it (E / π per face, like the rest).
         for sun in self.suns.iter().filter(|s| s.in_volume) {
-            if !self.blocked(p, sun.toward, FAR_U) {
+            if !self.blocked(p + sun.toward * RAY_START_U, sun.toward, FAR_U) {
                 for (c, face) in cube.iter_mut().zip(FACES) {
                     *c += sun.irradiance * (face.dot(sun.toward).max(0.0) / PI);
                 }
@@ -332,23 +347,38 @@ pub fn directions(count: usize) -> Vec<Vec3> {
 /// (2 × count when done).
 pub fn bake(scene: &Scene, spec: &GridSpec, rays: usize, progress: &AtomicUsize) -> IrradianceGrid {
     let dirs = directions(rays);
+    bake_with(spec, |grid, bounce| {
+        Ok(pass(scene, grid, &dirs, bounce, progress))
+    })
+    .expect("the CPU pass cannot fail")
+}
+
+/// The two passes around `pass` (one cube per probe of the grid, `None` inside geometry; the
+/// second gets the first's filled volume to bounce): the CPU's or the GPU's.
+fn bake_with(
+    spec: &GridSpec,
+    mut pass: impl FnMut(
+        &IrradianceGrid,
+        Option<&IrradianceGrid>,
+    ) -> Result<Vec<Option<[Vec3; 6]>>, String>,
+) -> Result<IrradianceGrid, String> {
     let mut grid = IrradianceGrid {
         dims: spec.dims,
         min: spec.min,
         max: spec.max,
         cubes: vec![[Vec3::ZERO; 6]; spec.count()],
     };
-    let first = pass(scene, &grid, &dirs, None, progress);
+    let first = pass(&grid, None)?;
     let inside: Vec<bool> = first.iter().map(Option::is_none).collect();
     grid.cubes = fill(&grid, first);
-    let second = pass(scene, &grid, &dirs, Some(&grid), progress);
+    let second = pass(&grid, Some(&grid))?;
     let second: Vec<Option<[Vec3; 6]>> = second
         .into_iter()
         .zip(&inside)
         .map(|(c, &inside)| if inside { None } else { c })
         .collect();
     grid.cubes = fill(&grid, second);
-    grid
+    Ok(grid)
 }
 
 fn pass(

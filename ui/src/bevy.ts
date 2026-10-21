@@ -37,6 +37,7 @@ paused: boolean,
  */
 showroom: boolean, };
 export type ApplySettings = UiSettings;
+export type BakeQuality = "low" | "high";
 export type BindHud = { 
 /**
  * Per-player visuals.
@@ -155,7 +156,11 @@ what: EditorAdd, } | { "kind": "topView" } | { "kind": "focus" } | { "kind": "lo
 /**
  * Every allowed time, forward and mirrored.
  */
-all: boolean, } | { "kind": "toggleProbes" } | { "kind": "gizmo", 
+all: boolean, 
+/**
+ * Probe spacing and rays (`low` when left out).
+ */
+quality: BakeQuality, } | { "kind": "toggleProbes" } | { "kind": "gizmo", 
 /**
  * The mode.
  */

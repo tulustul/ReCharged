@@ -2,7 +2,8 @@
 // add jump / ground area / shortcut, lints) and Lighting (the previewed time's look and the room's
 // lamp grid, probes, bake). The open tab lives in Bevy (`editor.tab`): the Track tab shows the
 // layout handles.
-import type { EditorAdd, EditorStatus, EditorTab } from "../bevy";
+import { useState } from "react";
+import type { BakeQuality, EditorAdd, EditorStatus, EditorTab } from "../bevy";
 import { bevy } from "../bevy";
 import { editorStrings as words } from "../strings/editor";
 import { color, space } from "../theme/tokens";
@@ -58,6 +59,7 @@ function Track({ status }: { status: EditorStatus }) {
 function Lighting({ status }: { status: EditorStatus }) {
   const baking = status.baking !== null;
   const look = status.look;
+  const [quality, setQuality] = useState<BakeQuality>("low");
   return (
     <>
       <text style={ui.text}>{words.previewing(status.options.time)}</text>
@@ -77,8 +79,9 @@ function Lighting({ status }: { status: EditorStatus }) {
       <Header label={words.bakeHeader} />
       <node style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
         <Tool label={words.probes(status.probes)} hot={status.probes === false} onPress={() => command({ kind: "toggleProbes" })} disabled={status.probes === null} />
-        <Tool label={words.bake} onPress={() => command({ kind: "bake", all: false })} disabled={baking} />
-        <Tool label={words.bakeAll} onPress={() => command({ kind: "bake", all: true })} disabled={baking} />
+        <Tool label={words.bakeQuality(quality)} hot={quality === "high"} onPress={() => setQuality(quality === "low" ? "high" : "low")} disabled={baking} />
+        <Tool label={words.bake} onPress={() => command({ kind: "bake", all: false, quality })} disabled={baking} />
+        <Tool label={words.bakeAll} onPress={() => command({ kind: "bake", all: true, quality })} disabled={baking} />
       </node>
       {status.baking !== null && <text style={{ ...ui.dim, color: color.cyan }}>{status.baking}</text>}
       {status.staleBake.length > 0 && <text style={{ ...ui.dim, color: color.warning }}>{words.staleVolumes(status.staleBake)}</text>}
