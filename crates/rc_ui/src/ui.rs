@@ -23,6 +23,9 @@ const CUE_RETRIGGER_SECS: f64 = 0.04;
 /// The FPS meter and the profiler average this many seconds (and update as often).
 const FPS_WINDOW_SECS: f64 = 0.5;
 
+/// The full profiler leaves out diagnostics without a measurement this recent.
+const STALE: std::time::Duration = std::time::Duration::from_secs(1);
+
 /// React → Bevy message `ui.ready`: the React app mounted (again after a full hot reload).
 #[react_message(name = "ui.ready")]
 pub struct UiReady;
@@ -190,7 +193,7 @@ pub struct UiProfiler {
     pub draws: Option<u32>,
     /// Draw calls of the shadow views.
     pub shadow_draws: Option<u32>,
-    /// Every Bevy diagnostic by path; empty unless expanded.
+    /// Every Bevy diagnostic measured in the last second, by path; empty unless expanded.
     pub diagnostics: Vec<UiDiagnostic>,
 }
 
@@ -426,6 +429,8 @@ fn profiler(store: Option<&DiagnosticsStore>, full: bool) -> UiProfiler {
     let mut diagnostics: Vec<UiDiagnostic> = match store {
         Some(store) if full => store
             .iter()
+            // A pass that stopped running (e.g. the environment map filter) keeps its history.
+            .filter(|d| d.measurement().is_some_and(|m| m.time.elapsed() < STALE))
             .filter_map(|d| {
                 let value = d.average().filter(|v| v.is_finite())?;
                 Some(UiDiagnostic {

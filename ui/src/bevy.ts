@@ -1416,7 +1416,7 @@ draws: number | null,
  */
 shadowDraws: number | null, 
 /**
- * Every Bevy diagnostic by path; empty unless expanded.
+ * Every Bevy diagnostic measured in the last second, by path; empty unless expanded.
  */
 diagnostics: Array<UiDiagnostic>, };
 export type UiQuality = "low" | "medium" | "high" | "ultra" | "custom";

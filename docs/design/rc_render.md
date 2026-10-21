@@ -118,6 +118,11 @@ physical sky fill (`env_light` 15–32 k) so shade under trees, fences and parke
   bind-group preparation panics every frame in Bevy 0.20 here. Bevy re-filters a
   `GeneratedEnvironmentMapLight` every frame, so it lives on one probe entity and every camera
   shares the filtered maps (`EnvironmentMapLight` copies; split screen used to filter per view).
+  The map is static between `EnvMap` rebuilds, so the probe keeps the component only until the
+  render world reports that source filtered (all five generator pipelines compiled, bind groups
+  prepared), then drops it; the targets keep their contents and a new source is filtered once more
+  into the same targets. Toybox Twister `--bench` (Iris Xe, 5 alternating pairs): p50 67.8–69.6 →
+  64.7–66.1 ms.
 - **Indoor:** key = sun through windows/skylights (the room shell's ceiling casts no shadows, walls
   do), fill = soft sky bounce, a generated room cubemap (walls/floor/ceiling, window band toward the
   key, lamp spots at night) for IBL, ceiling lamp grid over `Track::bounds()` at the env's

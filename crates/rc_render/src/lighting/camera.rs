@@ -2,17 +2,30 @@
 //! fog, ambient light, image-based lighting from the generated environment map (room or sky),
 //! the visible sky (Bevy's atmosphere, outdoors) with the star field at night, bloom strength.
 //!
+//! The environment map is static between `EnvMap` rebuilds, so it is filtered once per source:
+//! Bevy re-filters a `GeneratedEnvironmentMapLight` every frame (≈ 3–11 ms of GPU on the Iris Xe),
+//! so the probe keeps it only until the render world reports that source filtered.
+//!
 //! Outdoor IBL deliberately avoids `AtmosphereEnvironmentMapLight`: in Bevy 0.20 its probe
 //! bind-group preparation panics every frame here (`atmosphere_transforms.binding().unwrap()`),
 //! so the sky's lighting comes from `sky::sky_radiance` through the same generated-map path as
 //! indoor rooms.
 
+use std::sync::{Arc, Mutex};
+
 use bevy::camera::Exposure;
 use bevy::light::Skybox;
+use bevy::pbr::generate::{
+    GeneratorBindGroups, GeneratorPipelines, RenderEnvironmentMap, filtering_system,
+};
 use bevy::pbr::{AtmosphereSettings, DistanceFog, FogFalloff};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
+use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_resource::PipelineCache;
+use bevy::render::texture::GpuImage;
 use bevy::render::view::ColorGrading;
+use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderSystems};
 use rc_core::prelude::*;
 
 use super::ActiveEnvironment;
@@ -32,11 +45,26 @@ pub(super) fn build(app: &mut App) {
             .in_set(VisualSet)
             .after(LookSet),
     )
+    .init_resource::<FilteredMap>()
+    .add_systems(Update, stop_filtering.in_set(VisualSet))
     // The star field is made for an outdoor night session and dropped with it (it is a large
     // cubemap, and the menu must not keep session assets: the soak census).
     .add_systems(OnEnter(AppState::Unloading), |mut commands: Commands| {
         commands.remove_resource::<StarMap>();
     });
+    let filtered = app.world().resource::<FilteredMap>().clone();
+    if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
+        render_app
+            .insert_resource(filtered)
+            .init_resource::<ExtractedSource>()
+            .add_systems(ExtractSchedule, extract_source)
+            .add_systems(
+                Render,
+                report_filtered
+                    .after(filtering_system)
+                    .before(RenderSystems::Render),
+            );
+    }
 }
 
 /// Which environment's static parts (sky, filtered IBL maps, stars) a camera carries.
@@ -47,10 +75,20 @@ struct CameraEnv {
     maps: Option<(AssetId<Image>, AssetId<Image>)>,
 }
 
-/// The one entity Bevy filters the environment map on (every frame); cameras share its filtered
-/// maps instead of each filtering a copy (four player views did the work four times).
+/// The one entity Bevy filters the environment map on; cameras share its filtered maps instead of
+/// each filtering a copy (four player views did the work four times). Holds the source map, which
+/// it keeps a `GeneratedEnvironmentMapLight` for until that source is filtered.
 #[derive(Component, Debug)]
-struct EnvProbe;
+struct EnvProbe(AssetId<Image>);
+
+/// The source map the render world filtered last (render world → main world).
+#[derive(Resource, Debug, Clone, Default)]
+struct FilteredMap(Arc<Mutex<Option<AssetId<Image>>>>);
+
+/// Render world: the probe's source this frame, if Bevy's extraction (which needs the source and
+/// both filtered targets on the GPU) gave the probe a current `RenderEnvironmentMap`.
+#[derive(Resource, Debug, Default)]
+struct ExtractedSource(Option<AssetId<Image>>);
 
 /// The star field of the current outdoor night session.
 #[derive(Resource, Debug)]
@@ -70,32 +108,28 @@ fn apply_environment(
     env_map: Option<Res<EnvMap>>,
     stars: Option<Res<StarMap>>,
     mut images: ResMut<Assets<Image>>,
-    probes: Query<
-        (
-            Entity,
-            &GeneratedEnvironmentMapLight,
-            Option<&EnvironmentMapLight>,
-        ),
-        With<EnvProbe>,
-    >,
+    probes: Query<(Entity, &EnvProbe, Option<&EnvironmentMapLight>)>,
     cameras: Query<(Entity, Option<&CameraEnv>, Has<ForceOutdoor>), With<QualityCamera>>,
 ) {
     let Some(env) = env else {
         return;
     };
     let map = env_map.filter(|m| m.env == env.id).map(|m| m.image.clone());
-    // Point the probe at the current map (its filtered targets are refilled every frame).
+    // Point the probe at the current map: filtered into the same targets once ([`stop_filtering`]).
     let probe = probes.single().ok();
     if let Some(map) = &map {
-        let source = GeneratedEnvironmentMapLight {
-            environment_map: map.clone(),
-            ..default()
-        };
+        let source = (
+            EnvProbe(map.id()),
+            GeneratedEnvironmentMapLight {
+                environment_map: map.clone(),
+                ..default()
+            },
+        );
         match probe {
             None => {
-                commands.spawn((Name::new("Environment map probe"), EnvProbe, source));
+                commands.spawn((Name::new("Environment map probe"), source));
             }
-            Some((entity, current, _)) if current.environment_map != *map => {
+            Some((entity, current, _)) if current.0 != map.id() => {
                 commands.entity(entity).insert(source);
             }
             Some(_) => {}
@@ -141,6 +175,72 @@ fn apply_environment(
             });
         }
         commands.entity(entity).insert(wanted.clone());
+    }
+}
+
+/// Ends the per-frame filtering once the render world has filtered the probe's source; the
+/// filtered targets keep their contents (Bevy drops the render-side map with the component).
+fn stop_filtering(
+    mut commands: Commands,
+    filtered: Res<FilteredMap>,
+    probes: Query<(Entity, &EnvProbe), With<GeneratedEnvironmentMapLight>>,
+) {
+    let Some(done) = filtered.0.lock().ok().and_then(|f| *f) else {
+        return;
+    };
+    for (entity, probe) in &probes {
+        if probe.0 == done {
+            debug!("environment map filtered; filtering stops");
+            commands
+                .entity(entity)
+                .remove::<GeneratedEnvironmentMapLight>();
+        }
+    }
+}
+
+fn extract_source(
+    probes: Extract<Query<(&GeneratedEnvironmentMapLight, &EnvironmentMapLight), With<EnvProbe>>>,
+    images: Res<RenderAssets<GpuImage>>,
+    mut source: ResMut<ExtractedSource>,
+) {
+    source.0 = probes
+        .iter()
+        .find(|(generated, light)| {
+            [
+                &generated.environment_map,
+                &light.diffuse_map,
+                &light.specular_map,
+            ]
+            .into_iter()
+            .all(|image| images.get(image).is_some())
+        })
+        .map(|(generated, _)| generated.environment_map.id());
+}
+
+/// Bevy's filter passes skip silently until their pipelines compile (asynchronously in human
+/// runs); with all five ready and the probe's bind groups prepared, this frame filtered it.
+fn report_filtered(
+    source: Res<ExtractedSource>,
+    pipelines: Option<Res<GeneratorPipelines>>,
+    cache: Res<PipelineCache>,
+    probes: Query<(), (With<GeneratorBindGroups>, With<RenderEnvironmentMap>)>,
+    filtered: Res<FilteredMap>,
+) {
+    let ready = pipelines.is_some_and(|p| {
+        [
+            p.downsample_first,
+            p.downsample_second,
+            p.copy,
+            p.radiance,
+            p.irradiance,
+        ]
+        .into_iter()
+        .all(|id| cache.get_compute_pipeline(id).is_some())
+    });
+    if let (Some(id), true, false) = (source.0, ready, probes.is_empty())
+        && let Ok(mut done) = filtered.0.lock()
+    {
+        *done = Some(id);
     }
 }
 
