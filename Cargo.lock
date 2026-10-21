@@ -5954,6 +5954,7 @@ dependencies = [
  "rc_vehicle",
  "rc_vfx",
  "rc_weather",
+ "ron",
  "serde_json",
 ]
 

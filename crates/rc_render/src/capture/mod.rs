@@ -3,7 +3,9 @@
 //!   `assets/ui/tracks/toy_town.png`, 1280×720) from an elevated three-quarter view, forward
 //!   layout only;
 //! - `--track-tour <track>`: a screenshot every 25 u along the racing line into
-//!   `<user data>/captures/tour_<track>_<variant>/NNN.png`.
+//!   `<user data>/captures/tour_<track>_<variant>/NNN.png`;
+//! - `--camera <x,y,z,tx,ty,tz>`: the `--screenshot` from that eye looking at that target, after
+//!   `--screenshot-at` seconds (default [`SETTLE_SECS`]).
 //!
 //! A capture camera (a `QualityCamera`, so it renders exactly like a game view) renders into a
 //! 1280×720 image (no HUD, independent of the window size); the app quits once the last image is
@@ -227,7 +229,10 @@ fn plan_captures(
     let (Some(automation), Some(track), Some(paths)) = (automation, track, paths) else {
         return;
     };
-    if existing.is_some() || !(automation.capture_previews || automation.track_tour.is_some()) {
+    let view = automation.camera.zip(automation.screenshot.as_ref());
+    if existing.is_some()
+        || !(automation.capture_previews || automation.track_tour.is_some() || view.is_some())
+    {
         return;
     }
     let variant = track.variant().clone();
@@ -297,9 +302,17 @@ fn plan_captures(
             path: dir.join(format!("{i:03}.png")),
         }));
     }
+    if let Some(((eye, target), plan)) = view {
+        shots.push(Shot {
+            pose: Transform::from_translation(eye).looking_at(target, Vec3::Y),
+            fov_deg: TOUR_FOV_DEG,
+            path: plan.path.clone(),
+        });
+    }
     if shots.is_empty() {
         return;
     }
+    let settle = view.and_then(|(_, plan)| plan.at).unwrap_or(SETTLE_SECS);
     info!("capture: {} shots planned", shots.len());
     let image = images.add(Image::new_target_texture(
         CAPTURE_SIZE.x,
@@ -326,7 +339,7 @@ fn plan_captures(
         image,
         next: 0,
         posed: true,
-        wait: SETTLE_SECS,
+        wait: settle,
         saved: 0,
         frames: Vec::new(),
     });

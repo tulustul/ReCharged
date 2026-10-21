@@ -150,9 +150,20 @@ pub fn game(config: AutomationConfig, paths: UserPaths, bundle: PathBuf) -> App 
         rc_ui::GameUiPlugin,
         automation::AutomationPlugin,
     ));
-    if app.world().resource::<AutomationConfig>().bench.is_some() {
-        app.insert_resource(bench::settings())
-            .add_plugins(bench::plugin);
+    let automation = app.world().resource::<AutomationConfig>();
+    let (bench, graphics) = (automation.bench.is_some(), automation.graphics.clone());
+    // `--bench` and `--graphics` start from the default settings, not the profile's: rc_game's
+    // boot keeps a `Settings` inserted beforehand (and never saves it).
+    if bench || graphics.is_some() {
+        let mut settings = Settings::default();
+        if let Some(graphics) = graphics {
+            settings.graphics = graphics;
+        }
+        if bench {
+            settings = bench::settings(settings);
+            app.add_plugins(bench::plugin);
+        }
+        app.insert_resource(settings);
     }
     #[cfg(feature = "debug-physics")]
     app.add_plugins(bevy_rapier3d::prelude::RapierDebugRenderPlugin::default());

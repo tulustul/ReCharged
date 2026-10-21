@@ -72,7 +72,8 @@ fn take_screenshots(
     mut taken: Local<u32>,
     mut commands: Commands,
 ) {
-    let Some(plan) = &cfg.screenshot else {
+    // With `--camera`, rc_render's capture camera takes the shot.
+    let Some(plan) = cfg.screenshot.as_ref().filter(|_| cfg.camera.is_none()) else {
         return;
     };
     let first = plan.at.unwrap_or(DEFAULT_SCREENSHOT_SECS);

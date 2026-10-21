@@ -684,6 +684,8 @@ file is loaded and validated by a test of its owning crate.
 | `--bench <track>_<n>p` | p50/p95/p99 frame times as JSON (1920×1080 physical, vsync off; implies `--unlock-all`) |
 | `--calibrate-medals` | Elite AI in a Phantom, items & catch-up off, on every layout → `medals.ron` |
 | `--capture-previews`, `--track-tour <track>` | preview images; screenshots along the racing line |
+| `--camera <x,y,z,tx,ty,tz>` (with `--quick-race`, `--screenshot`) | the screenshot from the capture camera at that eye/target |
+| `--graphics <RON>` | `GraphicsSettings` fields over the defaults for this run (never saved) |
 | `--export-bindings <path>` | write the TS bindings and exit (also `cargo run -p rc_ui --example export_bindings`) |
 
 Every automated run uses vsync off (`AutoNoVsync`) and continuous winit updates, so captures don't

@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use bevy::math::Vec3;
 use rc_core::prelude::*;
 
 /// Printed for `--help` and after a usage error.
@@ -31,6 +32,10 @@ Usage: recharged [flags]
   --track-tour <track>     screenshots along the racing line (implies --quick-race <track>)
   --export-bindings <path> write the TypeScript bindings and exit
   --window <W>x<H>         initial window size (overrides the settings' window size; --bench: 1920x1080)
+  --camera <x,y,z,tx,ty,tz>  with --quick-race and --screenshot: shoot from this eye looking at this
+                           target (1280x720, no HUD; --screenshot-at = settle time, default 4 s), then quit
+  --graphics <RON>         graphics settings over the defaults, e.g. \"(preset: Low, shadows: Off,
+                           bloom: false)\" (fields of GraphicsSettings; the preset expands nothing)
   -h, --help               this text";
 
 /// Why the command line was rejected.
@@ -61,7 +66,7 @@ const RACE_OPTIONS: [&str; 10] = [
 ];
 const SHOT_OPTIONS: [&str; 2] = ["--screenshot-at", "--screenshot-every"];
 /// Flags that need the window; headless runs reject them.
-const WINDOWED: [&str; 8] = [
+const WINDOWED: [&str; 9] = [
     "--input-script",
     "--exit-after",
     "--screenshot",
@@ -70,6 +75,7 @@ const WINDOWED: [&str; 8] = [
     "--capture-previews",
     "--track-tour",
     "--window",
+    "--camera",
 ];
 /// `--bench` races this seed unless `--seed` says otherwise (the same field every run).
 const BENCH_SEED: u64 = 1;
@@ -130,6 +136,8 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
             "--track-tour" => cfg.track_tour = Some(TrackId::new(value()?)),
             "--export-bindings" => cfg.export_bindings = Some(value()?.into()),
             "--window" => cfg.window = Some(window_size(&value()?)?),
+            "--camera" => cfg.camera = Some(camera(&value()?)?),
+            "--graphics" => cfg.graphics = Some(graphics(&value()?)?),
             _ => return Err(invalid(format!("unknown flag `{arg}`"))),
         }
         seen.push(flag);
@@ -197,7 +205,57 @@ pub fn parse<S: AsRef<str>>(args: &[S]) -> Result<AutomationConfig, CliError> {
         }
         None => {}
     }
+    if cfg.camera.is_some() {
+        if cfg.quick_race.is_none() || cfg.screenshot.is_none() {
+            return Err(invalid(
+                "--camera needs --quick-race <track> and --screenshot <png>",
+            ));
+        }
+        if let Some(other) = first_of(&["--screenshot-every", "--track-tour", "--capture-previews"])
+        {
+            return Err(invalid(format!("--camera cannot be combined with {other}")));
+        }
+    }
     Ok(cfg)
+}
+
+/// `x,y,z,tx,ty,tz` → (eye, target).
+fn camera(text: &str) -> Result<(Vec3, Vec3), CliError> {
+    let n: Vec<f32> = text
+        .split(',')
+        .map(|v| v.trim().parse::<f32>())
+        .collect::<Result<_, _>>()
+        .unwrap_or_default();
+    match n[..] {
+        [x, y, z, tx, ty, tz] if n.iter().all(|v| v.is_finite()) => {
+            Ok((Vec3::new(x, y, z), Vec3::new(tx, ty, tz)))
+        }
+        _ => Err(invalid(format!(
+            "--camera expects x,y,z,tx,ty,tz (eye, then target), got `{text}`"
+        ))),
+    }
+}
+
+/// `(preset: Low, bloom: false)` → those fields over the default graphics settings. Unknown fields
+/// are rejected (serde would ignore them).
+fn graphics(text: &str) -> Result<GraphicsSettings, CliError> {
+    let bad = |why: String| {
+        invalid(format!(
+            "--graphics: {why} (expected e.g. \"(preset: Low, shadows: Off)\")"
+        ))
+    };
+    let given: ron::Value = ron::from_str(text).map_err(|e| bad(e.to_string()))?;
+    let parsed: GraphicsSettings = ron::from_str(text).map_err(|e| bad(e.to_string()))?;
+    let known = ron::to_string(&parsed)
+        .ok()
+        .and_then(|t| ron::from_str::<ron::Value>(&t).ok());
+    if let (ron::Value::Map(given), Some(ron::Value::Map(known))) = (&given, &known)
+        && let Some(field) = given.keys().find(|k| !known.keys().any(|f| f == *k))
+    {
+        let field = ron::to_string(field).unwrap_or_default();
+        return Err(bad(format!("unknown field {field}")));
+    }
+    Ok(parsed)
 }
 
 /// `toy_town_2p` → (`toy_town`, 2).
@@ -458,6 +516,37 @@ mod tests {
         assert!(
             err(&["--bench", "toy_town_1p", "--quick-race", "x"]).contains("drop --quick-race")
         );
+    }
+
+    #[test]
+    fn camera_shots_and_graphics_overrides() {
+        let shot = ["--quick-race", "toy_town", "--screenshot", "s.png"];
+        let cfg = ok(&[&shot[..], &["--camera", "1,2.5,-3, 0,0,0"]].concat());
+        assert_eq!(cfg.camera, Some((Vec3::new(1.0, 2.5, -3.0), Vec3::ZERO)));
+        assert!(err(&["--camera", "1,2,3,4,5,6"]).contains("needs --quick-race"));
+        assert!(err(&[&shot[..], &["--camera", "1,2,3"]].concat()).contains("x,y,z,tx,ty,tz"));
+        let every = [
+            &shot[..],
+            &["--camera", "0,1,0,1,0,0", "--screenshot-every", "1"],
+        ]
+        .concat();
+        assert!(err(&every).contains("cannot be combined with --screenshot-every"));
+
+        let g = ok(&["--graphics", "(preset: Low, shadows: Off, bloom: false)"])
+            .graphics
+            .expect("graphics");
+        assert_eq!(
+            (g.preset, g.shadows, g.bloom, g.anti_aliasing),
+            (
+                QualityPreset::Low,
+                ShadowQuality::Off,
+                false,
+                AntiAliasing::Taa
+            ),
+            "unnamed fields keep their defaults"
+        );
+        assert!(err(&["--graphics", "(shadow: Off)"]).contains("unknown field"));
+        assert!(err(&["--graphics", "(shadows: Ultra)"]).contains("--graphics"));
     }
 
     #[test]

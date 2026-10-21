@@ -8,6 +8,7 @@ use bevy::prelude::*;
 
 use crate::catalog::{CarId, CupId, PlayerSlot, TrackId};
 use crate::race::HintKind;
+use crate::settings::GraphicsSettings;
 use crate::weather::{TimeOfDay, WeatherChoice};
 
 /// The loading gate. Loaders register a key at build time; rc_game is the only runtime writer: it
@@ -210,6 +211,11 @@ pub struct AutomationConfig {
     /// `--window <W>x<H>`: initial window size in logical px; overrides the window size from
     /// `Settings` for this run (screenshots at fixed resolutions).
     pub window: Option<(u32, u32)>,
+    /// `--camera <x,y,z,tx,ty,tz>`: `--screenshot` is taken by rc_render's capture camera (1280×720,
+    /// no HUD) standing at the eye and looking at the target, instead of from the window.
+    pub camera: Option<(Vec3, Vec3)>,
+    /// `--graphics <RON>`: these graphics settings over the defaults for this run (never saved).
+    pub graphics: Option<GraphicsSettings>,
 }
 
 impl AutomationConfig {

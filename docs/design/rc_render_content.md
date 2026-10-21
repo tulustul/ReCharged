@@ -161,6 +161,9 @@ The camera renders its first pose for 4 s (pipelines compile, assets settle), ho
   and item rows: ≥ 3 u past a row and ≥ 12 u before the next, so the eye is never inside the Volt
   Cubes nor right behind them — B1), eye 1.6 u above it, looking 8 u ahead along it →
   `<user data>/captures/tour_<track>_<variant>/NNN.png`. Pass the same track to `--quick-race`.
+- `--camera <x,y,z,tx,ty,tz>` with `--screenshot <png>`: one shot from that eye looking at that
+  target (the game's 90° horizontal FOV), after `--screenshot-at` seconds (default 4) instead of
+  the window capture. Combine with `--graphics` to compare quality settings.
 
 ## Verify
 - `cargo test -p rc_render` — shapes (closed, outward, extents, UVs, posing), barrier blocks vs

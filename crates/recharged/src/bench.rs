@@ -17,10 +17,10 @@ const MEASURE_SECS: f32 = 20.0;
 /// The race must reach GO this long after startup (s).
 const START_TIMEOUT_SECS: f32 = 180.0;
 
-/// Default settings (vsync off): the same quality on every machine whatever the profile's
-/// settings. Inserted before rc_game's boot, which then keeps it (and never saves it).
-pub fn settings() -> Settings {
-    let mut settings = Settings::default();
+/// `settings` (the defaults, or `--graphics` over them) with vsync off: the same quality on every
+/// machine whatever the profile's settings. Inserted before rc_game's boot, which then keeps it
+/// (and never saves it).
+pub fn settings(mut settings: Settings) -> Settings {
     settings.graphics.vsync = false;
     settings
 }
@@ -120,6 +120,6 @@ mod tests {
         assert_eq!(r["frame_ms"]["max"], 100.0);
         assert_eq!(r["fps"], 19.8, "100 frames in 5.05 s");
         assert_eq!(r["secs"], 5.05);
-        assert!(!settings().graphics.vsync);
+        assert!(!settings(Settings::default()).graphics.vsync);
     }
 }

@@ -45,7 +45,15 @@ cargo run -p rc_editor -- <track> [--user-data-dir <dir>] # track editor
   --screenshot-at <s> [--screenshot-every <s>]`: in-race shots.
 - `--track-tour <track>`: a screenshot every 25 u along the racing line, written to
   `<user-data-dir>/captures/`.
-- A specific spot: run the editor and point its camera through the UI script, e.g.
+- A specific spot in a race: `--quick-race <track> [--time t] [--weather w] --camera
+  x,y,z,tx,ty,tz --screenshot <png> [--screenshot-at <settle s, default 4>]` renders one 1280×720
+  shot (no HUD) from eye (x,y,z) looking at (tx,ty,tz), then quits. Indoor rooms have a ceiling
+  (`room.height` in the track's `environment.ron`): keep the eye below it.
+- Graphics overrides (any run): `--graphics "(preset: Low, shadows: Off, anti_aliasing: Fxaa,
+  ambient_occlusion: false, bloom: false)"` (RON fields of `GraphicsSettings`, over the
+  defaults rather than the profile's settings; never saved). rc_render reads the individual
+  options, so a preset alone only changes the SSAO/SMAA/shadow-map detail: list the options too.
+- A specific spot in the editor: point its camera through the UI script, e.g.
   `RECHARGED_UI_SCRIPT="3 editor lookAt x y z tx ty tz" cargo run -p rc_editor -- <track>
   --window 1280x720 --screenshot <png> --screenshot-at 14 --exit-after 15`. Other `editor …`
   verbs are listed in `docs/design/rc_editor.md`.
